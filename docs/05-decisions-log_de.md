@@ -3440,6 +3440,15 @@ Annahme und keine Lücke zum Thema, und die gespeicherte Unterschrift steht wör
 `Orders:TellOnce = On`. Verfehlt der Schreiber das trotz Profil: eine Reparatur am Profilblock, ein Auftrag neu, höchstens zwei Runden;
 danach bleibt `WithoutPromise`.
 
+**Zusatz (2026-11-27): Abnahme bestanden.** Gemessen mit zwei Testkonten und frei erfundenen Aufträgen derselben Textsorte, ohne
+Faktenprüfung: Nach dem Speichern hatte der zweite Auftrag von Konto A keine Lücke und keine Rückfrage zum gespeicherten Thema, die
+gespeicherte Unterschrift stand wörtlich im Text, und Konto B sah nichts von Konto A (Profil leer, keine fremden Aufträge, fremdes
+Ergebnis abgewiesen). **Folge:** `Orders:TellOnce = On` in `appsettings.json` (Code-Standard bleibt `WithoutPromise`), eigener
+Commit. Die Überschrift ist enger gefasst: „Tell Atelier once – your next requests will not leave this open again“ statt „… it will
+not leave this open again“, weil die Zusage für das Lesen späterer Aufträge gilt; der gezeigte Text und jede Änderung daran behalten
+die Angaben, mit denen er entstand. Erklärseite und Handbuch sagen es ebenso. **Rückweg:** `Orders__TellOnce=WithoutPromise`
+(Angebot ohne Zusage) oder `Orders__TellOnce=Off`.
+
 ## D-084 — Startseite sagt, was Atelier für alle tut (2026-11-26)
 
 - **Inhalt:** Die Startseite (`/`) beschreibt jetzt den Standardweg statt der Werkstatt-Schleife: Auftrag in eigenen Worten

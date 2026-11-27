@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](12-user-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-27 (Nachschlagen im Web für alle eingeschaltet, Zusatz zu D-074; davor „Tell Atelier once“, D-083; davor nach Prüfung: Websuche nur auf dem Standardweg, Aufbewahrung, Wortwahl)*
+*Letzte Aktualisierung: 2026-11-27 („Tell Atelier once“ mit seiner Zusage, Zusatz zu D-083; Nachschlagen im Web für alle eingeschaltet, Zusatz zu D-074; davor „Tell Atelier once“, D-083; davor nach Prüfung: Websuche nur auf dem Standardweg, Aufbewahrung, Wortwahl)*
 
 Dieser Leitfaden ist für alle, die Atelier im Browser nutzen. Technisches Wissen ist nicht nötig. Die Seite **How it works**
 (`/how-it-works`, auch ohne Anmeldung erreichbar) zeigt dasselbe in kurz, zusammen mit den Funktionen, die gerade für dich
@@ -109,8 +109,9 @@ nicht wiederholen. Nur du kannst es ändern.
 **Einmal sagen („Tell Atelier once“).** Musste ein Text deinen Namen, deinen Gruß, die Anrede der Leser oder deine Sprache raten
 oder offen lassen, und steht dazu noch nichts unter About me, zeigt das Ergebnis dafür ein Feld mit **Save**. Was du dort
 speicherst, kommt in About me; wurde das Feld inzwischen unter About me ausgefüllt, wird nichts überschrieben, und das Ergebnis sagt
-„Already saved under About me“. Atelier nutzt es für deine nächsten Aufträge: Der Schreiber
-bekommt es bei jedem neuen Auftrag. Der Text, den du gerade siehst, behält die Angaben, mit denen er entstand, und ebenso
+„Already saved under About me“. Ab deinem nächsten Auftrag nimmt Atelier es aus About me, statt es zu raten oder danach zu
+fragen, und der Schreiber bekommt es bei jedem neuen Auftrag (daher die Überschrift „Tell Atelier once – your next requests will not
+leave this open again“, sinngemäß: Deine nächsten Aufträge lassen das nicht mehr offen). Der Text, den du gerade siehst, behält die Angaben, mit denen er entstand, und ebenso
 jede Änderung, um die du mit „Change something“ bittest – auch eine Angabe, die du inzwischen unter About me gelöscht hast. Soll der
 neue Wert in diesen Text, schreib ihn in deine Änderung. Das Ergebnis sagt außerdem, was der Schreiber mit diesem Auftrag aus About
 me bekam („With this request the writer got from About me: …“). Ändern oder löschen kannst du es unter About me; das gilt für deine

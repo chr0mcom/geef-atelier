@@ -2,7 +2,7 @@
 
 *[Deutsch](12-user-guide_de.md) · **English***
 
-*Last updated: 2026-11-27 (looking things up on the web switched on for everyone, addendum to D-074; before that Tell Atelier once, D-083; before that after review: web search only on the standard way, storage, wording)*
+*Last updated: 2026-11-27 (Tell Atelier once with its promise, addendum to D-083; looking things up on the web switched on for everyone, addendum to D-074; before that Tell Atelier once, D-083; before that after review: web search only on the standard way, storage, wording)*
 
 This guide is for everyone who uses Atelier in the web browser. You need no technical knowledge. The page **How it works**
 (`/how-it-works`, also open without signing in) shows the same in short, with the features that are switched on for you right
@@ -104,7 +104,8 @@ Only you can change it.
 **Tell Atelier once.** When a text had to guess or leave open your name, how you sign off, how readers are addressed or your
 language, and About me has nothing on it yet, the result shows a field for it with **Save**. What you save there goes into About me;
 if that field was filled under About me in the meantime, nothing is overwritten and the result says “Already saved under About me”.
-Atelier uses it for your next requests: the writer gets it with every new request. The text you are looking at keeps the details it was written with, and so does every change you ask for to it with
+From your next request on, Atelier takes it from About me instead of guessing or asking, and the writer gets it with every new
+request (hence the heading “Tell Atelier once – your next requests will not leave this open again”). The text you are looking at keeps the details it was written with, and so does every change you ask for to it with
 “Change something” – also a detail you have deleted under About me since then. To have the new value in this text, write it into
 your change. The result also says what the writer got from About me with that request (“With this request the writer got from
 About me: …”). You change or delete it under About me; that counts for your next requests. Whether the writer really uses it, for

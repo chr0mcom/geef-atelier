@@ -384,7 +384,7 @@ public sealed class HowItWorksPageTests : TestContext
     }
 
     [Fact]
-    public void As_shipped_the_offer_to_save_missing_details_is_described_without_the_promise_until_the_acceptance()
+    public void As_shipped_the_offer_to_save_missing_details_promises_it_for_the_next_requests_only()
     {
         this.AddTestAuthorization();
         UseShippedSettings();
@@ -392,8 +392,7 @@ public sealed class HowItWorksPageTests : TestContext
         var line = Render().Find("[data-testid='hiw-about-tell-once']").TextContent;
         Assert.Equal(TellOnceMode.WithoutPromise, new OrderOptions().TellOnce);
 
-        Assert.DoesNotContain("instead of guessing or asking", line, StringComparison.Ordinal);
-        Assert.Contains("Atelier uses it for your next requests: the writer gets it with every new request.", line, StringComparison.Ordinal);
+        Assert.Contains("From your next request on, Atelier takes it from About me instead of guessing or asking, and the writer gets it with every new request.", line, StringComparison.Ordinal);
         Assert.Contains("A change of a text you already have keeps the details it was written with", line, StringComparison.Ordinal);
         Assert.Contains("as long as that field is still empty", line, StringComparison.Ordinal);
     }

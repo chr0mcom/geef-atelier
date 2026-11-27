@@ -2,7 +2,7 @@
 
 *[Deutsch](14-admin-guide_de.md) · **English***
 
-*Last updated: 2026-11-27 (`Research:Mode = On`, addendum to D-074; before that `Orders:TellOnce`, D-083; before that after review: web search outside the standard way, OAuth clients)*
+*Last updated: 2026-11-27 (`Orders:TellOnce = On`, addendum to D-083; `Research:Mode = On`, addendum to D-074; before that `Orders:TellOnce`, D-083; before that after review: web search outside the standard way, OAuth clients)*
 
 This guide is for administrators: people who add accounts, decide which features are on and look after the older workshop. How
 to install and host Atelier is in the [developer and host guide](15-developer-guide.md) and the [README](../README.md).
@@ -38,7 +38,7 @@ feature on.
 | Workshop menu only for administrators | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
 | Older tools for AI assistants | `Mcp:LegacyTools` | `true` | `true` (D-075) | – |
 | Learning loop of the older way | `Learning:Enabled` | `false` | `false` (D-067) | – |
-| Offer to save missing details under About me (“Tell Atelier once”) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `WithoutPromise` (D-083; `On` after the acceptance) | – |
+| Offer to save missing details under About me (“Tell Atelier once”) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `On` (addendum to D-083, acceptance passed) | – |
 
 What the values mean:
 
@@ -58,11 +58,12 @@ What the values mean:
 - **Tell Atelier once:** shows the owner of a result one field per topic (sender, signature, form of address, language) that the
   reading of the request had to assume or leave open while About me has nothing on it, and the line “With this request the writer got
   from About me: …”; AI assistants get the same as `aboutMeMissing`/`fromAboutMe` and can save these four fields with `profile`. Saving
-  fills only fields that are still empty, in one locked step, and never overwrites. `WithoutPromise` (shipped) uses the heading “Save it
-  under About me for your next texts”; `On` uses “Tell Atelier once – it will not leave this open again” and is meant only after the
-  acceptance on the real system has shown that the writer uses what was saved. `Off` shows none of it, and `profile` is offered read
+  fills only fields that are still empty, in one locked step, and never overwrites. `On` (shipped since the acceptance passed) uses
+  the heading “Tell Atelier once – your next requests will not leave this open again”: the promise covers the reading of later
+  requests; a change of an existing text keeps the details it was written with. `WithoutPromise` (the code default) uses “Save it
+  under About me for your next texts”. `Off` shows none of it, and `profile` is offered read
   only with its earlier description. Administrators never see it on someone else's order, and saving goes only into the own About me
-  (D-083). After a passed acceptance: `Orders__TellOnce=On`; way back: `Orders__TellOnce=WithoutPromise` or `Orders__TellOnce=Off`.
+  (D-083). Way back: `Orders__TellOnce=WithoutPromise` (offer without the promise) or `Orders__TellOnce=Off`.
 
 **How to set a switch.** The settings are read at start. Set them as environment variables of the web service, with `__` in place
 of `:` (for example `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` passes variables one by one,

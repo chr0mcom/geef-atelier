@@ -56,7 +56,7 @@ public sealed class OrderAboutMeTests : TestContext
         var cut = RenderPage([GapTopic.Sender, GapTopic.Signature]);
 
         Assert.Equal(AboutMeLines.TellOnce, cut.Find("[data-testid='order-tell-once-heading']").TextContent);
-        Assert.Equal("Tell Atelier once – it will not leave this open again", AboutMeLines.TellOnce);
+        Assert.Equal("Tell Atelier once – your next requests will not leave this open again", AboutMeLines.TellOnce);
         Assert.Equal(["sender", "signature"], cut.FindAll("[data-testid='order-tell-once-row']").Select(r => r.GetAttribute("data-topic")));
         Assert.Equal(["Your name", "How you sign off"], cut.FindAll("[data-testid='order-tell-once-row'] label > span").Select(s => s.TextContent));
         Assert.All(cut.FindAll("[data-testid='order-tell-once-save']"), b => Assert.True(b.HasAttribute("disabled")));

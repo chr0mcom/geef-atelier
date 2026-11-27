@@ -27,6 +27,20 @@ public sealed class ShippedIntakeSettingsTests
         Assert.Equal(BriefMode.AppendAnswers, intake.BriefMode);
     }
 
+    [Fact]
+    public void The_shipped_settings_offer_tell_atelier_once_with_its_promise_while_the_code_default_stays_without_it()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(Path.Combine(RepoRoot(), "src", "Geef.Atelier.Web", "appsettings.json"), optional: false, reloadOnChange: false)
+            .Build();
+
+        var orders = configuration.GetSection("Orders").Get<OrderOptions>() ?? new OrderOptions();
+
+        Assert.Equal("On", configuration["Orders:TellOnce"]);
+        Assert.Equal(TellOnceMode.On, orders.TellOnce);
+        Assert.Equal(TellOnceMode.WithoutPromise, new OrderOptions().TellOnce);
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

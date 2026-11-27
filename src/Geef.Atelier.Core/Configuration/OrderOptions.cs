@@ -50,8 +50,9 @@ public sealed class OrderOptions
     public int MaxVersionsPerOrder { get; set; } = 10;
 
     /// <summary>
-    /// Whether a result offers to save what About me lacks and shows what the writer got from About me. <see cref="TellOnceMode.WithoutPromise"/>
-    /// until the acceptance on the real system shows that the writer uses what was saved; then <see cref="TellOnceMode.On"/>.
+    /// Whether a result offers to save what About me lacks and shows what the writer got from About me. The code default is
+    /// <see cref="TellOnceMode.WithoutPromise"/>; <c>appsettings.json</c> ships <see cref="TellOnceMode.On"/> since the acceptance on the
+    /// real system showed that the writer uses what was saved (addendum to D-083).
     /// </summary>
     public TellOnceMode TellOnce { get; set; } = TellOnceMode.WithoutPromise;
 }

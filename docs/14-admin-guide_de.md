@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](14-admin-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-27 (`Research:Mode = On`, Zusatz zu D-074; davor `Orders:TellOnce`, D-083; davor nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
+*Letzte Aktualisierung: 2026-11-27 (`Orders:TellOnce = On`, Zusatz zu D-083; `Research:Mode = On`, Zusatz zu D-074; davor `Orders:TellOnce`, D-083; davor nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
 
 Dieser Leitfaden ist für die Administration: Menschen, die Konten anlegen, entscheiden, welche Funktionen an sind, und sich um die
 ältere Werkstatt kümmern. Installation und Betrieb beschreiben der [Leitfaden für Entwicklung und Betrieb](15-developer-guide_de.md)
@@ -39,7 +39,7 @@ muss beim Einschalten nicht geändert werden.
 | Werkstatt-Menü nur für die Administration | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
 | Ältere Werkzeuge für KI-Assistenten | `Mcp:LegacyTools` | `true` | `true` (D-075) | – |
 | Lernschleife des älteren Wegs | `Learning:Enabled` | `false` | `false` (D-067) | – |
-| Angebot, fehlende Angaben unter About me zu speichern („Tell Atelier once“) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `WithoutPromise` (D-083; `On` nach der Abnahme) | – |
+| Angebot, fehlende Angaben unter About me zu speichern („Tell Atelier once“) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `On` (Zusatz zu D-083, Abnahme bestanden) | – |
 
 Was die Werte bedeuten:
 
@@ -62,11 +62,11 @@ Was die Werte bedeuten:
   Lesen des Auftrags angenommen oder offen gelassen werden musste und zu dem About me nichts hat, ein Feld, dazu die Zeile „With this
   request the writer got from About me: …“; KI-Assistenten bekommen dasselbe als `aboutMeMissing`/`fromAboutMe` und können diese vier
   Felder mit `profile` speichern. Gespeichert wird nur in Felder, die noch leer sind, in einem gesperrten Schritt, nie überschreibend.
-  `WithoutPromise` (ausgeliefert) nutzt die Überschrift „Save it under About me for your next texts“; `On` nutzt „Tell Atelier once – it
-  will not leave this open again“ und ist erst gedacht, wenn die Abnahme am echten System gezeigt hat, dass der Schreiber das
-  Gespeicherte verwendet. `Off` zeigt nichts davon, und `profile` wird nur lesend mit seiner früheren Beschreibung angeboten. Die
-  Administration sieht es nie an fremden Aufträgen, und gespeichert wird nur in die eigenen About-me-Angaben (D-083). Nach bestandener
-  Abnahme: `Orders__TellOnce=On`; Rückweg: `Orders__TellOnce=WithoutPromise` oder `Orders__TellOnce=Off`.
+  `On` (ausgeliefert, seit die Abnahme bestanden ist) nutzt die Überschrift „Tell Atelier once – your next requests will not leave
+  this open again“: Die Zusage gilt für das Lesen späterer Aufträge; eine Änderung eines vorhandenen Textes behält die Angaben, mit
+  denen er entstand. `WithoutPromise` (Code-Standard) nutzt „Save it under About me for your next texts“. `Off` zeigt nichts davon, und `profile` wird nur lesend mit seiner früheren Beschreibung angeboten. Die
+  Administration sieht es nie an fremden Aufträgen, und gespeichert wird nur in die eigenen About-me-Angaben (D-083). Rückweg:
+  `Orders__TellOnce=WithoutPromise` (Angebot ohne Zusage) oder `Orders__TellOnce=Off`.
 
 **Einen Schalter setzen.** Die Einstellungen werden beim Start gelesen. Setz sie als Umgebungsvariablen des Webdienstes, mit `__`
 statt `:` (zum Beispiel `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` reicht Variablen einzeln

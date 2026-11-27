@@ -3313,6 +3313,15 @@ no gap about the topic, and the saved signature stands word for word in the text
 `Orders:TellOnce = On`. If the writer misses this despite the profile: one repair of the profile block, one new order, at most two rounds;
 after that it stays `WithoutPromise`.
 
+**Addendum (2026-11-27): acceptance passed.** Measured with two test accounts and invented orders of the same kind, without the fact
+check: after saving, the second order of account A had no gap and no question about the saved topic, the saved signature stood word
+for word in the text, and account B saw nothing of account A (empty profile, no foreign orders, foreign result refused).
+**Consequence:** `Orders:TellOnce = On` in `appsettings.json` (the code default stays `WithoutPromise`), own commit. The heading is
+narrower: "Tell Atelier once – your next requests will not leave this open again" instead of "… it will not leave this open again",
+because the promise covers the reading of later requests; the shown text and every change to it keep the details it was written
+with. The explanation page and the guide say the same. **Way back:** `Orders__TellOnce=WithoutPromise` (offer without the promise)
+or `Orders__TellOnce=Off`.
+
 ## D-084 — Start page tells what Atelier does for everyone (2026-11-26)
 
 - **Content:** the start page (`/`) now describes the standard way instead of the workshop loop: request in your own words (files
