@@ -116,7 +116,7 @@ Every CLI run of a request starts in its own process group, and whenever a run e
 
 ## Lean mode (claude, since 2026-11-07)
 
-A default `claude -p` call is a full Claude Code agent session: agent system prompt, built-in tool definitions, the synced skill list and the auto-memory of the working directory precede the caller's text (~23k prompt tokens), and the caller's OpenAI system message only arrives as `[SYSTEM]` text inside the user turn. For role-play or "answer from your own perspective" prompts the agent persona then often declines in prose, so structured outputs came back as `refusal: "no JSON object found"` (2026-11-07, LLM Shootout debriefing: 4 of 6 replays).
+A default `claude -p` call is a full Claude Code agent session: agent system prompt, built-in tool definitions, the synced skill list and the auto-memory of the working directory precede the caller's text (~23k prompt tokens), and the caller's OpenAI system message only arrives as `[SYSTEM]` text inside the user turn. For role-play or "answer from your own perspective" prompts the agent persona then often declines in prose, so structured outputs came back as `refusal: "no JSON object found"` (2026-11-07, measured on a structured-output request: 4 of 6 replays).
 
 Lean mode runs `claude -p --output-format json --system-prompt-file <file> --tools "" --disable-slash-commands --strict-mcp-config --no-session-persistence` in an empty per-call directory: the caller's system/developer messages become the real system prompt (neutral default if there is none), no tools (WebSearch/WebFetch only when the request references http(s) images), no skills, no memory, no session transcript. Prompt size drops to ~2k tokens for a ~1.5k-token request.
 

@@ -1,6 +1,6 @@
 # Wächter für hängende Läufe und Proxy-Störungen
 
-Stand: 2026-11-24 · Skript: `scripts/atelier-watch.sh` · Tests: `cli-proxy/tests/test_atelier_watch_script.py`
+Stand: 2026-11-27 · Skript: `scripts/atelier-watch.sh` · Tests: `cli-proxy/tests/test_atelier_watch_script.py`
 
 Diese Anleitung beschreibt die Bedienung, nicht einen bestimmten Server. Werte in spitzen Klammern
 (`<state-dir>`, `<watch-user>`, `<repo>`) stehen für die Einstellungen des Betreibers; die Standardwerte
@@ -54,7 +54,7 @@ Exit-Code: 0 = alles in Ordnung, 1 = mindestens ein Problem oder ein unklares Er
 
 ## Cron-Eintrag
 
-Noch **nicht** eingetragen. Für den Betriebsbenutzer `<watch-user>`, der `docker` aufrufen darf (`crontab -e`):
+Das Repository richtet ihn nicht selbst ein. Für den Betriebsbenutzer `<watch-user>`, der `docker` aufrufen darf (`crontab -e`):
 
 ```cron
 */5 * * * * <repo>/scripts/atelier-watch.sh

@@ -97,7 +97,7 @@ services:
       - CODEX_HOME=/auth/codex
       - GEMINI_HOME=/auth/gemini
       - OPENROUTER_API_KEY=${LLM_OPENROUTER_API_KEY}
-      # Opt-in Bearer auth for the portfolio-shared gateway (comma-separated allowlist).
+      # Opt-in Bearer auth for the shared gateway (comma-separated allowlist).
       # Empty → open access (back-compat). Must match web's CLI_PROXY_API_KEY.
       - CLI_PROXY_API_KEYS=${CLI_PROXY_API_KEY:-}
       - ATELIER_BACKEND_URL=http://web:8080
@@ -108,7 +108,7 @@ services:
       - geef-atelier-cli-auth:/auth
     networks:
       geef-atelier-network: {}
-      # Shared portfolio network (Traefik): lets ANY other app reach the proxy as an
+      # Shared network (also used by Traefik): lets any other app on it reach the proxy as an
       # OpenAI-compatible gateway at http://cli-proxy:8090 (alias) or http://geef-atelier-cli-proxy:8090.
       # No Traefik ingress (traefik.enable=false) — internal docker DNS only, not exposed publicly.
       proxy:
