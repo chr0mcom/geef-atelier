@@ -334,7 +334,7 @@
     /// (the version before it has one). <c>null</c> otherwise, and "Resume" stays.
     /// </summary>
     Guid? ChangeOrderId => _details?.Run is { OrderId: Guid orderId } run
-        && _snapshot?.TemplateName == SystemCrew.DirectTemplateName
+        && SystemCrew.IsDirectPathTemplate(_snapshot?.TemplateName)
         && !string.IsNullOrWhiteSpace(_viewerName) && string.Equals(run.CreatedByUser, _viewerName, StringComparison.Ordinal)
         && (!string.IsNullOrWhiteSpace(run.FinalText) || run.OrderVersion > 1)
         && ServiceProvider.GetService<Microsoft.Extensions.Options.IOptions<OrderOptions>>()?.Value.ReviseModeFor(run.CreatedByUser) == ReviseMode.On

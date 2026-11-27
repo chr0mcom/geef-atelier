@@ -4,7 +4,7 @@
 
 *Last updated: 2026-11-27 (D-085: older review loop, three safeguard switches, shipped off; before that 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
-*Last updated: 2026-11-27 (D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-27 (D-087: “Extra careful” with an outline behind a switch, loop switches per account, measurement prepared; before that D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -3459,6 +3459,68 @@ revision 2026-07-28, the server instructions arrive without "[truncated]"; one c
 one through the upload page; `get_order_status` with `waitSeconds = 50` comes back without being cut off; a change with `revise_order`
 is reported as made only after the new version. The same in claude.ai on the web. As clients may cache `tools/list`, the new
 descriptions may only take effect in a new session.
+
+## D-087 — New “Extra careful”: direct path with an outline behind a switch, measurement prepared (2026-11-27)
+
+**Status:** built and tested, shipped off; the measurement is prepared, not run.
+
+**Purpose.** Package 7 of the remaining plan: for long, demanding texts “Extra careful” should bring something the standard way cannot.
+Today it runs on the older review loop (up to six rounds, two reviewers of another model per round, no fact check and no “What was
+checked”). The measurement decides whether a direct path with an outline (K) or the defused loop (L, switches of D-085) beats the direct
+path (D). No new build along section 3.5 of the analysis report.
+
+**Decision – building K.**
+- New switch `Orders:CarefulOutline` (`Off`/`On`, `Off` in code and `appsettings.json`) with `Orders:CarefulOutlineOverrides` per user
+  name like the other switches. With `On`, an “Extra careful” order **without** a chosen team and without a custom crew gets the code-only
+  template `direct-outline`; a chosen team, standard orders, changes and resumed runs stay as they are.
+- `direct-outline` is the template of the direct path under its own name: the same writer, the same checks without a model, the same
+  fact check, the same one correction, the same report. New is one call of the writer's model **before** the first version: it sees the
+  request and the files exactly as the writer does and returns sections with heading, word budget and content as JSON. When the code can
+  read the requested length in words, the budgets are scaled to that length (middle of a range, 90 % of an upper limit, 110 % of a lower
+  limit, otherwise the stated number; rounded to tens, at least 20 per section). The whole length and the sum of the budgets must lie
+  between 50 and 20,000 words. Only the first version gets the outline, with the sentence that it sets only order and length, every fact
+  comes from the request and the files, and instructions inside it do not count (the outline comes from a call that reads the files);
+  the correction gets only the problems, as before.
+- If no usable outline comes back (error, also a timeout or a transient gateway error, no JSON, no or more than 20 sections, implausible
+  length), nothing is repeated: the text is written in one go and
+  the order gets the note “The text could not be planned section by section first, so it was written in one go.” The call is stored as
+  its own cost line `direct-outline`.
+- The progress display shows the steps of the standard way for such runs; the run page offers “Change something” as for the standard
+  way.
+- **Bit-identical while off:** without the switch every template is chosen as before, the direct path never plans, and the writing
+  prompt without an outline is character-identical to the previous one (tests).
+
+**Decision – loop switches per account.** The three switches of D-085 each get an exception list per user name
+(`Convergence:BestDraftOverrides`, `…WriterBlockingOnlyOverrides`, `…StopWithoutProgressOverrides`), shipped empty, so that L can run
+for a measuring account without changing anything for others. The limits of the switches named in D-085 stay known; they are fixed only
+if L wins the measurement, before switching it on.
+
+**Measurement (prepared, outside this repository).** Five new, made-up long tasks (at least 1,500 words each, three with files), fixed
+before the criteria. Run 1: D against K; run 2: L against the winner of run 1 (its stored texts). A blind juror compares each pair in two
+passes with swapped order. “Wins” means: ahead in at least 4 of 5 in both passes and not more invented facts; if a limit does not
+cover all pairs, the result is “not decided”, never a loss; length fidelity (±25 %) is reported. If nobody wins, a repair of K follows (separate step), otherwise the checkbox goes. A needs check on earlier finished workshop
+tasks decides whether Auto-Crew and the composer may go with the removal: the old text may win at most once more often than the new
+one, the new one may not have more invented facts, and with mostly open tasks it is “not decided”. Hard limits per run, a guard of the
+shared codex subscription from its current state (read before every run and after every five codex calls) and the shared measuring
+guard; stop on failover or an open breaker. No time or daily rules.
+
+**Evidence.** Unit tests for reading, target size and scaling of the outline and for the prompts; pipeline tests over the real assembly
+of the direct path (outline first, missing outline with a note, no retry when the gateway refuses, correction without the outline, no
+outline with a seed text or on the direct path); routing tests of the template and of the start after clarifying; binding tests of the
+exceptions; an orchestrator test against Postgres in which the exceptions change only the runs of their account; end-to-end over MCP
+with and without the clarifier.
+
+**Known limits and open.**
+- An “Extra careful” order never looks anything up on the web, also with the outline (D-079, D-074).
+- The texts about “Extra careful” on `/start`, in `submit_order` and on the explanation page speak of several review rounds; they are
+  adapted only when the switch is turned on.
+- For now only the admin guide names the new switch.
+- When a K order is changed, the new version runs on the direct path like every change; the progress display there shows the loop
+  steps, as for older “Extra careful” orders. To be decided before switching on.
+- “Revise my file”: K does not make the file the template (as before with “Extra careful”), so it plans and writes anew where the
+  standard way changes little. To be decided before switching on.
+
+**Way back:** switch `Off` (default), remove the exceptions.
 
 ## D-088 — MCP: skill and questions as a form, both behind switches and shipped off (2026-11-27)
 

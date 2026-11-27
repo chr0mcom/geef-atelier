@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Application.Research;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
@@ -115,9 +116,15 @@ internal sealed class DirectPipelineHarness
         return (run, id);
     }
 
+    /// <summary>The snapshot the runs of this harness use; <see cref="DirectSnapshot"/> unless a test sets another (e.g. the outline template).</summary>
+    public CrewSnapshot Snapshot { get; set; } = DirectSnapshot;
+
+    /// <summary>Records the cost lines of the runs when a test sets one, e.g. for the planning call of the outline template.</summary>
+    public ICostAccumulator? Costs { get; set; }
+
     public PipelineAssemblyContext Context(RunEntity run) => new(
-        run, DirectSnapshot, Services, Services.GetRequiredService<IServiceScopeFactory>(), Resolver,
-        Options.Create(new ConvergenceOptions()), NullLoggerFactory.Instance, new CountingEventSink(), null, Warnings, null, null);
+        run, Snapshot, Services, Services.GetRequiredService<IServiceScopeFactory>(), Resolver,
+        Options.Create(new ConvergenceOptions()), NullLoggerFactory.Instance, new CountingEventSink(), Costs, Warnings, null, null);
 
     /// <summary>Builds and runs the pipeline, then lets the assembler store the report, like the orchestrator.</summary>
     public async Task<DirectRunOutcome> RunAsync(RunEntity run)

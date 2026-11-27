@@ -15,13 +15,18 @@ internal static class OrderRunExtensions
 
     /// <summary>
     /// The crew snapshot of an order: the code-only direct template for <see cref="OrderMode.Direct"/>, otherwise the named
-    /// template (default klassik) or the custom crew, with the order's files as the first grounding source.
+    /// template (default klassik) or the custom crew, with the order's files as the first grounding source. With
+    /// <paramref name="carefulOutline"/> (<c>Orders:CarefulOutline</c> on for the owner, D-087) a careful order without a chosen template
+    /// and without a custom crew gets the code-only template <see cref="SystemCrew.DirectOutlineTemplate"/> instead of klassik.
     /// </summary>
     public static async Task<ResolvedCrewSnapshot> ResolveOrderSnapshotAsync(
-        this ICrewService crewService, OrderMode mode, string? crewTemplateName, CrewSpec? customCrew, bool hasSources, CancellationToken ct)
+        this ICrewService crewService, OrderMode mode, string? crewTemplateName, CrewSpec? customCrew, bool hasSources, CancellationToken ct,
+        bool carefulOutline = false)
     {
         if (mode == OrderMode.Direct)
             return await crewService.ResolveCodeTemplateSnapshotAsync(SystemCrew.DirectTemplate, ct);
+        if (carefulOutline && crewTemplateName is null && customCrew is null)
+            return await crewService.ResolveCodeTemplateSnapshotAsync(SystemCrew.DirectOutlineTemplate, ct);
 
         var resolved = await crewService.ResolveSnapshotWithWarningsAsync(
             customCrew is null ? crewTemplateName ?? SystemCrew.KlassikTemplateName : crewTemplateName,
@@ -35,6 +40,15 @@ internal static class OrderRunExtensions
             .ToList();
         return resolved with { Snapshot = resolved.Snapshot with { GroundingProviders = [SystemCrew.OrderSourcesProfile, .. providers] } };
     }
+
+    /// <summary>
+    /// The path whose steps the progress display shows for <paramref name="order"/>: the direct steps while the current run is one of
+    /// "Extra careful" with an outline (<see cref="SystemCrew.DirectOutlineTemplateName"/>, D-087), otherwise the mode of the order.
+    /// </summary>
+    public static OrderMode ProgressMode(this OrderEntity order, RunEntity? current) =>
+        current is not null && string.Equals(current.CrewTemplateName, SystemCrew.DirectOutlineTemplateName, StringComparison.Ordinal)
+            ? OrderMode.Direct
+            : order.Mode;
 
     /// <summary>The pending standard run version 1 of <paramref name="order"/>.</summary>
     public static RunEntity ToFirstRun(this ResolvedCrewSnapshot resolved, OrderEntity order, string briefing, DateTimeOffset now) => new()

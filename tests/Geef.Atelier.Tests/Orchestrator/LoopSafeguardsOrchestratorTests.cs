@@ -18,6 +18,7 @@ namespace Geef.Atelier.Tests.Orchestrator;
 /// <c>Convergence:BestDraft</c> and <c>Convergence:StopWithoutProgress</c> on, a loop whose rounds stop getting better ends early and
 /// stores the best round as text and delivered iteration with a stop sentence that names what was checked; with the switches off
 /// the same script runs to the round limit and delivers the last round as before. A resumed run (seed draft) takes the switches too.
+/// Overrides per user name (D-087) switch them on only for runs of that user.
 /// </summary>
 [Collection("Postgres")]
 public sealed class LoopSafeguardsOrchestratorTests(PostgresFixture fixture)
@@ -80,11 +81,37 @@ public sealed class LoopSafeguardsOrchestratorTests(PostgresFixture fixture)
         Assert.Equal(ConvergenceDecision.StopMaxAttemptsReached.ToRunStopMessage(), run.ErrorMessage);
     }
 
-    private async Task<Guid> CreateRunAsync()
+    [Fact(Timeout = 30_000)]
+    public async Task Overrides_for_the_owner_of_the_run_switch_the_safeguards_on_for_that_run_only()
+    {
+        var options = new ConvergenceOptions
+        {
+            MaxIterations = 6,
+            BestDraftOverrides = { [MeterUser] = LoopSwitch.On },
+            StopWithoutProgressOverrides = { [MeterUser] = LoopSwitch.On },
+        };
+
+        var meterRun = await RunToEndAsync(await CreateRunAsync(MeterUser), options);
+        Assert.Equal(3, await IterationCountAsync(meterRun.Id));
+        Assert.Equal(1, meterRun.DeliveredIteration);
+        Assert.Equal(RunStopMessageExtensions.NoProgressStopMessage, meterRun.ErrorMessage);
+
+        var otherRun = await RunToEndAsync(await CreateRunAsync("someone-else"), options);
+        Assert.Equal(6, await IterationCountAsync(otherRun.Id));
+        Assert.Equal(6, otherRun.DeliveredIteration);
+        Assert.Equal(ConvergenceDecision.StopMaxAttemptsReached.ToRunStopMessage(), otherRun.ErrorMessage);
+    }
+
+    private const string MeterUser = "meter";
+
+    private async Task<Guid> CreateRunAsync(string? createdByUser = null)
     {
         await using var db = fixture.NewContext();
-        return await new RunPersistenceService(db).CreateRunAsync(
+        var id = await new RunPersistenceService(db).CreateRunAsync(
             "Loop safeguard test briefing.", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
+        if (createdByUser is not null)
+            await db.Runs.Where(r => r.Id == id).ExecuteUpdateAsync(s => s.SetProperty(r => r.CreatedByUser, createdByUser));
+        return id;
     }
 
     private async Task<RunEntity> RunToEndAsync(Guid runId, ConvergenceOptions convergence)

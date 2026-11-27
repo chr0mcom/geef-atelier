@@ -88,6 +88,14 @@ Was die Werte bedeuten:
   Vergleich; ohne einen Prüfer, der in allen Runden antwortete, kein Stopp); der Lauf
   nennt dann den Grund „Two more rounds did not reduce the open points, so the work was stopped.“ Freigabe, Höchstzahl der Runden
   und Zeitgrenze gehen vor. Alle drei sind aus, bis die Messung des neuen „Extra careful“ über sie entschieden hat (D-085).
+  Für Messkonten gibt es je Schalter Ausnahmen je Benutzername (`Convergence__BestDraftOverrides__<name>=On`,
+  `…WriterBlockingOnlyOverrides…`, `…StopWithoutProgressOverrides…`; ausgeliefert leer, D-087).
+- **„Extra careful“ mit Gliederung** (`Orders:CarefulOutline`, `Off`/`On`, ausgeliefert `Off`; Ausnahmen je Benutzername
+  `Orders__CarefulOutlineOverrides__<name>=On`): Mit `On` läuft ein „Extra careful“-Auftrag ohne gewähltes Team auf dem Standardweg mit
+  einem Aufruf vorweg, der den Text in Abschnitte mit Wortbudgets gliedert (aus der verlangten Länge, wenn sie sich ohne Modell lesen
+  lässt); der Schreiber schreibt danach, mit denselben automatischen Prüfungen, derselben Faktenprüfung und demselben „What was
+  checked“ wie der Standardweg. Kommt keine brauchbare Gliederung zurück, wird in einem Zug geschrieben und der Auftrag sagt das. Ein
+  gewähltes Team, Änderungen und fortgesetzte Läufe planen nie. Bleibt aus, bis die Messung von Paket 7 entschieden hat (D-087).
 
 **Einen Schalter setzen.** Die Einstellungen werden beim Start gelesen. Setz sie als Umgebungsvariablen des Webdienstes, mit `__`
 statt `:` (zum Beispiel `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` reicht Variablen einzeln

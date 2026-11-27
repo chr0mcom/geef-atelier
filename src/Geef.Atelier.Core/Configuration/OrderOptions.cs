@@ -13,6 +13,13 @@ public enum ReviseMode { Off = 0, On = 1 }
 /// </summary>
 public enum TellOnceMode { Off = 0, On = 1, WithoutPromise = 2 }
 
+/// <summary>
+/// How "Extra careful" works (<c>Orders:CarefulOutline</c>, decision log D-087). <see cref="Off"/> keeps the review loop of the default team;
+/// <see cref="On"/> writes on the direct path with an outline first: one call plans sections with word budgets, one call writes along
+/// them, followed by the same checks and the same report as the direct path.
+/// </summary>
+public enum CarefulOutlineMode { Off = 0, On = 1 }
+
 /// <summary>Behaviour of orders (section <c>Orders</c>).</summary>
 public sealed class OrderOptions
 {
@@ -24,6 +31,15 @@ public sealed class OrderOptions
 
     /// <summary>Whether orders from the start page and submit_order are clarified first (stage 2). Replaces the unused IntakeEnabled.</summary>
     public IntakeMode IntakeMode { get; set; } = IntakeMode.Shadow;
+
+    /// <summary>
+    /// How "Extra careful" orders without a chosen team are written (D-087). <see cref="CarefulOutlineMode.Off"/> until a measurement shows
+    /// that the outline is better.
+    /// </summary>
+    public CarefulOutlineMode CarefulOutline { get; set; } = CarefulOutlineMode.Off;
+
+    /// <summary>Mode per user name, overriding <see cref="CarefulOutline"/>.</summary>
+    public Dictionary<string, CarefulOutlineMode> CarefulOutlineOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Longest accepted request, in characters.</summary>
     public int RequestMaxChars { get; set; } = 50_000;
@@ -68,5 +84,15 @@ public static class OrderOptionsExtensions
     {
         ArgumentNullException.ThrowIfNull(options);
         return owner is not null && options.ReviseOverrides is { } overrides && overrides.TryGetValue(owner, out var mode) ? mode : options.Revise;
+    }
+
+    /// <summary>
+    /// How "Extra careful" works for orders of <paramref name="owner"/>: the entry of <see cref="OrderOptions.CarefulOutlineOverrides"/> for
+    /// that user name, otherwise <see cref="OrderOptions.CarefulOutline"/>.
+    /// </summary>
+    public static CarefulOutlineMode CarefulOutlineFor(this OrderOptions options, string? owner)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return owner is not null && options.CarefulOutlineOverrides is { } overrides && overrides.TryGetValue(owner, out var mode) ? mode : options.CarefulOutline;
     }
 }
