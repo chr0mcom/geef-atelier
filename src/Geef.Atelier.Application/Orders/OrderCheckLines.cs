@@ -25,7 +25,7 @@ public static class OrderCheckLines
     public const string AutomaticSeparator = ", ";
 
     public const string PassedNotEmpty = "is not empty";
-    public const string PassedStartsDirectly = "starts directly";
+    public const string PassedStartsDirectly = "starts with the text itself, not with a remark to the reader";
     public const string PassedLength = "has the requested length";
     public const string PassedLanguage = "is in the requested language";
     public const string PassedNoPlaceholders = "has no placeholders";

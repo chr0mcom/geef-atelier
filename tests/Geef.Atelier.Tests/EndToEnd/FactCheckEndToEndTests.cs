@@ -499,7 +499,7 @@ public sealed class FactCheckEndToEndTests(PostgresFixture postgres)
         Assert.Single(FactCalls(host));
         var result = await ResultOfAsync(host, orderId);
         Assert.Equal(FactCheckState.Checked, result.FactCheck);
-        Assert.Equal(["Checked automatically: the text is not empty, starts directly.", OrderCheckLines.FactsChecked, OrderCheckLines.Contradictions], result.Checks!.Checked);
+        Assert.Equal(["Checked automatically: the text is not empty, starts with the text itself, not with a remark to the reader.", OrderCheckLines.FactsChecked, OrderCheckLines.Contradictions], result.Checks!.Checked);
         Assert.Equal(OrderCheckLines.ToReviewNothing, result.Checks.ToReview);
     }
 

@@ -3285,3 +3285,26 @@ who you are.
 no gap about the topic, and the saved signature stands word for word in the text. Test account B sees nothing of A. Passed →
 `Orders:TellOnce = On`. If the writer misses this despite the profile: one repair of the profile block, one new order, at most two rounds;
 after that it stays `WithoutPromise`.
+
+## D-084 — Start page tells what Atelier does for everyone (2026-11-26)
+
+- **Content:** the start page (`/`) now describes the standard way instead of the workshop loop: request in your own words (files
+  optional), at most the configured number of questions (skippable), one writing pass, checks without AI and a fact check that
+  points out, at most one more try, then the text with "What was checked", open points and assumptions; "Change something" and
+  downloads. New: a made-up example (request → question → text with gaps, margin notes and the result boxes), "Who it is for" with
+  entries for people at home, clubs and schools, small offices, AI-assistant users, administrators and developers, "What Atelier
+  does not do", a short "Where your words go" and a clear way to start (signed in: "Write something").
+- **Workshop reduced** to one section "For teams": no model names, figures, costs or run identifiers any more. "Extra careful" is
+  described as the older way with the built-in team, open to everyone.
+- **Same switches as "How it works":** the page reads `HowItWorksFeatures` for the viewer; nothing is copied. The title and the
+  description are true for every switch state.
+- **Truth before promotion:** no claims about other products, no guarantees, no numbers that do not come from the settings. The
+  example is marked as made up. Tests check forbidden words and names, every switch state, that every link resolves, and in a
+  browser (light/dark × desktop/phone) sideways scrolling, layout shift, contrast of every text and the keyboard.
+- **Fixed on the way:** the "ghost" buttons of the public pages were drawn at 40 % opacity by a general rule of the dashboard
+  stylesheet (contrast below the minimum); the hero lost its side padding to a more specific rule. The film section is unchanged.
+- **After the independent review:** the page "Host it yourself" (`/self-host`) now says the same as the start page: requests,
+  texts and files are kept on the own server and go to the AI services that are connected (before: "they never leave your
+  servers", plus "briefings", "workshop", "GEEF loop"). The film stays unchanged but sits after "For teams" until the new video
+  exists. "What was checked" says "starts with the text itself, not with a remark to the reader" instead of "starts directly" (web,
+  MCP and the guides). The sticky navigation is opaque. The word list runs over every switch state.

@@ -89,7 +89,7 @@ the text asks you to check the new parts. While this feature is off, the button 
 
 | Line in "What was checked" | What happened |
 |---|---|
-| Checked automatically: the text … | Checked without AI. A few basics always: the text is not empty and starts directly. Length, language, gaps, lists or headings and words to use or avoid only when your request asked for them. |
+| Checked automatically: the text … | Checked without AI. A few basics always: the text is not empty and starts with the text itself, not with a remark to the reader. Length, language, gaps, lists or headings and words to use or avoid only when your request asked for them. |
 | Facts in the text were compared with … | Another AI compared the facts in the text with your request, your answers and your files and lists passages it could not find there. In the current default setting it **does not change the text**. It can miss things, and it often points at harmless sentences too, such as a closing line or a signature. With very long files it compares the text only with your request and answers, and the line says so. |
 | Totals in your files … | Sums in your files were added up again without AI. If one does not match, you see both figures. |
 | Changed after the check | What was changed because of a check. |

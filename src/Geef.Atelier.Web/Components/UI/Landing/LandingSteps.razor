@@ -1,0 +1,110 @@
+<section class="lp-section lp-steps" id="steps" aria-labelledby="lp-steps-title" data-testid="landing-steps">
+    <div class="lp-container">
+        <div class="lp-split-head">
+            <div>
+                <p class="lp-eyebrow">How it goes</p>
+                <h2 class="lp-h2" id="lp-steps-title">@StepWord steps from your words to your text.</h2>
+            </div>
+            <p class="lp-lede">
+                This is the standard way every text is written. There is no chat to steer and nothing to set up: you ask once, and the
+                result shows you what to fill in or check before you use it.
+            </p>
+        </div>
+
+        <div class="lp-flow" style="--steps: @StepCount; --retry-from: @RetryFrom; --retry-to: @RetryTo" data-testid="landing-flow">
+            <div class="lp-flow-ribbon" aria-hidden="true"><span class="ink"></span></div>
+            <div class="lp-flow-retry" aria-hidden="true">
+                <LandingIllustrations Name="StepRetry" />
+                <span class="lp-flow-retry-label">one more try, at most</span>
+            </div>
+            <ol class="lp-flow-list">
+
+            <li class="lp-flow-step" data-step="ask">
+                <span class="ord" aria-hidden="true">@Number("ask")</span>
+                <div class="ico" aria-hidden="true"><LandingIllustrations Name="StepAsk" /></div>
+                <h3 class="name">You ask</h3>
+                <p class="copy">Write in a sentence or two what you need, in your own words. Add up to @Features.MaxFiles files if you have them: PDF, Word or text.</p>
+                <p class="pip-row"><span class="pip" aria-hidden="true"></span>In your own words</p>
+            </li>
+
+            @if (Features.Questions)
+            {
+                <li class="lp-flow-step" data-step="questions" data-testid="landing-step-questions">
+                    <span class="ord" aria-hidden="true">@Number("questions")</span>
+                    <div class="ico" aria-hidden="true"><LandingIllustrations Name="StepQuestions" /></div>
+                    <h3 class="name">It may ask back</h3>
+                    <p class="copy">If something important is missing, you get up to @Features.MaxQuestions short questions with answers to click. Skip them if you like: what it has to guess is written down.</p>
+                    <p class="pip-row"><span class="pip" aria-hidden="true"></span>Up to @Features.MaxQuestions, all skippable</p>
+                </li>
+            }
+
+            <li class="lp-flow-step" data-step="write">
+                <span class="ord" aria-hidden="true">@Number("write")</span>
+                <div class="ico" aria-hidden="true"><LandingIllustrations Name="PhaseExecution" /></div>
+                <h3 class="name">It writes</h3>
+                <p class="copy">An AI writer drafts the whole text from what you gave it, including your files. Where a fact is missing, it is asked to leave a gap instead of making something up.</p>
+                @if (Features.WebResearch)
+                {
+                    <p class="copy" data-testid="landing-step-research">If your request has gaps that can be looked up, it may look them up on the web first. It never does this when you add files.</p>
+                }
+                <p class="pip-row"><span class="pip" aria-hidden="true"></span>Gaps stay visible</p>
+            </li>
+
+            <li class="lp-flow-step" data-step="check">
+                <span class="ord" aria-hidden="true">@Number("check")</span>
+                <div class="ico" aria-hidden="true"><LandingIllustrations Name="StepCheck" /></div>
+                <h3 class="name">It checks</h3>
+                <p class="copy">Automatic checks without AI look for certain problems, such as the wrong length or language. If one finds a clear problem, the writer gets one more try.</p>
+                @if (FactCheckSentence is { } factCheck)
+                {
+                    <p class="copy" data-testid="landing-step-factcheck">@factCheck</p>
+                }
+                <p class="pip-row"><span class="pip" aria-hidden="true"></span>@(FactCheckSentence is null ? "Without AI" : "Without AI, plus a fact check")</p>
+            </li>
+
+            <li class="lp-flow-step" data-step="result">
+                <span class="ord" aria-hidden="true">@Number("result")</span>
+                <div class="ico" aria-hidden="true"><LandingIllustrations Name="PhaseFinalize" /></div>
+                <h3 class="name">You get the text</h3>
+                <p class="copy">The text first, then what was checked, what to fill in or look at, and what was assumed. Download it as Word, PDF or Markdown.</p>
+                @if (Features.ChangeText)
+                {
+                    <p class="copy" data-testid="landing-step-change">Not quite right? Use “@Geef.Atelier.Application.Orders.RevisionLines.ChangeButton” and say in your own words what to change. Earlier versions are kept.</p>
+                }
+                <p class="pip-row"><span class="pip" aria-hidden="true"></span>You decide what to send</p>
+            </li>
+            </ol>
+        </div>
+
+        <p class="lp-flow-foot">
+            <span>This takes from less than a minute to several minutes. You can close the page: the text waits for you under My work.</span>
+            <a href="/how-it-works#steps" data-enhance-nav="false">Every step in detail</a>
+        </p>
+    </div>
+</section>
+
+@code {
+    /// <summary>What the start page may call available for the viewer.</summary>
+    [Parameter, EditorRequired] public HowItWorksFeatures Features { get; set; } = null!;
+
+    string[] Order => Features.Questions ? ["ask", "questions", "write", "check", "result"] : ["ask", "write", "check", "result"];
+
+    int StepCount => Order.Length;
+
+    string StepWord => StepCount switch { 4 => "Four", 5 => "Five", _ => StepCount.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+
+    int Number(string step) => Array.IndexOf(Order, step) + 1;
+
+    string RetryFrom => Percent((Number("write") - 1d) / StepCount);
+
+    string RetryTo => Percent(1 - (Number("check") - 1d) / StepCount);
+
+    static string Percent(double share) => (share * 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    string? FactCheckSentence => Features.FactCheck switch
+    {
+        FactCheckOffer.MayFixOnce => "Another AI compares the facts in the text with what you gave and points out what may not be backed. Some of it may be fixed once; the rest is shown to you.",
+        FactCheckOffer.ReportsOnly => "Another AI compares the facts in the text with what you gave and points out what may not be backed. It does not change the text.",
+        _ => null,
+    };
+}

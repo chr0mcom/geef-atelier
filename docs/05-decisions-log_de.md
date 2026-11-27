@@ -3411,3 +3411,29 @@ Stilvorlagen (kein Fall), „Remember this?“, die Übernahme der früheren Ler
 Annahme und keine Lücke zum Thema, und die gespeicherte Unterschrift steht wörtlich im Text. Testkonto B sieht nichts von A. Bestanden →
 `Orders:TellOnce = On`. Verfehlt der Schreiber das trotz Profil: eine Reparatur am Profilblock, ein Auftrag neu, höchstens zwei Runden;
 danach bleibt `WithoutPromise`.
+
+## D-084 — Startseite sagt, was Atelier für alle tut (2026-11-26)
+
+- **Inhalt:** Die Startseite (`/`) beschreibt jetzt den Standardweg statt der Werkstatt-Schleife: Auftrag in eigenen Worten
+  (Dateien optional), höchstens die eingestellte Zahl an Rückfragen (überspringbar), ein Schreibdurchgang, Prüfungen ohne KI und ein
+  Faktenprüfer, der meldet, höchstens ein weiterer Versuch, dann der Text mit „What was checked“, offenen Punkten und Annahmen;
+  „Change something“ und Downloads. Neu: ein erfundenes Beispiel (Auftrag → Rückfrage → Text mit Lücken, Randnotizen und den
+  Ergebniskästen), „Who it is for“ mit Einstiegen für Privat, Verein und Schule, kleines Büro, Nutzer von KI-Assistenten,
+  Administratoren und Entwickler, „What Atelier does not do“, kurz „Where your words go“ und ein klarer Weg zum Start (angemeldet:
+  „Write something“).
+- **Werkstatt verkleinert** auf einen Abschnitt „For teams“: keine Modellnamen, Zahlen, Kosten oder Lauf-Kennungen mehr. „Extra
+  careful“ ist als älterer Weg mit dem eingebauten Team beschrieben, offen für alle.
+- **Dieselben Schalter wie „How it works“:** Die Seite liest `HowItWorksFeatures` für die betrachtende Person; nichts ist kopiert.
+  Titel und Beschreibung stimmen für jeden Schalterstand.
+- **Ehrlichkeit vor Werbung:** keine Aussagen über andere Produkte, keine Garantien, keine Zahlen, die nicht aus den Einstellungen
+  kommen. Das Beispiel ist als erfunden gekennzeichnet. Tests prüfen verbotene Wörter und Namen, jeden Schalterzustand, dass jeder
+  Link auflöst, und im Browser (hell/dunkel × Desktop/Telefon) seitliches Scrollen, Layoutsprung, Kontrast jedes Textes und die
+  Tastatur.
+- **Nebenbei behoben:** Die „Ghost“-Schaltflächen der öffentlichen Seiten wurden durch eine allgemeine Regel des
+  Dashboard-Stylesheets mit 40 % Deckkraft gezeichnet (Kontrast unter dem Minimum); dem Kopfbereich nahm eine spezifischere Regel den
+  seitlichen Abstand. Der Filmabschnitt ist unverändert.
+- **Nach der unabhängigen Prüfung:** Die Seite „Host it yourself“ (`/self-host`) sagt jetzt dasselbe wie die Startseite: Aufträge,
+  Texte und Dateien bleiben auf dem eigenen Server und gehen an die angebundenen KI-Dienste (vorher: „they never leave your
+  servers“, dazu „briefings“, „workshop“, „GEEF loop“). Der Film bleibt unverändert, steht aber bis zum neuen Video hinter „For
+  teams“. „What was checked“ sagt „starts with the text itself, not with a remark to the reader“ statt „starts directly“ (Web, MCP
+  und Leitfäden). Die mitlaufende Navigation ist deckend. Die Wortliste läuft über jeden Schalterzustand.

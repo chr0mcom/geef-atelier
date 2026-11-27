@@ -140,18 +140,33 @@ verwendet: dem Export-Button (`Manuscript.razor`) und dem „Profile"-Eintrag im
 - **Bootstrap:** vollständig entfernt in PS-3
 - **Kein Inline-Styling** in Komponenten (außer minimal in Pages)
 
-## Landing-Page (D-053)
+## Landing-Page (D-053, überarbeitet mit D-084)
 
-**Route:** `/` — `Landing.razor`, `[AllowAnonymous]`, Static SSR (kein `@rendermode`), `LandingLayout.razor`.
+**Route:** `/` — `Landing.razor`, `[AllowAnonymous]`, Static SSR (kein `@rendermode`), `LandingLayout.razor`. Sie liest dieselben
+Einstellungen wie „How it works“ über `HowItWorksFeatures` (`FeaturesFor(viewer)`) und reicht das Ergebnis an die Abschnitte weiter:
+Rückfragen, Ändern, Webrecherche und Faktenprüfung werden nur beschrieben, wenn sie für die betrachtende Person an sind, und jede
+Zahl stammt aus den Einstellungen.
 
-**CSS:** `wwwroot/atelier-landing.css` — 1:1-Port des React-Prototyp-`landing.css`. Alle 27 referenzierten CSS-Tokens existierten bereits in allen drei Paletten (`atelier.css`); keine Tokens hinzugefügt.
+**Abschnitte (Reihenfolge):** `LandingNav` (angemeldet: My work / Write something), `LandingHero`, `LandingExample` (erfundenes
+Beispiel als Korrekturbogen mit Randnotizen, gebaut aus den festen Sätzen von `OrderCheckLines` und den Einleitungen von
+`HowItWorks`), `LandingSteps` (vier oder fünf Schritte des Standardwegs, „one more try, at most“),
+`LandingCapabilities` (sechs Punkte und „What Atelier does not do“), `LandingAudiences` (#for-whom), `LandingPrivacy`,
+`LandingWorkshop` (#teams; folgt `Ui:WorkshopForAdminsOnly`), `LandingFilm` (unverändert; bis zum neuen Video hinter „For teams“, eine Zeile in
+`Landing.razor` setzt ihn wieder nach oben), `LandingClosing`, `LandingFooter`. Inline-SVGs in
+`LandingIllustrations.razor` über `Name`.
 
-**JS:** `wwwroot/js/landing.js` — reines IIFE, kein Blazor-Interop. `IntersectionObserver` für Scroll-Reveal (`.lp-reveal` → `.in`). GEEF-Flow-Choreografie: zweiter Observer + `setTimeout`-Sequenz G→E→E-Schleife→F via `is-active`/`has-passed`-Phasen-Klassen. `prefers-reduced-motion` setzt `body[data-static="1"]`, CSS stoppt alle Keyframe-Animationen.
+**CSS:** `wwwroot/atelier-landing.css`, nur Tokens der drei Paletten. Präfixe: `lp-*`, `ex-*`/`proof-*` (Beispiel), `lp-flow*`
+(Schritte), `cap`, `aud`, `team-sheet`. Neben Presse und Film nur eine orchestrierte Bewegung (die Schritte).
 
-**Komponenten:** `Components/UI/Landing/` — neun Sektions-Komponenten (`LandingNav`, `LandingHero`, `LandingTurn`, `LandingGeefFlow`, `LandingCrew`, `LandingProof`, `LandingCapabilities`, `LandingClosing`, `LandingFooter`) und `LandingIllustrations.razor` (12 Inline-SVGs via `Name`-Parameter + `@switch`).
+**JS:** `wwwroot/js/landing.js` — reines IIFE. Schritte: ein Durchlauf über `.lp-flow-step` (`is-active`/`has-passed`), der Bogen
+`.lp-flow-retry` erscheint, solange der Prüfschritt aktiv ist. `prefers-reduced-motion` markiert alle Schritte sofort.
+Scroll-Einblendung nur noch für den Film.
 
-**Stub-Seiten:** `Components/Pages/Public/` — neun `[AllowAnonymous]`-Static-SSR-Seiten mit `LandingLayout` und `ComingSoon.razor` (`[Parameter, EditorRequired] string Title`): `/pricing`, `/docs`, `/self-host`, `/status`, `/changelog`, `/contact`, `/imprint`, `/privacy`, `/terms`.
+**Tests:** `Web/HowItWorks/LandingWordsTests` (Wörter, Namen, Versprechen), `LandingSwitchesTests` (Schalterzustände, Zahlen,
+Überschriftenfolge), `LandingLinksTests` (jeder Link löst auf), `Web/E2E/LandingFlowTests` (hell/dunkel × Desktop/Telefon: kein
+seitliches Scrollen, kein Layoutsprung, Kontrast jedes Textes, Tastatur, Schritte).
 
-**CSS-Klassen-Präfixe:** `lp-nav`, `lp-hero`, `lp-turn`, `lp-reveal`, `lp-caps`, `lp-close`, `lp-footer`, `lp-stub`. GEEF-Flow: `geef-flow`, `geef-phase`. Crew: `crew-sheet`. Proof: `run-mock`. Illustrationen: `press-anim`, `platen`, `paper-in`, `paper-out`, `stamp-glow`, `loop-path`.
+**Stub-Seiten:** `Components/Pages/Public/` — `[AllowAnonymous]`-Static-SSR-Seiten mit `LandingLayout`: `/pricing`, `/docs`,
+`/self-host`, `/status`, `/changelog`, `/contact`, `/imprint`, `/privacy`, `/terms`.
 
-**Asset-Einbindung:** `App.razor` injiziert `atelier-landing.css`, `js/landing.js`, `landing-root` (html) und `landing-body` (body) nur bedingt für `Path == "/"` — kein Overhead für authentifizierte App-Routen.
+**Asset-Einbindung:** `App.razor` bindet `atelier-landing.css` für die öffentlichen Seiten und `js/landing.js` nur für `Path == "/"` ein.
