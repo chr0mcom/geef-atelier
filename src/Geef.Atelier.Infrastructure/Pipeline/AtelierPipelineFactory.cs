@@ -1,17 +1,8 @@
-using Geef.Atelier.Application.Crew.Grounding;
-using Geef.Atelier.Application.Grounding;
-using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
-using Geef.Atelier.Core.Domain.Warnings;
-using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Configuration;
-using Geef.Atelier.Infrastructure.Grounding;
-using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk;
-using Geef.Sdk.Runtime;
-using Geef.Sdk.Context;
 using Geef.Sdk.Events;
 using Geef.Sdk.Middleware;
 using Geef.Sdk.Policies;
@@ -19,146 +10,38 @@ using Geef.Sdk.Providers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SdkGeef = Geef.Sdk.Geef;
-using SdkAdvisorTrigger = Geef.Sdk.Advisors.AdvisorTrigger;
 
 namespace Geef.Atelier.Infrastructure.Pipeline;
 
 internal static class AtelierPipelineFactory
 {
-    /// <summary>
-    /// Thrown when a crew has sources but no grounding provider factory was passed: the sources would otherwise be
-    /// dropped without a trace.
-    /// </summary>
-    internal const string MissingGroundingFactoryMessage =
-        "The crew has sources, but no grounding provider factory was supplied to build the pipeline.";
+    /// <summary>Shown when a stored setup names a check that this version no longer has; the run fails with it as it is.</summary>
+    internal const string UnknownCheckMessage =
+        "The saved setup of this task names a check that no longer exists, so it cannot run. Please start it again.";
 
     /// <summary>
-    /// Builds the pipeline dynamically from a fully-dereferenced <see cref="CrewSnapshot"/>.
-    /// Pre-execution advisors (<see cref="AdvisorTrigger.BeforeFirstExecution"/> /
-    /// <see cref="AdvisorTrigger.BeforeEveryExecution"/>) and convergence-failure recovery
-    /// advisors (<see cref="AdvisorTrigger.OnConvergenceFailure"/>) are registered directly
-    /// with the SDK builder and consulted by the runner at the appropriate lifecycle points.
-    /// A <paramref name="customGroundingStep"/> replaces the briefing grounding step; the crew's grounding providers
-    /// are then not called (the custom step brings its own material, as the direct path does with the order's files).
-    /// <paramref name="loopSafeguards"/> (D-085) is passed only by the review-loop assemblers (standard and resumed runs); missing or
-    /// <see cref="LoopSafeguards.None"/> builds the loop as before. A pipeline with a <paramref name="customExecutionStep"/> (direct
-    /// path, crew composition) is not the review loop and never takes them.
+    /// Builds the pipeline of one run from its <see cref="CrewSnapshot"/>: the given grounding and execution steps, one reviewer per
+    /// reviewer profile of the snapshot (each resolved by <paramref name="reviewerResolver"/>), the convergence policy of the snapshot and
+    /// the best-effort text when the checks never pass. A snapshot without reviewers, or with a reviewer the resolver does not know, is
+    /// rejected with <see cref="InvalidCrewSnapshotException"/>, whose message is shown to the user as it is.
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> Build(
         CrewSnapshot snapshot,
-        ILlmClientResolver resolver,
         IOptions<ConvergenceOptions> convergenceOptions,
-        IRunWarningSink warningSink,
-        IAdvisorConsultationRepository? consultationRepository = null,
-        Guid runId = default,
+        IGroundingStep grounding,
+        IExecutionStep execution,
+        Func<ReviewerProfile, IReviewer?> reviewerResolver,
         ILoggerFactory? loggerFactory = null,
-        IEnumerable<IGeefEventSink>? additionalSinks = null,
-        IGroundingProviderFactory? groundingProviderFactory = null,
-        IPricingCatalog? pricingCatalog = null,
-        ICostAccumulator? costAccumulator = null,
-        IGroundingRefiner? groundingRefiner = null,
-        IGroundingConsultationRepository? groundingConsultationRepository = null,
-        IExecutionStep? customExecutionStep = null,
-        Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null,
-        ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
-        IGroundingStep? customGroundingStep = null,
-        LoopSafeguards? loopSafeguards = null)
+        IEnumerable<IGeefEventSink>? additionalSinks = null)
     {
-        var safeguards = customExecutionStep is null ? loopSafeguards ?? LoopSafeguards.None : LoopSafeguards.None;
-        IGroundingStep grounding = customGroundingStep ?? new BriefingGroundingStep();
-        if (customGroundingStep is null && snapshot.GroundingProviders is { Count: > 0 })
-        {
-            if (groundingProviderFactory is null)
-                throw new InvalidOperationException(MissingGroundingFactoryMessage);
-            grounding = new MultiProviderGroundingStep(
-                grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
-                loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
-                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
-                warningSink,
-                groundingRefiner,
-                groundingConsultationRepository,
-                toolBackedGroundingProvider);
-        }
-
-        IExecutionStep execution = customExecutionStep
-            ?? new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator,
-                blockingFindingsOnly: safeguards.WriterBlockingOnly);
-
-        var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator, specialReviewerResolver);
-        var finalizer = LoopFinalizer(safeguards);
-
-        var builder = CreateBuilder(grounding, execution, reviewers, finalizer,
-            convergenceOptions, snapshot.ConvergenceOverride,
-            snapshot.EvaluationStrategy, loggerFactory, additionalSinks, safeguards.StopWithoutProgress);
-
-        if (consultationRepository is not null && customExecutionStep is null)
-            RegisterAdvisors(builder, snapshot.Advisors, resolver, consultationRepository, runId, pricingCatalog, costAccumulator);
-
+        var reviewers = ResolveReviewers(snapshot.Reviewers, reviewerResolver);
+        var builder = CreateBuilder(grounding, execution, reviewers, new MarkdownFinalizer(), convergenceOptions, snapshot.ConvergenceOverride,
+            snapshot.EvaluationStrategy, loggerFactory, additionalSinks);
         builder.EnableBestEffortOnNonConvergence();
-
         return builder.Build();
     }
 
-    /// <summary>
-    /// Builds the pipeline like <see cref="Build"/>, but also injects the last completed iteration's
-    /// artifact text as a seed draft into the initial run context. Used by the orchestrator for resume
-    /// runs where <paramref name="seedDraftText"/> is non-null. <paramref name="loopSafeguards"/> as in <see cref="Build"/>.
-    /// </summary>
-    public static GeefPipelineRunner<FinalizedDocument> BuildWithSeedDraft(
-        CrewSnapshot snapshot,
-        ILlmClientResolver resolver,
-        IOptions<ConvergenceOptions> convergenceOptions,
-        string seedDraftText,
-        IRunWarningSink warningSink,
-        IAdvisorConsultationRepository? consultationRepository = null,
-        Guid runId = default,
-        ILoggerFactory? loggerFactory = null,
-        IEnumerable<IGeefEventSink>? additionalSinks = null,
-        IGroundingProviderFactory? groundingProviderFactory = null,
-        IPricingCatalog? pricingCatalog = null,
-        ICostAccumulator? costAccumulator = null,
-        IGroundingRefiner? groundingRefiner = null,
-        IGroundingConsultationRepository? groundingConsultationRepository = null,
-        ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
-        LoopSafeguards? loopSafeguards = null)
-    {
-        var safeguards = loopSafeguards ?? LoopSafeguards.None;
-        IGroundingStep grounding = new SeedDraftGroundingStep(seedDraftText);
-        if (snapshot.GroundingProviders is { Count: > 0 })
-        {
-            if (groundingProviderFactory is null)
-                throw new InvalidOperationException(MissingGroundingFactoryMessage);
-            grounding = new MultiProviderGroundingStep(
-                grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
-                loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
-                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
-                warningSink,
-                groundingRefiner,
-                groundingConsultationRepository,
-                toolBackedGroundingProvider);
-        }
-
-        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator,
-            blockingFindingsOnly: safeguards.WriterBlockingOnly);
-        var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator);
-        var finalizer = LoopFinalizer(safeguards);
-
-        var builder = CreateBuilder(grounding, execution, reviewers, finalizer,
-            convergenceOptions, snapshot.ConvergenceOverride,
-            snapshot.EvaluationStrategy, loggerFactory, additionalSinks, safeguards.StopWithoutProgress);
-
-        if (consultationRepository is not null)
-            RegisterAdvisors(builder, snapshot.Advisors, resolver, consultationRepository, runId, pricingCatalog, costAccumulator);
-
-        builder.EnableBestEffortOnNonConvergence();
-
-        return builder.Build();
-    }
-
-    /// <summary>
-    /// Builds the pipeline with explicitly supplied providers. Used in tests to inject stubs or fakes.
-    /// Advisor registration is skipped (no advisor profiles available in this code path).
-    /// </summary>
+    /// <summary>Builds the pipeline with explicitly supplied steps. Used in tests to inject stubs or fakes.</summary>
     public static GeefPipelineRunner<FinalizedDocument> BuildWithProviders(
         IGroundingStep grounding,
         IExecutionStep execution,
@@ -168,12 +51,9 @@ internal static class AtelierPipelineFactory
         ConvergencePolicyOverride? convergenceOverride = null,
         EvaluationStrategy evaluationStrategy = EvaluationStrategy.Parallel,
         ILoggerFactory? loggerFactory = null,
-        IEnumerable<IGeefEventSink>? additionalSinks = null)
-    {
-        return CreateBuilder(grounding, execution, reviewers, finalizer,
-            convergenceOptions, convergenceOverride,
+        IEnumerable<IGeefEventSink>? additionalSinks = null) =>
+        CreateBuilder(grounding, execution, reviewers, finalizer, convergenceOptions, convergenceOverride,
             evaluationStrategy, loggerFactory, additionalSinks).Build();
-    }
 
     private static GeefPipelineBuilder<FinalizedDocument> CreateBuilder(
         IGroundingStep grounding,
@@ -184,12 +64,9 @@ internal static class AtelierPipelineFactory
         ConvergencePolicyOverride? convergenceOverride,
         EvaluationStrategy evaluationStrategy,
         ILoggerFactory? loggerFactory,
-        IEnumerable<IGeefEventSink>? additionalSinks,
-        bool stopWithoutProgress = false)
+        IEnumerable<IGeefEventSink>? additionalSinks)
     {
         IConvergencePolicy policy = ConvergencePolicyBuilder.Build(convergenceOptions.Value, convergenceOverride);
-        if (stopWithoutProgress)
-            policy = new NoProgressStopPolicy(policy, ConvergencePolicyBuilder.BlockingSeverity);
 
         var builder = SdkGeef.CreatePipeline<FinalizedDocument>()
             .UseGrounding(grounding)
@@ -206,10 +83,7 @@ internal static class AtelierPipelineFactory
             .UseMiddleware(new TracingMiddleware());
 
         if (loggerFactory is not null)
-        {
-            builder = builder.AddEventSink(
-                new LoggingEventSink(loggerFactory.CreateLogger("Geef.Atelier.Pipeline")));
-        }
+            builder = builder.AddEventSink(new LoggingEventSink(loggerFactory.CreateLogger("Geef.Atelier.Pipeline")));
 
         if (additionalSinks is not null)
         {
@@ -220,70 +94,12 @@ internal static class AtelierPipelineFactory
         return builder;
     }
 
-    private static IFinalizer<FinalizedDocument> LoopFinalizer(LoopSafeguards safeguards) =>
-        safeguards.BestDraft
-            ? new BestDraftFinalizer(new MarkdownFinalizer(), ConvergencePolicyBuilder.BlockingSeverity)
-            : new MarkdownFinalizer();
-
-    private static void RegisterAdvisors(
-        GeefPipelineBuilder<FinalizedDocument> builder,
-        IReadOnlyList<AdvisorProfile> profiles,
-        ILlmClientResolver resolver,
-        IAdvisorConsultationRepository consultationRepository,
-        Guid runId,
-        IPricingCatalog? pricingCatalog,
-        ICostAccumulator? costAccumulator)
-    {
-        foreach (var profile in profiles)
-        {
-            var advisor = new ProfileBasedAdvisor(
-                profile, resolver, consultationRepository, runId, pricingCatalog, costAccumulator);
-            builder.AddAdvisor(advisor, MapTrigger(profile.Trigger));
-        }
-    }
-
-    private static SdkAdvisorTrigger MapTrigger(AdvisorTrigger atelierTrigger) => atelierTrigger switch
-    {
-        AdvisorTrigger.BeforeFirstExecution => SdkAdvisorTrigger.BeforeFirstExecution,
-        AdvisorTrigger.BeforeEveryExecution => SdkAdvisorTrigger.BeforeEveryExecution,
-        AdvisorTrigger.OnConvergenceFailure => SdkAdvisorTrigger.OnConvergenceFailure,
-        _ => SdkAdvisorTrigger.BeforeFirstExecution
-    };
-
-    /// <summary>
-    /// Returns reviewers for the given profiles. A crew without reviewers is rejected: silently approving every
-    /// draft would deliver unchecked text as if it had been reviewed. The system crews, the template studio and the
-    /// crew-spec validator always provide at least one reviewer; only a hand-edited template can lack one. The run then
-    /// fails with <see cref="InvalidCrewSnapshotException"/>, whose message is shown to the user as it is.
-    /// When <paramref name="specialReviewerResolver"/> is supplied, each profile is offered to it first;
-    /// a non-null return value replaces the default <see cref="ProfileBasedReviewer"/> for that profile.
-    /// </summary>
-    private static IEnumerable<IReviewer> ResolveReviewers(
-        IReadOnlyList<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile> profiles,
-        ILlmClientResolver resolver,
-        IPricingCatalog? pricingCatalog,
-        ICostAccumulator? costAccumulator,
-        Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null)
+    private static List<IReviewer> ResolveReviewers(IReadOnlyList<ReviewerProfile> profiles, Func<ReviewerProfile, IReviewer?> reviewerResolver)
     {
         if (profiles.Count == 0)
             throw new InvalidCrewSnapshotException(
-                "The team for this task has no reviewers, so its text could not be checked. Add at least one reviewer and start again.");
+                "The saved setup of this task has no checks, so its text could not be checked. Please start it again.");
 
-        var classifier = new HttpTransientFaultClassifier();
-        return profiles.Select(r =>
-        {
-            if (specialReviewerResolver is not null)
-            {
-                var special = specialReviewerResolver(r);
-                if (special is not null)
-                    return special;
-            }
-
-            return (IReviewer)new ResilientReviewer(
-                new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator),
-                classifier,
-                maxAttempts: LlmResilience.ReviewerMaxAttempts,
-                maxDelay: LlmResilience.ReviewerMaxDelay);
-        });
+        return profiles.Select(p => reviewerResolver(p) ?? throw new InvalidCrewSnapshotException(UnknownCheckMessage)).ToList();
     }
 }

@@ -147,7 +147,8 @@ public sealed class LiveReloadDataAccessTests : TestContext
                 BriefingText = "Test briefing",
                 ConfigJson = "{}",
                 FinalText = "Draft.",
-                CrewSnapshot = TestCrewSnapshots.KlassikJson,
+                CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName,
+                CrewSnapshot = TestCrewSnapshots.RunnableJson,
             },
             []);
         var probe = new ConcurrencyProbeRunService(details.Run, details) { ImmediateCalls = 2 };
@@ -181,7 +182,8 @@ public sealed class LiveReloadDataAccessTests : TestContext
                 Status = RunStatus.Running,
                 BriefingText = "Test briefing",
                 ConfigJson = "{}",
-                CrewSnapshot = TestCrewSnapshots.KlassikJson,
+                CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName,
+                CrewSnapshot = TestCrewSnapshots.RunnableJson,
             },
             []);
         var runService = new CountingDetailRunService(new StubRunService(details), runId);

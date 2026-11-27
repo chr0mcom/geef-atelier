@@ -9,9 +9,9 @@ public sealed class CrewSnapshotDeserializeForRunTests
     [Fact]
     public void ReadsAValidSnapshot()
     {
-        var snapshot = CrewSnapshot.DeserializeForRun(TestCrewSnapshots.KlassikJson);
+        var snapshot = CrewSnapshot.DeserializeForRun(TestCrewSnapshots.RunnableJson);
 
-        Assert.Equal(SystemCrew.DefaultExecutorProfile.Name, snapshot.Executor.Name);
+        Assert.Equal(TestLoop.Writer.Name, snapshot.Executor.Name);
         Assert.Equal(2, snapshot.Reviewers.Count);
     }
 
@@ -52,6 +52,6 @@ public sealed class CrewSnapshotDeserializeForRunTests
     public void TolerantReadStaysAvailableForDisplay()
     {
         Assert.Null(CrewSnapshot.Deserialize("{not json"));
-        Assert.NotNull(CrewSnapshot.Deserialize(TestCrewSnapshots.KlassikJson));
+        Assert.NotNull(CrewSnapshot.Deserialize(TestCrewSnapshots.RunnableJson));
     }
 }

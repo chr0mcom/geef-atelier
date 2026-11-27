@@ -127,7 +127,7 @@ public sealed class RunServiceResumeTests
     // ── RunKind inheritance ───────────────────────────────────────────────
 
     [Fact]
-    public async Task ResumeRunAsync_InheritsParentRunKind_CrewComposition()
+    public async Task ResumeRunAsync_RefusesAComposedRunAsARemovedWayOfWorking()
     {
         var parentId  = Guid.NewGuid();
         var parent    = new RunEntity
@@ -135,15 +135,18 @@ public sealed class RunServiceResumeTests
             Id = parentId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Aborted,
             BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = "alice",
             Kind = RunKind.CrewComposition,
-            CrewSnapshot = TestCrewSnapshots.KlassikJson,
+            CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName,
+            CrewSnapshot = TestCrewSnapshots.RunnableJson,
         };
         var capturing = new CapturingPersistenceService();
         var repo      = new SingleDetailsRepository(parent, []);
         var svc       = MakeService(capturing, repo);
 
-        await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice");
+        var error = await Assert.ThrowsAsync<RunNotResumableException>(() =>
+            svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice"));
 
-        Assert.Equal(RunKind.CrewComposition, capturing.LastKind);
+        Assert.Equal(ResumeRules.RetiredSetupMessage, error.Message);
+        Assert.Null(capturing.LastKind);
     }
 
     [Fact]
@@ -303,7 +306,8 @@ public sealed class RunServiceResumeTests
         {
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
             BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = createdByUser,
-            CrewSnapshot = TestCrewSnapshots.KlassikJson,
+            CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName,
+            CrewSnapshot = TestCrewSnapshots.RunnableJson,
         };
 
     private static RunEntity MakeRunWithText(Guid id, RunStatus status, string? createdByUser, string finalText) =>
@@ -311,7 +315,7 @@ public sealed class RunServiceResumeTests
         {
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
             BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = createdByUser,
-            CrewSnapshot = TestCrewSnapshots.KlassikJson, FinalText = finalText,
+            CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName, CrewSnapshot = TestCrewSnapshots.RunnableJson, FinalText = finalText,
         };
 
     private static RunEntity MakeOrderRun(Guid id, RunStatus status, string finalText, int version, string? revisionHint) =>
@@ -319,7 +323,7 @@ public sealed class RunServiceResumeTests
         {
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
             BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = "alice",
-            CrewSnapshot = TestCrewSnapshots.KlassikJson, FinalText = finalText,
+            CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName, CrewSnapshot = TestCrewSnapshots.RunnableJson, FinalText = finalText,
             OrderId = Guid.NewGuid(), OrderVersion = version, RevisionHint = revisionHint,
         };
 
@@ -328,6 +332,7 @@ public sealed class RunServiceResumeTests
         {
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
             BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = createdByUser,
+            CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName,
             CrewSnapshot = snapshotJson,
         };
 

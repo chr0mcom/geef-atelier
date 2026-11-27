@@ -16,7 +16,7 @@ public sealed class StubPipelineConvergenceTests(ITestOutputHelper output)
     {
         var outputSink = new OutputEventSink(output);
         var runner = AtelierPipelineFactory.BuildWithProviders(
-            new BriefingGroundingStep(),
+            new TestLoopGrounding(),
             new StubExecutionStep(),
             [
                 new StubReviewer("BriefingTreueStub",  Geef.Sdk.Results.FindingSeverity.Error,   "Stub finding: simulated briefing-coverage gap (will be cleared on next iteration)."),

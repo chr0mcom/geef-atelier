@@ -7,6 +7,8 @@ using Geef.Atelier.Tests.Llm;
 using Geef.Sdk.Events;
 using Microsoft.Extensions.Options;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Pipeline;
 
 public sealed class AtelierPipelineEventTests
@@ -21,11 +23,11 @@ public sealed class AtelierPipelineEventTests
         var sink       = new CountingEventSink();
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
-            new BriefingGroundingStep(),
-            new ProfileBasedExecutor(SystemCrew.DefaultExecutorProfile, resolver),
+            new TestLoopGrounding(),
+            new TestLoopWriter(TestLoop.Writer, resolver),
             [
-                new ProfileBasedReviewer(SystemCrew.BriefingFidelityProfile, resolver),
-                new ProfileBasedReviewer(SystemCrew.ClarityProfile, resolver)
+                new TestLoopReviewer(TestLoop.Reviewers[0], resolver),
+                new TestLoopReviewer(TestLoop.Reviewers[1], resolver)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),

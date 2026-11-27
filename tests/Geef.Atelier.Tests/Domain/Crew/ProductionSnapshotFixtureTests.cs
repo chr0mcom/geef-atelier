@@ -6,7 +6,6 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.Grounding;
-using Geef.Atelier.Infrastructure.Pipeline;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
@@ -58,8 +57,6 @@ public sealed class ProductionSnapshotFixtureTests(ITestOutputHelper output)
                     problems.Add($"{name}: no reviewers (would now fail instead of auto-approving)");
                 foreach (var profile in snapshot.GroundingProviders ?? [])
                 {
-                    if (profile.IsSystem && GroundingPathSelection.ProviderTypePathSystemProfiles.Contains(profile.Name) && profile.UsesToolPath())
-                        problems.Add($"{name}: system profile {profile.Name} would still take the tool path");
                     if (!registeredGrounding.Contains(profile.ProviderType) && !profile.ProviderType.IsRetiredGroundingType())
                         problems.Add($"{name}: grounding type '{profile.ProviderType}' is neither registered nor retired");
                 }

@@ -37,7 +37,7 @@ public sealed class RunOrchestratorFailsOnProviderErrorTests(PostgresFixture fix
     {
         await using var ctx   = fixture.NewContext();
         var svc   = new RunPersistenceService(ctx);
-        var runId = await svc.CreateRunAsync("HTTP 400 test", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
+        var runId = await svc.CreateRunAsync("HTTP 400 test", "{}", crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None);
 
         await using var host = new OrchestratorTestHost(fixture, ThrowingLlmClient.HttpError(HttpStatusCode.BadRequest));
         await host.StartAsync();
@@ -58,7 +58,7 @@ public sealed class RunOrchestratorFailsOnProviderErrorTests(PostgresFixture fix
     {
         await using var ctx   = fixture.NewContext();
         var svc   = new RunPersistenceService(ctx);
-        var runId = await svc.CreateRunAsync("HTTP 401 test", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
+        var runId = await svc.CreateRunAsync("HTTP 401 test", "{}", crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None);
 
         await using var host = new OrchestratorTestHost(fixture, ThrowingLlmClient.HttpError(HttpStatusCode.Unauthorized));
         await host.StartAsync();
@@ -79,7 +79,7 @@ public sealed class RunOrchestratorFailsOnProviderErrorTests(PostgresFixture fix
     {
         await using var ctx   = fixture.NewContext();
         var svc   = new RunPersistenceService(ctx);
-        var runId = await svc.CreateRunAsync("HTTP 500 test", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
+        var runId = await svc.CreateRunAsync("HTTP 500 test", "{}", crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None);
 
         await using var host = new OrchestratorTestHost(fixture, ThrowingLlmClient.HttpError(HttpStatusCode.InternalServerError));
         await host.StartAsync();
@@ -100,7 +100,7 @@ public sealed class RunOrchestratorFailsOnProviderErrorTests(PostgresFixture fix
     {
         await using var ctx   = fixture.NewContext();
         var svc   = new RunPersistenceService(ctx);
-        var runId = await svc.CreateRunAsync("Timeout test", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
+        var runId = await svc.CreateRunAsync("Timeout test", "{}", crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None);
 
         await using var host = new OrchestratorTestHost(fixture, ThrowingLlmClient.Timeout());
         await host.StartAsync();
@@ -121,7 +121,7 @@ public sealed class RunOrchestratorFailsOnProviderErrorTests(PostgresFixture fix
     {
         await using var ctx   = fixture.NewContext();
         var svc   = new RunPersistenceService(ctx);
-        var runId = await svc.CreateRunAsync("Generic error test", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
+        var runId = await svc.CreateRunAsync("Generic error test", "{}", crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None);
 
         await using var host = new OrchestratorTestHost(fixture, ThrowingLlmClient.GenericError("Totally unexpected error."));
         await host.StartAsync();
@@ -143,7 +143,7 @@ public sealed class RunOrchestratorFailsOnProviderErrorTests(PostgresFixture fix
     {
         await using var ctx   = fixture.NewContext();
         var svc   = new RunPersistenceService(ctx);
-        var runId = await svc.CreateRunAsync("Regression: successful run", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
+        var runId = await svc.CreateRunAsync("Regression: successful run", "{}", crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None);
 
         await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient());
         await host.StartAsync();

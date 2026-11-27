@@ -268,8 +268,7 @@ internal sealed class RunOrchestratorService(
             var accumulator = costTrackingEnabled ? new RunCostAccumulator() : null;
 
             await using var scope = scopeFactory.CreateAsyncScope();
-            var snapshot = await scope.ServiceProvider.GetRequiredService<AtelierDbContext>()
-                .ForRunAsync(run, CrewSnapshot.DeserializeForRun(run.CrewSnapshot), cts.Token);
+            var snapshot = CrewSnapshot.DeserializeForRun(run.CrewSnapshot);
             var assemblyContext = new PipelineAssemblyContext(
                 run, snapshot, scope.ServiceProvider, scopeFactory, llmClientResolver, convergenceOptions, loggerFactory,
                 sink, accumulator, warningSink, groundingProviderFactory, pricingCatalog);

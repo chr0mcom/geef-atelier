@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Persistence;
 
 [Collection("Postgres")]
@@ -31,11 +33,11 @@ public sealed class PostgresEventSinkPersistsCompleteRunTests(PostgresFixture fi
         var resolver   = new TestLlmClientResolver(fakeClient);
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
-            new BriefingGroundingStep(),
-            new ProfileBasedExecutor(SystemCrew.DefaultExecutorProfile, resolver),
+            new TestLoopGrounding(),
+            new TestLoopWriter(TestLoop.Writer, resolver),
             [
-                new ProfileBasedReviewer(SystemCrew.BriefingFidelityProfile, resolver),
-                new ProfileBasedReviewer(SystemCrew.ClarityProfile, resolver)
+                new TestLoopReviewer(TestLoop.Reviewers[0], resolver),
+                new TestLoopReviewer(TestLoop.Reviewers[1], resolver)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),

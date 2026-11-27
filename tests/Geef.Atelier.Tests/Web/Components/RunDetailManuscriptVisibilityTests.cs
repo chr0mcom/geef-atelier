@@ -27,7 +27,8 @@ public sealed class RunDetailManuscriptVisibilityTests : TestContext
                 ConfigJson = "{}",
                 FinalText = finalText,
                 ErrorMessage = errorMessage,
-                CrewSnapshot = withSnapshot ? TestCrewSnapshots.KlassikJson : null,
+                CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName,
+                CrewSnapshot = withSnapshot ? TestCrewSnapshots.RunnableJson : null,
             },
             []);
 

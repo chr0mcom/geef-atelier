@@ -63,15 +63,8 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
         var ledger = Ledgers.GetValue(context, _ => new FactCheckLedger());
 
         return AtelierPipelineFactory.Build(
-            context.Snapshot, context.LlmClientResolver, context.ConvergenceOptions,
-            runId: context.Run.Id,
-            loggerFactory: context.LoggerFactory,
-            additionalSinks: [context.EventSink],
-            groundingProviderFactory: context.GroundingProviderFactory,
-            pricingCatalog: context.PricingCatalog,
-            costAccumulator: context.CostAccumulator,
-            customExecutionStep: writer,
-            specialReviewerResolver: profile => profile.Name switch
+            context.Snapshot, context.ConvergenceOptions, grounding, writer,
+            profile => profile.Name switch
             {
                 DeterministicChecksReviewer.ReviewerName => checks,
                 SourceFactCheckReviewer.ReviewerName => FactReviewer(context, profile, ledger),
@@ -79,8 +72,8 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
                     context.CostAccumulator, context.WarningSink, context.Run.Id, context.LoggerFactory.CreateLogger<RequirementsCheckReviewer>()),
                 _ => null,
             },
-            warningSink: context.WarningSink,
-            customGroundingStep: grounding);
+            context.LoggerFactory,
+            [context.EventSink]);
     }
 
     /// <summary>The planning call of a run of <see cref="SystemCrew.DirectOutlineTemplateName"/> (D-087); <c>null</c> for every other run.</summary>

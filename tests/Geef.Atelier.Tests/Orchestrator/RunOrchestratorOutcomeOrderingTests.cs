@@ -36,7 +36,7 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
     public async Task ConvergedOutcomeAppearsOnlyAfterTheFinishingStepsAreStored()
     {
         var finalizers = new BlockingFinalizerFactory();
-        var runId = await CreateRunAsync(Briefing(), TestCrewSnapshots.Serialize(WithFinalizer(TestCrewSnapshots.Klassik)));
+        var runId = await CreateRunAsync(Briefing(), TestCrewSnapshots.Serialize(WithFinalizer(TestCrewSnapshots.Runnable)));
         await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient(), FastOptions(),
             services => services.AddSingleton<IFinalizerExecutorFactory>(finalizers));
         await host.StartAsync();
@@ -58,7 +58,7 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
     public async Task BestEffortOutcomeAppearsOnlyAfterTheFinishingStepsAreStored()
     {
         var finalizers = new BlockingFinalizerFactory();
-        var snapshot = WithFinalizer(TestCrewSnapshots.Klassik with
+        var snapshot = WithFinalizer(TestCrewSnapshots.Runnable with
         {
             ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
             RunFinalizersOnMaxAttempts = true,
@@ -121,7 +121,7 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
     public async Task LostCompletionWriteNeverClaimsAConvergedResult()
     {
         var briefing = Briefing();
-        var runId = await CreateRunAsync(briefing, TestCrewSnapshots.KlassikJson);
+        var runId = await CreateRunAsync(briefing, TestCrewSnapshots.RunnableJson);
         await using var trigger = await RunRowTrigger.CreateAsync(fixture, briefing,
             """NEW."Status" = 'Completed' AND OLD."Status" <> 'Completed'""",
             "RAISE EXCEPTION 'injected completion write failure';");
@@ -139,7 +139,7 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
     [Fact(Timeout = 30_000)]
     public async Task CriticalStopWithATextIsAbortedButDeliveredWithOpenPoints()
     {
-        var snapshot = TestCrewSnapshots.Klassik with
+        var snapshot = TestCrewSnapshots.Runnable with
         {
             ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 3, AbortOnCritical: true, DetectRegression: null, StagnationThreshold: null),
         };
@@ -161,7 +161,7 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
         Finalizers = [new FinalizerProfile("blocking-step", "Blocking step", "d", FinalizerType.Transform, [], false)],
     };
 
-    private static string NonConvergingSnapshotJson() => TestCrewSnapshots.Serialize(TestCrewSnapshots.Klassik with
+    private static string NonConvergingSnapshotJson() => TestCrewSnapshots.Serialize(TestCrewSnapshots.Runnable with
     {
         ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
     });

@@ -35,7 +35,7 @@ public sealed class RunDetailChangeLinkTests : TestContext
         var run = new RunEntity
         {
             Id = _runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Failed, BriefingText = "Test briefing", ConfigJson = "{}",
-            FinalText = finalText, CreatedByUser = "alice", OrderId = orderId, OrderVersion = orderId is null ? null : version, RevisionHint = revisionHint,
+            FinalText = finalText, CreatedByUser = "alice", OrderId = orderId, CrewTemplateName = template, OrderVersion = orderId is null ? null : version, RevisionHint = revisionHint,
             CrewSnapshot = System.Text.Json.JsonSerializer.Serialize(snapshot, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }),
         };
         Services.AddSingleton<IRunService>(new SnapshotRunService(new StubRunService(new RunDetails(run, [])), snapshot));
@@ -68,15 +68,24 @@ public sealed class RunDetailChangeLinkTests : TestContext
     }
 
     [Theory]
-    [InlineData(true, ReviseMode.Off, true)]
-    [InlineData(false, ReviseMode.On, true)]
-    [InlineData(true, ReviseMode.On, false)]
-    public void Otherwise_resume_stays(bool direct, ReviseMode revise, bool withOrder)
+    [InlineData(ReviseMode.Off, true)]
+    [InlineData(ReviseMode.On, false)]
+    public void Otherwise_resume_stays(ReviseMode revise, bool withOrder)
     {
-        var cut = Render(direct ? SystemCrew.DirectTemplateName : "klassik", withOrder ? _orderId : null, revise);
+        var cut = Render(SystemCrew.DirectTemplateName, withOrder ? _orderId : null, revise);
 
         Assert.Single(cut.FindAll("[data-testid='resume-run-button']"));
         Assert.Empty(cut.FindAll("[data-testid='resume-change-link']"));
+    }
+
+    [Fact]
+    public void A_run_of_a_removed_way_of_working_offers_neither_resume_nor_change_and_says_why()
+    {
+        var cut = Render("klassik", _orderId, ReviseMode.On);
+
+        Assert.Empty(cut.FindAll("[data-testid='resume-run-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='resume-change-link']"));
+        Assert.Equal(ResumeRules.RetiredSetupMessage, cut.Find("[data-testid='resume-refusal']").TextContent.Trim());
     }
 
     [Fact]

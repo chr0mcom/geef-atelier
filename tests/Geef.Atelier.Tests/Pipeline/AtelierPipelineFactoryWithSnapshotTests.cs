@@ -5,6 +5,8 @@ using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
 using Microsoft.Extensions.Options;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Pipeline;
 
 /// <summary>
@@ -15,9 +17,9 @@ public sealed class AtelierPipelineFactoryWithSnapshotTests
 {
     private static CrewSnapshot KlassikSnapshot(EvaluationStrategy strategy = EvaluationStrategy.Parallel) => new(
         SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
-        TemplateName: SystemCrew.KlassikTemplateName,
-        Executor: SystemCrew.DefaultExecutorProfile,
-        Reviewers: [SystemCrew.BriefingFidelityProfile, SystemCrew.ClarityProfile],
+        TemplateName: TestLoop.TemplateName,
+        Executor: TestLoop.Writer,
+        Reviewers: TestLoop.Reviewers,
         EvaluationStrategy: strategy,
         ConvergenceOverride: null,
         Advisors: Array.Empty<AdvisorProfile>());
@@ -33,7 +35,7 @@ public sealed class AtelierPipelineFactoryWithSnapshotTests
         var snapshot = KlassikSnapshot(strategy);
 
         var ex = Record.Exception(() =>
-            AtelierPipelineFactory.Build(snapshot, resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings()));
+            TestLoop.Build(snapshot, resolver, Options.Create(new ConvergenceOptions())));
 
         Assert.Null(ex);
     }
@@ -44,15 +46,15 @@ public sealed class AtelierPipelineFactoryWithSnapshotTests
         var resolver = new TestLlmClientResolver(new FakeLlmClient());
         var snapshot = new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
-            TemplateName: SystemCrew.KlassikTemplateName,
-            Executor: SystemCrew.DefaultExecutorProfile,
-            Reviewers: [SystemCrew.BriefingFidelityProfile],
+            TemplateName: TestLoop.TemplateName,
+            Executor: TestLoop.Writer,
+            Reviewers: [TestLoop.Reviewers[0]],
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
             Advisors: Array.Empty<AdvisorProfile>());
 
         var ex = Record.Exception(() =>
-            AtelierPipelineFactory.Build(snapshot, resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings()));
+            TestLoop.Build(snapshot, resolver, Options.Create(new ConvergenceOptions())));
 
         Assert.Null(ex);
     }

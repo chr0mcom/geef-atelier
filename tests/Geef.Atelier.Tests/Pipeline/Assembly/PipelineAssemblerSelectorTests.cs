@@ -20,8 +20,6 @@ public sealed class PipelineAssemblerSelectorTests
 
     public static TheoryData<string, Type> Cases => new()
     {
-        { "classic", typeof(StandardPipelineAssembler) },
-        { "resume", typeof(SeedDraftPipelineAssembler) },
         { "direct", typeof(DirectPipelineAssembler) },
         { "direct-seeded", typeof(DirectPipelineAssembler) },
     };
@@ -32,10 +30,9 @@ public sealed class PipelineAssemblerSelectorTests
     {
         var (run, snapshot) = kind switch
         {
-            "resume" => (Run(seed: "draft"), TestCrewSnapshots.Klassik),
             "direct" => (Run(), DirectPipelineHarness.DirectSnapshot),
             "direct-seeded" => (Run(seed: "draft"), DirectPipelineHarness.DirectSnapshot),
-            _ => (Run(), TestCrewSnapshots.Klassik),
+            _ => (Run(), TestCrewSnapshots.Runnable),
         };
 
         var selector = new ServiceCollection().AddOptions().AddPipelineAssemblers().BuildServiceProvider().GetRequiredService<IPipelineAssemblerSelector>();
@@ -50,8 +47,22 @@ public sealed class PipelineAssemblerSelectorTests
         var selector = services.GetRequiredService<IPipelineAssemblerSelector>();
 
         Assert.IsType<DirectPipelineAssembler>(selector.Select(Run(), DirectPipelineHarness.DirectSnapshot));
-        Assert.IsType<StandardPipelineAssembler>(selector.Select(Run(), TestCrewSnapshots.Klassik));
-        Assert.Equal(3, services.GetServices<IPipelineAssembler>().Count());
+        Assert.Single(services.GetServices<IPipelineAssembler>());
+    }
+
+    [Theory]
+    [InlineData(RunKind.Standard, null)]
+    [InlineData(RunKind.Standard, "draft")]
+    [InlineData(RunKind.CrewComposition, null)]
+    [InlineData(RunKind.Learning, null)]
+    public void A_run_of_a_removed_way_of_working_is_refused_with_a_plain_sentence(RunKind kind, string? seed)
+    {
+        var selector = new ServiceCollection().AddOptions().AddPipelineAssemblers().BuildServiceProvider().GetRequiredService<IPipelineAssemblerSelector>();
+        var snapshot = CrewSnapshot.DeserializeForRun(TestCrewSnapshots.RetiredKlassikJson);
+
+        var error = Assert.Throws<InvalidCrewSnapshotException>(() => selector.Select(Run(kind, seed), snapshot));
+
+        Assert.Equal(PipelineAssemblerSelector.RetiredSetupMessage, error.Message);
     }
 
     [Fact]

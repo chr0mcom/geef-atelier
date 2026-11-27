@@ -7,6 +7,8 @@ using Geef.Atelier.Tests.Llm;
 using Microsoft.Extensions.Options;
 using Xunit.Abstractions;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Pipeline;
 
 public sealed class AtelierPipelineConvergenceTests(ITestOutputHelper output)
@@ -21,11 +23,11 @@ public sealed class AtelierPipelineConvergenceTests(ITestOutputHelper output)
         var outputSink = new OutputEventSink(output);
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
-            new BriefingGroundingStep(),
-            new ProfileBasedExecutor(SystemCrew.DefaultExecutorProfile, resolver),
+            new TestLoopGrounding(),
+            new TestLoopWriter(TestLoop.Writer, resolver),
             [
-                new ProfileBasedReviewer(SystemCrew.BriefingFidelityProfile, resolver),
-                new ProfileBasedReviewer(SystemCrew.ClarityProfile, resolver)
+                new TestLoopReviewer(TestLoop.Reviewers[0], resolver),
+                new TestLoopReviewer(TestLoop.Reviewers[1], resolver)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),

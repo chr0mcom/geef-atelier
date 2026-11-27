@@ -100,7 +100,7 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
             Status = RunStatus.Running,
             BriefingText = "Test briefing",
             ConfigJson = "{}",
-            CrewSnapshot = TestCrewSnapshots.KlassikJson,
+            CrewSnapshot = TestCrewSnapshots.RunnableJson,
         },
         []);
 

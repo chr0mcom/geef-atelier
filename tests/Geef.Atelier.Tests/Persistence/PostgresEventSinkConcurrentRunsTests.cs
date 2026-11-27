@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Persistence;
 
 [Collection("Postgres")]
@@ -34,11 +36,11 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
         var fakeClient1 = new FakeLlmClient();
         var resolver1   = new TestLlmClientResolver(fakeClient1);
         var runner1 = AtelierPipelineFactory.BuildWithProviders(
-            new BriefingGroundingStep(),
-            new ProfileBasedExecutor(SystemCrew.DefaultExecutorProfile, resolver1),
+            new TestLoopGrounding(),
+            new TestLoopWriter(TestLoop.Writer, resolver1),
             [
-                new ProfileBasedReviewer(SystemCrew.BriefingFidelityProfile, resolver1),
-                new ProfileBasedReviewer(SystemCrew.ClarityProfile, resolver1)
+                new TestLoopReviewer(TestLoop.Reviewers[0], resolver1),
+                new TestLoopReviewer(TestLoop.Reviewers[1], resolver1)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),
@@ -47,11 +49,11 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
         var fakeClient2 = new FakeLlmClient();
         var resolver2   = new TestLlmClientResolver(fakeClient2);
         var runner2 = AtelierPipelineFactory.BuildWithProviders(
-            new BriefingGroundingStep(),
-            new ProfileBasedExecutor(SystemCrew.DefaultExecutorProfile, resolver2),
+            new TestLoopGrounding(),
+            new TestLoopWriter(TestLoop.Writer, resolver2),
             [
-                new ProfileBasedReviewer(SystemCrew.BriefingFidelityProfile, resolver2),
-                new ProfileBasedReviewer(SystemCrew.ClarityProfile, resolver2)
+                new TestLoopReviewer(TestLoop.Reviewers[0], resolver2),
+                new TestLoopReviewer(TestLoop.Reviewers[1], resolver2)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),

@@ -105,8 +105,6 @@ internal sealed class OrderGroundingStep(
             .Set(AtelierContextKeys.OrderConstraints, constraints)
             .Set(AtelierContextKeys.FactMaterial, material)
             .Set(AtelierContextKeys.FactCheckMode, mode);
-        if (bundle.ContextDocument.Length > 0)
-            context = context.Set(AtelierContextKeys.GroundingContext, bundle.ContextDocument);
         if (seed is not null)
             context = context.Set(AtelierContextKeys.SeedDraft, WriterNotesFormat.Defuse(seed));
         if (arithmetic is not null)

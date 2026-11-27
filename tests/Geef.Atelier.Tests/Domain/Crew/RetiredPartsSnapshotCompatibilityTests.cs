@@ -15,7 +15,7 @@ public sealed class RetiredPartsSnapshotCompatibilityTests
 {
     private static string OlderSnapshotJson()
     {
-        var root = JsonNode.Parse(TestCrewSnapshots.KlassikJson)!.AsObject();
+        var root = JsonNode.Parse(TestCrewSnapshots.RunnableJson)!.AsObject();
         root["groundingProviders"] = new JsonArray(
             Grounding("academic-default", "academic-search", isSystem: true),
             Grounding("tavily-news", "news-search", isSystem: true),

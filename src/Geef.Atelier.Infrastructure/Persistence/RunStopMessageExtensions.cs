@@ -16,9 +16,6 @@ public static class RunStopMessageExtensions
     /// <summary>Sentence for a pipeline that ended unsuccessfully without reporting a reason.</summary>
     public const string StoppedWithOpenPointsMessage = "The work stopped before all open points were resolved.";
 
-    /// <summary>Sentence for <see cref="LoopStopReasons.NoProgress"/> (D-085, <c>Convergence:StopWithoutProgress</c>).</summary>
-    public const string NoProgressStopMessage = "Two more rounds did not reduce the open points, so the work was stopped.";
-
     /// <summary>Sentence added when the best draft so far was stored as the result.</summary>
     public const string BestVersionKeptMessage = "The best version so far was kept.";
 
@@ -36,7 +33,6 @@ public static class RunStopMessageExtensions
         ConvergenceDecision.StopRegression => "The text got worse again after earlier fixes, so the work was stopped.",
         ConvergenceDecision.EscalateToHuman => "The open points could not be resolved automatically and need a person to look at them.",
         ConvergenceDecision.AbortReviewerUnavailable => "A check could not be carried out, so the work was stopped.",
-        LoopStopReasons.NoProgress => NoProgressStopMessage,
         _ => UnknownStopMessage
     };
 

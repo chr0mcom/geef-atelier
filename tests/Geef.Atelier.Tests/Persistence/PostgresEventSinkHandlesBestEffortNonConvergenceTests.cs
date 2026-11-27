@@ -12,6 +12,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Persistence;
 
 [Collection("Postgres")]
@@ -31,18 +33,18 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
 
         var snapshot = new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
-            TemplateName: SystemCrew.KlassikTemplateName,
-            Executor: SystemCrew.DefaultExecutorProfile,
-            Reviewers: [SystemCrew.BriefingFidelityProfile, SystemCrew.ClarityProfile],
+            TemplateName: TestLoop.TemplateName,
+            Executor: TestLoop.Writer,
+            Reviewers: TestLoop.Reviewers,
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null,
             Advisors: Array.Empty<AdvisorProfile>());
 
-        var runner = AtelierPipelineFactory.Build(
+        var runner = TestLoop.Build(
             snapshot,
             new TestLlmClientResolver(new RejectingFakeLlmClient()),
-            Options.Create(new ConvergenceOptions { MaxIterations = 2 }), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
-            additionalSinks: [sink]);
+            Options.Create(new ConvergenceOptions { MaxIterations = 2 }),
+            [sink]);
 
         // Act — best-effort mode: the runner returns instead of throwing on non-convergence.
         var result = await runner.RunAsync(Briefing, CancellationToken.None);
@@ -88,18 +90,18 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
 
         var snapshot = new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
-            TemplateName: SystemCrew.KlassikTemplateName,
-            Executor: SystemCrew.DefaultExecutorProfile,
-            Reviewers: [SystemCrew.BriefingFidelityProfile, SystemCrew.ClarityProfile],
+            TemplateName: TestLoop.TemplateName,
+            Executor: TestLoop.Writer,
+            Reviewers: TestLoop.Reviewers,
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null,
             Advisors: Array.Empty<AdvisorProfile>());
 
-        var runner = AtelierPipelineFactory.Build(
+        var runner = TestLoop.Build(
             snapshot,
             new TestLlmClientResolver(new CriticalFakeLlmClient()),
-            Options.Create(new ConvergenceOptions { MaxIterations = 2, AbortOnCritical = true }), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
-            additionalSinks: [sink]);
+            Options.Create(new ConvergenceOptions { MaxIterations = 2, AbortOnCritical = true }),
+            [sink]);
 
         // Act — critical aborts also flow through the best-effort branch in Build pipelines.
         var result = await runner.RunAsync(Briefing, CancellationToken.None);

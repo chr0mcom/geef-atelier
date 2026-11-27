@@ -25,7 +25,7 @@ public sealed class RunOrchestratorHonorsStoppingTokenTests(PostgresFixture fixt
         // Arrange — create a run; gate blocks all API calls immediately
         await using var ctx = fixture.NewContext();
         var svc   = new RunPersistenceService(ctx);
-        var runId = await svc.CreateRunAsync("Stopping test run", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
+        var runId = await svc.CreateRunAsync("Stopping test run", "{}", crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None);
 
         var gate        = new SemaphoreSlim(0, int.MaxValue); // closed
         var gatedClient = new GatedFakeLlmClient(gate);

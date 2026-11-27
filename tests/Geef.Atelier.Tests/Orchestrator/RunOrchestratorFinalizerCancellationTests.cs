@@ -139,7 +139,7 @@ public sealed class RunOrchestratorFinalizerCancellationTests(PostgresFixture fi
 
     private async Task<Guid> CreateRunAsync(bool bestEffort = false, IReadOnlyList<FinalizerProfile>? finalizers = null)
     {
-        var snapshot = TestCrewSnapshots.Klassik with
+        var snapshot = TestCrewSnapshots.Runnable with
         {
             Finalizers = finalizers ?? [new FinalizerProfile("waiting-step", "Waiting step", "d", FinalizerType.Transform, [], false)],
         };

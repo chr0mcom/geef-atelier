@@ -72,6 +72,7 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                 services.TryAddSingleton<IGroundingProviderFactory>(sp =>
                     new GroundingProviderFactory(sp.GetServices<IGroundingProvider>()));
                 services.AddPipelineAssemblers();
+                services.AddTestLoopAssembler();
                 services.AddHostedService<RunOrchestratorService>();
             })
             .Build();

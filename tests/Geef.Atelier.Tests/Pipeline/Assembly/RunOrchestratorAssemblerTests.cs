@@ -37,8 +37,8 @@ public sealed class RunOrchestratorAssemblerTests(PostgresFixture fixture)
     public async Task The_selected_assembler_builds_the_pipeline_and_stores_its_results_before_the_outcome()
     {
         await using var ctx = fixture.NewContext();
-        var runId = await new RunPersistenceService(ctx).CreateRunAsync("Assembler test", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
-        var recording = new RecordingAssembler(new StandardPipelineAssembler(), fixture);
+        var runId = await new RunPersistenceService(ctx).CreateRunAsync("Assembler test", "{}", crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None);
+        var recording = new RecordingAssembler(new TestLoopAssembler(), fixture);
 
         await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient(), configureServices: services =>
             services.AddSingleton<IPipelineAssemblerSelector>(new PipelineAssemblerSelector([recording])));

@@ -10,6 +10,8 @@ using Geef.Sdk.Providers;
 using Geef.Sdk.Results;
 using Microsoft.Extensions.Options;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Pipeline;
 
 /// <summary>
@@ -24,23 +26,22 @@ public sealed class BestEffortIterationMatchesSdkTests
     {
         var snapshot = new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
-            TemplateName: SystemCrew.KlassikTemplateName,
-            Executor: SystemCrew.DefaultExecutorProfile,
-            Reviewers: [SystemCrew.BriefingFidelityProfile, SystemCrew.ClarityProfile],
+            TemplateName: TestLoop.TemplateName,
+            Executor: TestLoop.Writer,
+            Reviewers: TestLoop.Reviewers,
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 3, AbortOnCritical: false, DetectRegression: false, StagnationThreshold: null),
             Advisors: Array.Empty<Geef.Atelier.Core.Domain.Crew.Advisors.AdvisorProfile>());
         var scripted = new Dictionary<string, IReviewer>
         {
-            [SystemCrew.BriefingFidelityProfile.Name] = new ScriptedReviewer("always-rejects", 1, 2, 3),
-            [SystemCrew.ClarityProfile.Name] = new ScriptedReviewer("satisfied-in-round-two", 1, 3),
+            [TestLoop.Reviewers[0].Name] = new ScriptedReviewer("always-rejects", 1, 2, 3),
+            [TestLoop.Reviewers[1].Name] = new ScriptedReviewer("satisfied-in-round-two", 1, 3),
         };
-        var runner = AtelierPipelineFactory.Build(
+        var runner = TestLoop.Build(
             snapshot,
             new TestLlmClientResolver(new RoundDraftClient()),
             Options.Create(new ConvergenceOptions()),
-            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
-            specialReviewerResolver: profile => scripted[profile.Name]);
+            reviewers: profile => scripted[profile.Name]);
 
         var result = await runner.RunAsync("Write a short test text.", CancellationToken.None);
 

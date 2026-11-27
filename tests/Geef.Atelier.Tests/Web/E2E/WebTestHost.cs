@@ -134,6 +134,7 @@ internal sealed class WebTestHost : IAsyncDisposable
             new Geef.Atelier.Infrastructure.Grounding.GroundingProviderFactory(
                 sp.GetServices<Geef.Atelier.Application.Crew.Grounding.IGroundingProvider>()));
         builder.Services.AddPipelineAssemblers();
+        builder.Services.AddTestLoopAssembler();
         builder.Services.AddHostedService<RunOrchestratorService>();
 
         // SignalR + Notifier

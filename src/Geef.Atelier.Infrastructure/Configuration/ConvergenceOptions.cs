@@ -19,39 +19,4 @@ public sealed class ConvergenceOptions
     /// <summary>Per-iteration minute budget used to auto-scale the wall clock when
     /// <see cref="MaxElapsedMinutes"/> is null (default 15 min/iteration → e.g. 16 iterations = 4 h).</summary>
     public int MinutesPerIterationBudget { get; init; } = 15;
-
-    /// <summary>
-    /// Review loop only (standard and resumed runs, D-085): with <see cref="LoopSwitch.On"/> a loop that ends without approval
-    /// delivers the round with the fewest failed reviewers, then the fewest blocking findings, the most recent one on a tie,
-    /// instead of the round the SDK picks. Default <see cref="LoopSwitch.Off"/>.
-    /// </summary>
-    public LoopSwitch BestDraft { get; init; } = LoopSwitch.Off;
-
-    /// <summary>
-    /// Review loop only (D-085): with <see cref="LoopSwitch.On"/> the writer gets only the blocking findings of the last round,
-    /// never those of failed reviewers or below the blocking severity. Default <see cref="LoopSwitch.Off"/>.
-    /// </summary>
-    public LoopSwitch WriterBlockingOnly { get; init; } = LoopSwitch.Off;
-
-    /// <summary>
-    /// Review loop only (D-085): with <see cref="LoopSwitch.On"/> the loop stops once two rounds in a row brought no progress
-    /// (no round better than every round before it). Default <see cref="LoopSwitch.Off"/>.
-    /// </summary>
-    public LoopSwitch StopWithoutProgress { get; init; } = LoopSwitch.Off;
-
-    /// <summary>Value of <see cref="BestDraft"/> per user name (the owner of the run), overriding it (D-087, measurement accounts).</summary>
-    public Dictionary<string, LoopSwitch> BestDraftOverrides { get; init; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Value of <see cref="WriterBlockingOnly"/> per user name, overriding it (D-087).</summary>
-    public Dictionary<string, LoopSwitch> WriterBlockingOnlyOverrides { get; init; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Value of <see cref="StopWithoutProgress"/> per user name, overriding it (D-087).</summary>
-    public Dictionary<string, LoopSwitch> StopWithoutProgressOverrides { get; init; } = new(StringComparer.OrdinalIgnoreCase);
-}
-
-/// <summary>Operating switch of one review-loop safeguard (D-085).</summary>
-public enum LoopSwitch
-{
-    Off = 0,
-    On = 1,
 }

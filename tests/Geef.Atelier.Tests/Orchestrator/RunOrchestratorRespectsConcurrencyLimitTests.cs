@@ -27,7 +27,7 @@ public sealed class RunOrchestratorRespectsConcurrencyLimitTests(PostgresFixture
         await using var ctx = fixture.NewContext();
         var svc = new RunPersistenceService(ctx);
         for (var i = 0; i < 4; i++)
-            runIds.Add(await svc.CreateRunAsync($"Concurrency run {i + 1}", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None));
+            runIds.Add(await svc.CreateRunAsync($"Concurrency run {i + 1}", "{}", crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None));
 
         // Gate starts closed (0 permits) — all API calls block
         var gate = new SemaphoreSlim(0, int.MaxValue);

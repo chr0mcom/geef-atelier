@@ -103,7 +103,7 @@ public sealed class RunOrchestratorSafeguardTests(PostgresFixture fixture)
 
     private static string SnapshotJson(bool bestEffort, bool withFinalizer)
     {
-        var snapshot = TestCrewSnapshots.Klassik;
+        var snapshot = TestCrewSnapshots.Runnable;
         if (bestEffort)
             snapshot = snapshot with
             {

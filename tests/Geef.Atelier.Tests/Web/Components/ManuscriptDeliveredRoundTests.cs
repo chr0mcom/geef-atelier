@@ -5,7 +5,7 @@ using Geef.Atelier.Web.Components.UI;
 namespace Geef.Atelier.Tests.Web.Components;
 
 /// <summary>
-/// D-085: when the stored text comes from an earlier round than the last one (<c>Convergence:BestDraft</c>), the manuscript says which
+/// When the stored text comes from an earlier round than the last one (the best-effort text of a run without approval), the manuscript says which
 /// round it is instead of "After N iterations"; otherwise it reads as before.
 /// </summary>
 public sealed class ManuscriptDeliveredRoundTests : TestContext

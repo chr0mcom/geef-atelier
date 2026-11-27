@@ -14,24 +14,8 @@ internal static class AtelierContextKeys
     public static readonly ContextKey<LlmTokenUsage>  TokenUsage    = new("geef:atelier:token-usage");
 
     /// <summary>
-    /// The most complete draft produced so far across all iterations (the high-water mark by length).
-    /// <c>ProfileBasedExecutor</c> uses it as the yardstick for detecting a draft collapse (changelog /
-    /// partial document) and as the fallback when the executor repeatedly fails to re-emit the full text,
-    /// guaranteeing the working draft never regresses below the most complete version seen.
-    /// </summary>
-    public static readonly ContextKey<string>         BestDraft     = new("geef:atelier:best-draft");
-
-    /// <summary>
-    /// Injected by <c>MultiProviderGroundingStep</c> when one or more grounding providers are configured.
-    /// Contains concatenated formatted web-research blocks that <c>ProfileBasedExecutor</c> prepends before
-    /// the advisor block and user prompt.
-    /// </summary>
-    public static readonly ContextKey<string>         GroundingContext  = new("geef:atelier:grounding-context");
-
-    /// <summary>
-    /// Injected by <c>SeedDraftGroundingStep</c> for resume runs. Contains the artifact text of the
-    /// last completed iteration of the parent run. <c>ProfileBasedExecutor</c> uses it on iteration 1
-    /// to prime the LLM with a prior draft rather than generating from scratch.
+    /// Injected by <c>OrderGroundingStep</c> for a run with a seed draft (a resumed run or a change of an earlier version): the text
+    /// to start from. <c>DirectWriterExecutor</c> uses it on the first pass instead of writing from scratch.
     /// </summary>
     public static readonly ContextKey<string>         SeedDraft        = new("geef:atelier:seed-draft");
 
@@ -70,11 +54,4 @@ internal static class AtelierContextKeys
     /// for (<c>RunEntity.RevisionHint</c>). Its presence makes the writer use <c>DirectWriterPrompts.RevisionInstruction</c>.
     /// </summary>
     public static readonly ContextKey<string> RevisionHint = new("geef:atelier:revision-hint");
-
-    /// <summary>
-    /// Set by <c>BestDraftFinalizer</c> (D-085) on the context it finalizes when it picked the best round of a loop that ended
-    /// without approval: the number of that round. <c>DeliveredOutcomeExtensions.ToDeliveredOutcome</c> records it as the delivered
-    /// iteration. Missing whenever the safeguard is off.
-    /// </summary>
-    public static readonly ContextKey<int> DeliveredRound = new("geef:atelier:delivered-round");
 }

@@ -33,7 +33,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     [Fact(Timeout = 30_000)]
     public async Task ConvergedRunRecordsConvergedOutcomeAndTheLastIteration()
     {
-        var runId = await CreateRunAsync(TestCrewSnapshots.KlassikJson);
+        var runId = await CreateRunAsync(TestCrewSnapshots.RunnableJson);
 
         var run = await RunToEndAsync(new FakeLlmClient(), runId);
 
@@ -45,7 +45,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     [Fact(Timeout = 30_000)]
     public async Task NonConvergedRunKeepsFailedStatusDeliversTheBestDraftAndStoresTheLastFindingsOnce()
     {
-        var snapshot = TestCrewSnapshots.Klassik with
+        var snapshot = TestCrewSnapshots.Runnable with
         {
             ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 2, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         };
@@ -67,7 +67,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     [Fact(Timeout = 30_000)]
     public async Task FailedReviewerBecomesAWarningOnTheRun()
     {
-        var snapshot = TestCrewSnapshots.Klassik with
+        var snapshot = TestCrewSnapshots.Runnable with
         {
             Reviewers = [SystemCrew.BriefingFidelityProfile, SystemCrew.ClarityProfile with { SystemPrompt = FailingReviewerClient.Marker }],
         };
@@ -119,21 +119,21 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     [Fact(Timeout = 30_000)]
     public async Task CrewWithoutReviewersFailsInsteadOfAutoApproving()
     {
-        var runId = await CreateRunAsync(TestCrewSnapshots.Serialize(TestCrewSnapshots.Klassik with { Reviewers = [] }));
+        var runId = await CreateRunAsync(TestCrewSnapshots.Serialize(TestCrewSnapshots.Runnable with { Reviewers = [] }));
         var llm = new CountingLlmClient();
 
         var run = await RunToEndAsync(llm, runId);
 
         Assert.Equal(RunStatus.Failed, run.Status);
         Assert.Equal((RunOutcome?)RunOutcome.Failed, run.Outcome);
-        Assert.Contains("no reviewers", run.ErrorMessage);
+        Assert.Contains("has no checks", run.ErrorMessage);
         Assert.Equal(0, llm.Calls);
     }
 
     [Fact(Timeout = 30_000)]
     public async Task ProviderErrorRecordsFailedOutcome()
     {
-        var runId = await CreateRunAsync(TestCrewSnapshots.KlassikJson);
+        var runId = await CreateRunAsync(TestCrewSnapshots.RunnableJson);
 
         var run = await RunToEndAsync(ThrowingLlmClient.HttpError(System.Net.HttpStatusCode.Unauthorized), runId);
 
@@ -171,7 +171,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
         await using (var db = fixture.NewContext())
         {
             Assert.Equal(RunStatus.Pending, (await db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId)).Status);
-            await new RunPersistenceService(db).UpdateSnapshotAsync(runId, TestCrewSnapshots.KlassikJson);
+            await new RunPersistenceService(db).UpdateSnapshotAsync(runId, TestCrewSnapshots.RunnableJson);
         }
 
         var run = await WaitForTerminalAsync(runId);
@@ -194,7 +194,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     [Fact(Timeout = 30_000)]
     public async Task SkippedAndFailingFinishingStepsBecomeWarnings()
     {
-        var snapshot = TestCrewSnapshots.Klassik with
+        var snapshot = TestCrewSnapshots.Runnable with
         {
             Finalizers =
             [
@@ -231,7 +231,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     [Fact(Timeout = 30_000)]
     public async Task FinishingStepsThatAreNotRunAfterNonConvergenceBecomeAWarning()
     {
-        var snapshot = TestCrewSnapshots.Klassik with
+        var snapshot = TestCrewSnapshots.Runnable with
         {
             ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
             Finalizers = [new FinalizerProfile("export", "Export", "d", FinalizerType.FileExport, [], false)],
