@@ -21,7 +21,6 @@ public sealed class AdminOnlyPagesTests : TestContext
     [
         typeof(ProvidersIndex),
         typeof(ProviderTypeSelection),
-        typeof(HttpProviderEditor),
         typeof(CliProviderEditor),
         typeof(ProviderView),
         typeof(ToolsIndex),

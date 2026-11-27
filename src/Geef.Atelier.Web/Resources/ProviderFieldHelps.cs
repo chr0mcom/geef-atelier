@@ -15,37 +15,6 @@ public static class ProviderFieldHelps
     public const string IsActive =
         "Inactive providers are not shown in new profile forms. Existing profiles that reference this provider continue to work.";
 
-    // HTTP-specific
-    public const string HttpEndpoint =
-        "Base URL of the OpenAI-compatible endpoint, e.g. 'https://api.openai.com/v1'. No trailing slash.";
-
-    public const string HttpApiKeyEnv =
-        "Name of the environment variable that contains the API key, e.g. 'OPENAI_API_KEY'. The value is read from the server environment at runtime — never stored in the database.";
-
-    public const string HttpEndpointEnvOverride =
-        "Optional environment variable that overrides the endpoint URL. Useful for local instances like Ollama.";
-
-    public const string HttpAuthHeaderName =
-        "Name of the auth header. Default: 'Authorization'. For Azure OpenAI: 'api-key'.";
-
-    public const string HttpAuthHeaderFormat =
-        "Format of the auth header value with '{key}' as placeholder. Default: 'Bearer {key}'. For api-key auth: '{key}'.";
-
-    public const string HttpModelsEndpoint =
-        "Path to the models discovery endpoint relative to the base URL, e.g. '/models'. Leave empty if the provider has no models endpoint — then use a manual model list.";
-
-    public const string HttpDefaultHeaders =
-        "Optional additional HTTP headers sent with every request, e.g. HTTP-Referer or API version headers. Format: one header per line as 'Key: Value'.";
-
-    public const string HttpManualModelList =
-        "Manual model list when no models endpoint is available. One model per line.";
-
-    public const string HttpCostPerInputToken =
-        "Optional price per input token in EUR for cost tracking. Leave empty if unknown or not relevant.";
-
-    public const string HttpCostPerOutputToken =
-        "Optional price per output token in EUR for cost tracking. Leave empty if unknown or not relevant.";
-
     // CLI-specific
     public const string CliKind =
         "CLI type. For built-in CLIs (Claude, Codex, Gemini) most fields are pre-filled and read-only. For 'Generic' all fields are editable.";
