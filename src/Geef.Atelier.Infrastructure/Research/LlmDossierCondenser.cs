@@ -11,7 +11,7 @@ namespace Geef.Atelier.Infrastructure.Research;
 
 /// <summary>
 /// One structured call on the model of <see cref="ModelSlot.GroundingRefiner"/> with the schema <see cref="DossierSchema.Name"/>,
-/// <c>reasoning_effort</c> <see cref="ReasoningEffort"/>, without failover and with its own hard time limit
+/// <c>reasoning_effort</c> <see cref="ReasoningEffort"/>, without failover to another model (only another account with the same model) and with its own hard time limit
 /// (<see cref="ResearchOptions.CondenseTimeout"/>, gateway limit <see cref="ProxyTimeoutSeconds"/>). No second attempt, no other model.
 /// </summary>
 /// <remarks>

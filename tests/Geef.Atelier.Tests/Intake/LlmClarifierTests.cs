@@ -140,7 +140,7 @@ public sealed class LlmClarifierTests
 
         await clarifier.ClarifyAsync(Request, CancellationToken.None);
 
-        Assert.Equal([OpenAiCompatibleClient.FailoverOff], Assert.Single(handler.Requests).Request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
+        Assert.Equal([OpenAiCompatibleClient.FailoverSameModel], Assert.Single(handler.Requests).Request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
     }
 
     [Fact]

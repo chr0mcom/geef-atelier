@@ -105,7 +105,7 @@ public sealed class LlmFactCheckerTests
         Assert.Equal([(Profile.Provider, Profile.Model, (int?)8_192)], setup.Resolver.Profiles);
 
         var (request, body) = Assert.Single(setup.Handler.Requests);
-        Assert.Equal([OpenAiCompatibleClient.FailoverOff], request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
+        Assert.Equal([OpenAiCompatibleClient.FailoverSameModel], request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
         using var json = JsonDocument.Parse(body);
         var root = json.RootElement;
         Assert.Equal(Profile.Model, root.GetProperty("model").GetString());
@@ -160,7 +160,7 @@ public sealed class LlmFactCheckerTests
 
         Assert.Equal("claude-sonnet-latest", call.Model);
         Assert.Equal([("claude-cli", "claude-sonnet-latest", (int?)8_192)], setup.Resolver.Profiles);
-        Assert.Equal([OpenAiCompatibleClient.FailoverOff], Assert.Single(setup.Handler.Requests).Request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
+        Assert.Equal([OpenAiCompatibleClient.FailoverSameModel], Assert.Single(setup.Handler.Requests).Request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
     }
 
     [Fact]
@@ -357,7 +357,7 @@ public sealed class LlmFactCheckerTests
         Assert.Equal([new RecheckResult("f1", RecheckStatus.StillThere, "Fotos liegen diesem Schreiben bei.")], call.Results);
         Assert.Equal(answer, call.RawJson);
         var (request, body) = Assert.Single(setup.Handler.Requests);
-        Assert.Equal([OpenAiCompatibleClient.FailoverOff], request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
+        Assert.Equal([OpenAiCompatibleClient.FailoverSameModel], request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
         using var json = JsonDocument.Parse(body);
         Assert.Equal(FactCheckSchema.RecheckName, json.RootElement.GetProperty("response_format").GetProperty("json_schema").GetProperty("name").GetString());
         var messages = json.RootElement.GetProperty("messages").EnumerateArray().ToList();

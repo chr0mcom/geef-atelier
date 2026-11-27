@@ -51,8 +51,8 @@ internal sealed record OwnWords(string Request, IReadOnlyList<string> Answers, I
 /// space) becomes a blocking finding, at most <see cref="MaxFindings"/>. Its message and the correction are a fixed sentence with that
 /// verified quote (<see cref="Problem"/>); nothing the check wrote in its own words reaches the writer, the report or the page. The length is left out (the checks
 /// without a model cover it). Later passes are not checked again (cost cap); a call that fails is not repeated, the reviewer is then
-/// isolated as failed (never blocking) and the run gets the warning <see cref="UncheckedWarning"/>. No failover (another model would
-/// change the measured path).
+/// isolated as failed (never blocking) and the run gets the warning <see cref="UncheckedWarning"/>. No failover to another model (another model
+/// would change the measured path); another account with the same model may answer.
 /// </summary>
 internal sealed class RequirementsCheckReviewer(
     ReviewerProfile profile,

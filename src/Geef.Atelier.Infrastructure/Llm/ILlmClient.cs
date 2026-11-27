@@ -85,8 +85,9 @@ public sealed record LlmRequest
     public string? ContextDocument { get; init; }
 
     /// <summary>
-    /// When true, the cli-proxy is asked not to fail over to another CLI for this call (request header
-    /// <c>x-cli-proxy-failover: off</c>). Used by callers whose result is only usable from the requested CLI, such as
+    /// When true, the cli-proxy is asked to keep this call on the requested CLI and model (request header
+    /// <c>x-cli-proxy-failover: same-model</c>): it may move to another account of the same CLI, which runs the same model under
+    /// the same name, but never to another CLI. Used by callers whose result is only usable from the requested model, such as
     /// the direct-path writer in document mode. Other providers ignore it.
     /// </summary>
     public bool DisableFailover { get; init; }

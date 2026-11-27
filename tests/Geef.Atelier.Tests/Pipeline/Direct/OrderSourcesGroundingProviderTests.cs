@@ -62,7 +62,7 @@ public sealed class OrderSourcesGroundingProviderTests
 public sealed class OpenAiCompatibleClientFailoverSwitchTests
 {
     [Theory]
-    [InlineData(true, "off")]
+    [InlineData(true, "same-model")]
     [InlineData(false, null)]
     public async Task The_failover_header_is_sent_only_when_asked(bool disable, string? expected)
     {

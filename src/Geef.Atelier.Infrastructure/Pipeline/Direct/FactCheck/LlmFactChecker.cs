@@ -12,7 +12,7 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct.FactCheck;
 
 /// <summary>
 /// <see cref="IFactChecker"/> over the gateway: structured output (<see cref="FactCheckSchema"/>) in print mode, proxy failover
-/// off, reasoning effort from <see cref="DirectOptions"/>, the time limit per call from the caller, costs recorded per call. One
+/// limited to the same model, reasoning effort from <see cref="DirectOptions"/>, the time limit per call from the caller, costs recorded per call. One
 /// attempt per call: the fallback to another model is the caller's decision (<see cref="IsUnavailable"/>). The time limit goes to
 /// the cli-proxy as well (<see cref="ProxyTimeoutSeconds"/>, <see cref="ProxyTimeoutMargin"/> below the own limit), so that the proxy
 /// ends the CLI process and its child processes first instead of letting it run on after the call was given up; the own

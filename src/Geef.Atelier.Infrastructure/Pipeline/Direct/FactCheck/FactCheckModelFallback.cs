@@ -6,8 +6,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct.FactCheck;
 /// <summary>
 /// The one second attempt of a fact check whose model could not be reached (contract stage 3, 4.3): the next candidate of the
 /// slot <see cref="ModelSlot.FactReviewer"/> that is neither the writer's model nor served by the provider that failed, and that
-/// is not paid per token. The proxy's own failover stays off, because it would fall back to the CLI's default model, usually the
-/// writer's.
+/// is not paid per token. The proxy's own failover stays limited to the same model (another account of the same CLI), because a
+/// change of CLI would fall back to the CLI's default model, usually the writer's.
 /// </summary>
 internal static class FactCheckModelFallback
 {

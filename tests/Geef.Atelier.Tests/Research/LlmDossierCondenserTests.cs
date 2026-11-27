@@ -61,7 +61,7 @@ public sealed class LlmDossierCondenserTests
         Assert.Equal([(Provider, Model, (int?)LlmDossierCondenser.MaxTokens)], resolver.Profiles);
 
         var (request, body) = Assert.Single(handler.Requests);
-        Assert.Equal([OpenAiCompatibleClient.FailoverOff], request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
+        Assert.Equal([OpenAiCompatibleClient.FailoverSameModel], request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
         Assert.Equal(["55"], request.Headers.GetValues(OpenAiCompatibleClient.TimeoutHeader));
         using var json = JsonDocument.Parse(body);
         var root = json.RootElement;

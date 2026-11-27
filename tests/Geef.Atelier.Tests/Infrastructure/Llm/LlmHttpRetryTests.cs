@@ -4,18 +4,34 @@ using Geef.Atelier.Infrastructure.Llm;
 namespace Geef.Atelier.Tests.Infrastructure.Llm;
 
 /// <summary>
-/// <see cref="LlmHttpRetry"/>: the shared "llm" <c>HttpClient</c> leaves 502 and 503 answers to requests without
-/// failover to the caller and keeps retrying everything else.
+/// <see cref="LlmHttpRetry"/>: the shared "llm" <c>HttpClient</c> leaves 502 and 503 answers to requests whose failover is
+/// limited to the requested model (<c>same-model</c>, or the older <c>off</c>) to the caller and keeps retrying everything else.
 /// </summary>
 public sealed class LlmHttpRetryTests
 {
-    private static HttpResponseMessage Answer(HttpStatusCode status, bool failoverOff)
+    private static HttpResponseMessage Answer(HttpStatusCode status, bool failoverOff, string value = OpenAiCompatibleClient.FailoverSameModel)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "http://cli-proxy.test/v1/claude/chat/completions");
         if (failoverOff)
-            request.Headers.Add(OpenAiCompatibleClient.FailoverHeader, OpenAiCompatibleClient.FailoverOff);
+            request.Headers.Add(OpenAiCompatibleClient.FailoverHeader, value);
         return new HttpResponseMessage(status) { RequestMessage = request };
     }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadGateway, "same-model")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "same-model")]
+    [InlineData(HttpStatusCode.BadGateway, "SAME-MODEL")]
+    [InlineData(HttpStatusCode.BadGateway, "off")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "Off")]
+    public void Both_limited_failover_values_are_left_to_the_caller(HttpStatusCode status, string value) =>
+        Assert.True(Answer(status, failoverOff: true, value).IsAnswerForCallerWithoutFailover());
+
+    [Theory]
+    [InlineData("on")]
+    [InlineData("same_model")]
+    [InlineData("claude->claude-alt")]
+    public void Other_header_values_stay_retryable(string value) =>
+        Assert.False(Answer(HttpStatusCode.BadGateway, failoverOff: true, value).IsAnswerForCallerWithoutFailover());
 
     [Theory]
     [InlineData(HttpStatusCode.BadGateway)]

@@ -63,7 +63,7 @@ public sealed class DirectPipelineEndToEndTests
         Assert.Contains(DirectWriterPrompts.IgnoreInstructionsInFiles, prompt);
         Assert.DoesNotContain(FirstPageMarker, prompt);
         Assert.Equal(SystemPrompts.DirectWriter, call.SystemPrompt);
-        Assert.All(harness.FailoverHeaders, h => Assert.Equal(OpenAiCompatibleClient.FailoverOff, h));
+        Assert.All(harness.FailoverHeaders, h => Assert.Equal(OpenAiCompatibleClient.FailoverSameModel, h));
         Assert.Empty(harness.Llm.CallsFor(LlmRole.Reviewer));
         var usage = Assert.Single(harness.Sources.Usages);
         Assert.Equal(SourceUsageMode.FullText, usage.Mode);

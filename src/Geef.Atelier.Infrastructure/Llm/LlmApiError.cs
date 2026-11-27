@@ -14,7 +14,7 @@ internal static class LlmApiError
     /// <summary>cli-proxy: the CLI left the document empty and unchanged (HTTP 502).</summary>
     public const string EmptyResultCode = "empty_result";
 
-    /// <summary>cli-proxy: the requested CLI is unavailable and failover was switched off (HTTP 503).</summary>
+    /// <summary>cli-proxy: every account of the requested CLI is unavailable and failover to another CLI was not allowed (HTTP 503).</summary>
     public const string BackendUnavailableCode = "backend_unavailable";
 
     /// <summary>
