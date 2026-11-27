@@ -24,13 +24,12 @@ namespace Geef.Atelier.Tests.EndToEnd;
 /// End-to-end host over the real <c>Program</c> wiring (DI, pipeline factory, grounding step, orchestrator,
 /// repositories, event sink, MCP endpoint) against an isolated database on the shared Testcontainers Postgres.
 /// Only the outer boundary is replaced: the primary handlers of the named HTTP clients for the LLM endpoint,
-/// the cli-proxy model listing, Tavily and embeddings. Every other named client is blocked and logged.
+/// the cli-proxy model listing and Tavily. Every other named client is blocked and logged.
 /// </summary>
 internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
 {
     public const string McpToken = "e2e-mcp-token";
     public const string McpTokenUser = "e2e-mcp-user";
-    public const int EmbeddingDimensions = 1536;
     public const string BlockedClientLabel = "blocked";
 
     private static readonly HashSet<string> FakedClients = new(StringComparer.Ordinal)
@@ -38,7 +37,6 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
         HttpClientNames.Llm,
         HttpClientNames.CliProxyModels,
         FakeTavilyEndpoint.ClientName,
-        FakeEmbeddingsEndpoint.ClientName,
     };
 
     private static readonly RunStatus[] TerminalStatuses = [RunStatus.Completed, RunStatus.Failed, RunStatus.Aborted];
@@ -80,7 +78,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     /// <summary>Scriptable Tavily answers.</summary>
     public FakeTavilyEndpoint Tavily { get; }
 
-    /// <summary>Requests to Tavily, embeddings, the model listing and blocked clients.</summary>
+    /// <summary>Requests to Tavily, the model listing and blocked clients.</summary>
     public ExternalCallLog External { get; }
 
     /// <summary>The application's root service provider.</summary>
@@ -108,7 +106,6 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
         var external = new ExternalCallLog();
         var script = new ScriptedLlmEndpoint(llm);
         var tavily = new FakeTavilyEndpoint(external);
-        var embeddings = new FakeEmbeddingsEndpoint(external, EmbeddingDimensions);
         var models = new FakeCliProxyModelsEndpoint(external);
         var gate = new OrchestratorGate();
 
@@ -122,14 +119,11 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             web.UseSetting("Tavily:ApiKey", "e2e-tavily-key");
             web.UseSetting("Tavily:Endpoint", "https://tavily.e2e.invalid");
             web.UseSetting("Llm:Providers:openrouter:ApiKey", "e2e-openrouter-key");
-            web.UseSetting("Embeddings:Endpoint", "https://embeddings.e2e.invalid/api/v1");
-            web.UseSetting("Embeddings:Dimensions", EmbeddingDimensions.ToString(System.Globalization.CultureInfo.InvariantCulture));
             web.UseSetting("CliProxy:BaseUrl", "http://cli-proxy.e2e.invalid:8090");
             web.UseSetting("ModelCatalog:WarmUpEnabled", "false");
             web.UseSetting("Orchestrator:PollingInterval", "00:00:00.150");
             web.UseSetting("Orchestrator:CancellationPollingInterval", "00:00:00.200");
             web.UseSetting("Orchestrator:MaxConcurrentRuns", "4");
-            web.UseSetting("Finalizer:ExportPath", Path.Combine(keyDirectory, "exports"));
             web.UseSetting("Sources:StorageRoot", Path.Combine(keyDirectory, "sources"));
             web.UseSetting("Logging:LogLevel:Default", "Warning");
             web.UseSetting("Orders:IntakeMode", "Off");
@@ -155,8 +149,6 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
                     .ConfigurePrimaryHttpMessageHandler(() => new StubHttpMessageHandler(models.HandleAsync));
                 services.AddHttpClient(FakeTavilyEndpoint.ClientName)
                     .ConfigurePrimaryHttpMessageHandler(() => new StubHttpMessageHandler(tavily.HandleAsync));
-                services.AddHttpClient(FakeEmbeddingsEndpoint.ClientName)
-                    .ConfigurePrimaryHttpMessageHandler(() => new StubHttpMessageHandler(embeddings.HandleAsync));
 
                 services.ConfigureAll<HttpClientFactoryOptions>(options =>
                     options.HttpMessageHandlerBuilderActions.Add(builder =>

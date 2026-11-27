@@ -15,8 +15,7 @@ public interface IRunWarningSink
     /// Short plain-English sentence for the user, without technical details (exception texts, upstream answers,
     /// host or variable names, paths, technical profile names; name profiles by their display name); those belong in
     /// the log, passed through <see cref="SecretRedactionExtensions.ToRedactedLogText"/>. The same rule applies to
-    /// every other text shown with a run: <c>RunEntity.ErrorMessage</c>, <c>RunEntity.FinalizerErrorMessage</c> and
-    /// <c>RunArtifact.StatusMessage</c>. Unambiguous key formats are removed
+    /// every other text shown with a run, such as <c>RunEntity.ErrorMessage</c>. Unambiguous key formats are removed
     /// (<see cref="SecretRedactionExtensions.RedactKnownSecrets"/>) and the text is truncated to a safe length; long
     /// names stay intact.
     /// </param>

@@ -6,12 +6,12 @@ namespace Geef.Atelier.Tests.Domain.Crew.Models;
 public sealed class SystemCrewModelMatrixTests
 {
     [Fact]
-    public void EveryLlmCodeOnlyProfileWithASlotCarriesAnAllowedSlot()
+    public void EveryLlmCodeOnlyProfileWithASlotCarriesASlotOfItsRole()
     {
         foreach (var e in SystemCrew.CodeOnlyExecutorProfiles.Values)
-            Assert.True(e.ModelSlot is { } s && s.IsAllowedFor(ModelActorKind.Executor), e.Name);
+            Assert.Equal(ModelSlot.Executor, e.ModelSlot);
         foreach (var r in SystemCrew.CodeOnlyReviewerProfiles.Values.Where(r => r.ModelSlot is not null))
-            Assert.True(r.ModelSlot!.Value.IsAllowedFor(ModelActorKind.Reviewer), r.Name);
+            Assert.True(r.ModelSlot!.Value.IsReviewerRole(), r.Name);
     }
 
     [Fact]

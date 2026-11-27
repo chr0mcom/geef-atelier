@@ -728,7 +728,7 @@ public sealed class OrderChangeTests : TestContext
         Id = Guid.NewGuid(),
         RunId = runId,
         Source = Geef.Atelier.Core.Domain.Warnings.RunWarningSources.Grounding,
-        Code = Geef.Atelier.Core.Domain.Warnings.RunWarningCodes.GroundingProviderSkipped,
+        Code = "grounding.provider_skipped",
         Message = message,
         CreatedAt = OrderTestData.Start,
     };

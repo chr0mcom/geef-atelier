@@ -21,7 +21,7 @@ public sealed class RunWarningSinkTests(PostgresFixture fixture)
         var runId = await CreateRunAsync();
         var sink = new RunWarningSink(fixture.NewScopeFactory(), NullLogger<RunWarningSink>.Instance);
 
-        await sink.ReportAsync(runId, RunWarningSources.Grounding, RunWarningCodes.GroundingProviderSkipped, "first", iteration: null);
+        await sink.ReportAsync(runId, RunWarningSources.Grounding, "grounding.provider_skipped", "first", iteration: null);
         await sink.ReportAsync(runId, RunWarningSources.Review, RunWarningCodes.ReviewerFailed, "second", iteration: 2);
 
         await using var db = fixture.NewContext();
@@ -69,8 +69,8 @@ public sealed class RunWarningSinkTests(PostgresFixture fixture)
         var sink = new RunWarningSink(fixture.NewScopeFactory(), NullLogger<RunWarningSink>.Instance);
         const string sentence = "The source \"custom-tavily-refined-academic-search-v2\" could not be read and was skipped.";
 
-        await sink.ReportAsync(runId, RunWarningSources.Grounding, RunWarningCodes.GroundingProviderSkipped, sentence);
-        await sink.ReportAsync(runId, RunWarningSources.Grounding, RunWarningCodes.GroundingProviderSkipped,
+        await sink.ReportAsync(runId, RunWarningSources.Grounding, "grounding.provider_skipped", sentence);
+        await sink.ReportAsync(runId, RunWarningSources.Grounding, "grounding.provider_skipped",
             "The source \"Export2024QuarterlyReportForManagementTeamA\" said: tvly-ABCDEFGHIJ0123456789 and Bearer abcdefghijkl0123.");
 
         await using var db = fixture.NewContext();
@@ -93,7 +93,7 @@ public sealed class RunWarningSinkTests(PostgresFixture fixture)
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
             NullLogger<RunWarningSink>.Instance);
 
-        var write = sink.ReportAsync(Guid.NewGuid(), RunWarningSources.Grounding, RunWarningCodes.GroundingProviderSkipped, "lost");
+        var write = sink.ReportAsync(Guid.NewGuid(), RunWarningSources.Grounding, "grounding.provider_skipped", "lost");
 
         await write.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.True(write.IsCompletedSuccessfully);

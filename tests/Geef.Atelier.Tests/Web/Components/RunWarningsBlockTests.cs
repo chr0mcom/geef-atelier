@@ -70,7 +70,7 @@ public sealed class RunWarningsBlockTests : TestContext
         Id = Guid.NewGuid(),
         RunId = Guid.NewGuid(),
         Source = RunWarningSources.Grounding,
-        Code = RunWarningCodes.GroundingProviderSkipped,
+        Code = "grounding.provider_skipped",
         Message = "The source \"Web search\" could not be read and was skipped.",
         CreatedAt = DateTimeOffset.UtcNow,
     };

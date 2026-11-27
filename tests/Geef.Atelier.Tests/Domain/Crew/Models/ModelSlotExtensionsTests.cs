@@ -4,21 +4,14 @@ namespace Geef.Atelier.Tests.Domain.Crew.Models;
 
 public sealed class ModelSlotExtensionsTests
 {
-    [Fact]
-    public void IntakeIsNotAllowedForAnyProfileKind()
-    {
-        foreach (var kind in Enum.GetValues<ModelActorKind>())
-        {
-            Assert.DoesNotContain(ModelSlot.Intake, kind.AllowedSlots());
-            Assert.False(ModelSlot.Intake.IsAllowedFor(kind));
-        }
-    }
-
-    [Fact]
-    public void IntakeHasItsOwnDescriptionAndCandidates()
-    {
-        Assert.Equal("Prepares an order before writing: what is missing and what to ask.", ModelSlot.Intake.Describe());
-        Assert.False(ModelSlot.Intake.IsReviewerRole());
-        Assert.False(ModelSlot.Intake.IsAdvisorRole());
-    }
+    [Theory]
+    [InlineData(ModelSlot.FactReviewer, true)]
+    [InlineData(ModelSlot.StyleReviewer, true)]
+    [InlineData(ModelSlot.DomainReviewer, true)]
+    [InlineData(ModelSlot.Helper, true)]
+    [InlineData(ModelSlot.Executor, false)]
+    [InlineData(ModelSlot.Intake, false)]
+    [InlineData(ModelSlot.GroundingRefiner, false)]
+    public void OnlyTheReviewSlotsHaveTheReviewerRole(ModelSlot slot, bool reviewer) =>
+        Assert.Equal(reviewer, slot.IsReviewerRole());
 }

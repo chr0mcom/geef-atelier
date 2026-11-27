@@ -67,8 +67,6 @@ internal sealed class FakeProviderService : IProviderService
         if (SystemProviders.IsSystemProviderName(name))
             throw new InvalidOperationException("System providers cannot be deleted.");
 
-        if (await _repo.IsReferencedByAnyProfileAsync(name, ct))
-            throw new InvalidOperationException("Provider is referenced by profiles and cannot be deleted.");
 
         await _repo.DeleteAsync(name, ct);
     }

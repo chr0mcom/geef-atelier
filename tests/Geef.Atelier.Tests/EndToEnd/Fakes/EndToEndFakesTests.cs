@@ -50,18 +50,4 @@ public sealed class EndToEndFakesTests
         Assert.Equal(LlmRole.Reviewer, call.Role);
         Assert.Equal("function:submit_review", call.ToolChoice);
     }
-
-    [Fact]
-    public void Fake_embeddings_rank_similar_text_above_unrelated_text()
-    {
-        var query = FakeEmbeddingsEndpoint.Embed("history of the Nordkap lighthouse", 1536);
-        var similar = FakeEmbeddingsEndpoint.Embed("The Nordkap lighthouse history notes", 1536);
-        var unrelated = FakeEmbeddingsEndpoint.Embed("quarterly invoice for office chairs", 1536);
-
-        Assert.True(Cosine(query, similar) > Cosine(query, unrelated));
-        Assert.Equal(1536, query.Length);
-    }
-
-    private static double Cosine(float[] a, float[] b) =>
-        a.Zip(b, (x, y) => (double)x * y).Sum();
 }

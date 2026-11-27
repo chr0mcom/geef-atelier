@@ -29,24 +29,6 @@ public sealed class ModelParserTests
         Assert.Null(ModelSlotParser.ParseOrNull(raw));
     }
 
-    [Theory]
-    [InlineData(ModelActorKind.Executor, ModelSlot.Executor, true)]
-    [InlineData(ModelActorKind.Executor, ModelSlot.FactReviewer, false)]
-    [InlineData(ModelActorKind.Reviewer, ModelSlot.StyleReviewer, true)]
-    [InlineData(ModelActorKind.Reviewer, ModelSlot.Helper, true)]
-    [InlineData(ModelActorKind.Reviewer, ModelSlot.StrategicAdvisor, false)]
-    [InlineData(ModelActorKind.Advisor, ModelSlot.CriticalAdvisor, true)]
-    [InlineData(ModelActorKind.Advisor, ModelSlot.Executor, false)]
-    public void SlotsAreRestrictedPerActorKind(ModelActorKind kind, ModelSlot slot, bool allowed) =>
-        Assert.Equal(allowed, slot.IsAllowedFor(kind));
-
-    [Fact]
-    public void EveryComposerSlotHasADescription()
-    {
-        foreach (var slot in Enum.GetValues<ModelSlot>())
-            Assert.False(string.IsNullOrWhiteSpace(slot.Describe()));
-    }
-
     [Fact]
     public void EnumValuesAreStableBecauseSnapshotsStoreNumbers()
     {

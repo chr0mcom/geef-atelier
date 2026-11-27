@@ -21,7 +21,7 @@ public sealed class RunDetailWarningsTests : TestContext
     {
         Register(
         [
-            Warning(RunWarningCodes.GroundingProviderSkipped, "A source could not be read and was skipped: Tavily Web Search (reason: timeout)."),
+            Warning("grounding.provider_skipped", "A source could not be read and was skipped: Tavily Web Search (reason: timeout)."),
             Warning(RunWarningCodes.LlmFailover, "An AI service was unavailable, so another one answered instead."),
         ]);
 

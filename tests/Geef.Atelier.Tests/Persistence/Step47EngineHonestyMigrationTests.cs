@@ -97,7 +97,7 @@ public sealed class Step47EngineHonestyMigrationTests : IAsyncLifetime
             db.Runs.Add(new RunEntity { Id = runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Failed, BriefingText = "b", ConfigJson = "{}" });
             db.RunWarnings.Add(new RunWarningEntity
             {
-                Id = Guid.NewGuid(), RunId = runId, Source = RunWarningSources.Grounding, Code = RunWarningCodes.GroundingProviderSkipped,
+                Id = Guid.NewGuid(), RunId = runId, Source = RunWarningSources.Grounding, Code = "grounding.provider_skipped",
                 Message = "m", CreatedAt = DateTimeOffset.UtcNow,
             });
             await db.SaveChangesAsync();
@@ -139,7 +139,7 @@ public sealed class Step47EngineHonestyMigrationTests : IAsyncLifetime
                 RunId = runId,
                 Iteration = 1,
                 Source = RunWarningSources.Grounding,
-                Code = RunWarningCodes.GroundingProviderSkipped,
+                Code = "grounding.provider_skipped",
                 Message = "A source could not be read and was skipped.",
                 CreatedAt = DateTimeOffset.UtcNow,
             });

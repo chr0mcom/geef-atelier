@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Crew.Models;
-using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Research;
 using Geef.Atelier.Tools.FactCheckEval;
 using Geef.Atelier.Tools.IntakeEval;

@@ -22,10 +22,4 @@ public interface IProviderRepository
 
     /// <summary>Toggles the active state of a provider without a full update. Throws if not found.</summary>
     Task SetActiveAsync(string name, bool isActive, CancellationToken ct);
-
-    /// <summary>
-    /// Returns true when any reviewer, executor, advisor, or finalizer profile references
-    /// <paramref name="name"/> as its provider. Used to guard delete operations.
-    /// </summary>
-    Task<bool> IsReferencedByAnyProfileAsync(string name, CancellationToken ct);
 }

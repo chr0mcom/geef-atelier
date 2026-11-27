@@ -67,30 +67,6 @@ internal sealed class ProviderRepository(AtelierDbContext db) : IProviderReposit
             throw new InvalidOperationException($"Provider '{name}' not found.");
     }
 
-    /// <inheritdoc/>
-    public async Task<bool> IsReferencedByAnyProfileAsync(string name, CancellationToken ct)
-    {
-        // Checks reviewer, executor, and advisor profiles (direct "Provider" column),
-        // plus finalizer profiles (Settings JSONB key "provider").
-        // EF Core 8 wraps SqlQueryRaw<int> with SELECT s."Value" FROM (...) AS s,
-        // so the column must be aliased "Value".
-        const string sql =
-            """
-            SELECT COUNT(*)::int AS "Value" FROM (
-                SELECT 1 FROM "ReviewerProfiles"  WHERE "Provider" = {0}
-                UNION ALL
-                SELECT 1 FROM "ExecutorProfiles"  WHERE "Provider" = {0}
-                UNION ALL
-                SELECT 1 FROM "AdvisorProfiles"   WHERE "Provider" = {0}
-                UNION ALL
-                SELECT 1 FROM "FinalizerProfiles" WHERE "Settings"->>'provider' = {0}
-            ) AS refs
-            """;
-
-        return await db.Database
-            .SqlQueryRaw<int>(sql, name)
-            .FirstAsync(ct) > 0;
-    }
 
     private static Provider ToModel(ProviderEntity e)
     {

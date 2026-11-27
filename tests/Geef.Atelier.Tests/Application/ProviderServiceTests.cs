@@ -78,21 +78,6 @@ public sealed class ProviderServiceTests
     }
 
     [Fact]
-    public async Task DeleteCustomAsync_ThrowsWhenReferencedByProfile()
-    {
-        var repo = new FakeProviderRepository();
-        var now = DateTimeOffset.UtcNow;
-        await repo.CreateAsync(new Provider(
-            "custom-used", "Used", "desc", ProviderType.Http,
-            new Dictionary<string, System.Text.Json.JsonElement>(), false, true, now, now), default);
-        repo.AddReference("custom-used");
-
-        var service = new ProviderService(repo, new FakeHttpClientFactory());
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteCustomAsync("custom-used"));
-    }
-
-    [Fact]
     public async Task DeleteCustomAsync_SucceedsForUnreferencedCustomProvider()
     {
         var service = BuildService();

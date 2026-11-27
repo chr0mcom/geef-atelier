@@ -84,9 +84,6 @@ internal sealed class ProviderService(
         if (SystemProviders.IsSystemProviderName(name))
             throw new InvalidOperationException(SystemCannotBeDeletedMessage);
 
-        if (await repository.IsReferencedByAnyProfileAsync(name, ct))
-            throw new InvalidOperationException("Provider is referenced by profiles and cannot be deleted.");
-
         await repository.DeleteAsync(name, ct);
     }
 
