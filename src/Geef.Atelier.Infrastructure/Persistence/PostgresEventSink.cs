@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Domain.Dashboard;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Pipeline;
@@ -164,29 +163,6 @@ internal sealed class PostgresEventSink(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "IRunNotifier failed for run {RunId}; UI update skipped", atelierRunId);
-        }
-
-        // Fire dashboard event for pipeline milestones (Press + DayBook live-update)
-        if (geefEvent is PipelineStartedEvent or PipelineCompletedEvent or PipelineFailedEvent)
-        {
-            try
-            {
-                var username = await db.Runs
-                    .Where(r => r.Id == atelierRunId)
-                    .Select(r => r.CreatedByUser)
-                    .FirstOrDefaultAsync(ct);
-
-                var dashEvent = new DashboardEvent(
-                    DashboardEventKind.PressUpdated,
-                    username,
-                    null,
-                    null);
-                await notifier.NotifyDashboardEventAsync(dashEvent, ct);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Dashboard notification failed for run {RunId}", atelierRunId);
-            }
         }
     }
 

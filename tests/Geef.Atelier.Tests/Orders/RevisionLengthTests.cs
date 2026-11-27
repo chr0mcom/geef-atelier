@@ -1,5 +1,4 @@
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Domain.Dashboard;
 using Geef.Atelier.Core.Domain.Orders;
 
 namespace Geef.Atelier.Tests.Orders;

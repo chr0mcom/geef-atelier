@@ -24,13 +24,6 @@ public interface IRunRepository
     Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns aggregated statistics for the current calendar month.
-    /// Pass <c>null</c> for <paramref name="username"/> for system-wide stats (Admin-mode);
-    /// pass a username to scope run-level statistics to that user only.
-    /// </summary>
-    Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Permanently deletes the run with the given ID and all associated data (iterations, findings, events, etc.).
     /// No-op if the run does not exist.
     /// </summary>

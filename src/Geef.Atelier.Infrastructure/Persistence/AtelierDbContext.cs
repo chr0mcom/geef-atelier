@@ -1,7 +1,6 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
-using Geef.Atelier.Core.Domain.Crew.Composition;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
@@ -59,7 +58,6 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<KnowledgeDocumentChunkEntity> KnowledgeDocumentChunks => Set<KnowledgeDocumentChunkEntity>();
 
 
-    public DbSet<CrewTemplateEmbedding> CrewTemplateEmbeddings => Set<CrewTemplateEmbedding>();
 
     internal DbSet<AtelierUser> Users => Set<AtelierUser>();
 

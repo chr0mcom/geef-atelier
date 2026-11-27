@@ -6,6 +6,8 @@ using Geef.Atelier.Tests.Orchestrator;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Application;
 
 [Collection("Postgres")]
@@ -29,7 +31,7 @@ public sealed class RunServiceCancelsRunningRunTests(PostgresFixture fixture)
         await using (var scope = host.ScopeFactory.CreateAsyncScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-            runId = await svc.SubmitRunAsync(new SubmitRunRequest("Cancel test briefing", "{}"));
+            runId = await scope.ServiceProvider.CreatePendingAsync("Cancel test briefing");
         }
 
         // Wait until Running (precondition guard)

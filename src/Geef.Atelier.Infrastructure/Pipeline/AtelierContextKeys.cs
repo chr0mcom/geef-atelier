@@ -1,5 +1,4 @@
 using Geef.Atelier.Core.Domain.Checks;
-using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Writing;
 using Geef.Atelier.Infrastructure.Llm;
@@ -21,13 +20,6 @@ internal static class AtelierContextKeys
     /// guaranteeing the working draft never regresses below the most complete version seen.
     /// </summary>
     public static readonly ContextKey<string>         BestDraft     = new("geef:atelier:best-draft");
-
-    /// <summary>
-    /// The executor profile to use for LLM calls. Set by the composition pipeline factory so that
-    /// <see cref="Geef.Atelier.Infrastructure.Composition.CrewComposerExecutor"/> can resolve the
-    /// correct provider/model without requiring it as a constructor argument.
-    /// </summary>
-    public static readonly ContextKey<ExecutorProfile> CompositionExecutorProfile = new("geef:atelier:composition-executor-profile");
 
     /// <summary>
     /// Injected by <c>MultiProviderGroundingStep</c> when one or more grounding providers are configured.

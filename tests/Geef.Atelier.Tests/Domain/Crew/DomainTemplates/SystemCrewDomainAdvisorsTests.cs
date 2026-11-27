@@ -59,8 +59,7 @@ public sealed class SystemCrewDomainAdvisorsTests
     [Fact]
     public void AdvisorProfiles_HasFourTotalEntries()
     {
-        // 2 original (briefing-clarifier, devils-advocate) + 2 domain-specific + 1 auto-crew (crew-design-advisor)
-        Assert.Equal(5, SystemCrew.AdvisorProfiles.Count);
+        Assert.Equal(4, SystemCrew.AdvisorProfiles.Count);
     }
 
     [Fact]

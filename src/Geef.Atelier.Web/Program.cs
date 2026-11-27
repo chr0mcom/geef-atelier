@@ -11,7 +11,6 @@ using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Embeddings;
-using Geef.Atelier.Infrastructure.Composition;
 using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Intake;
 using Geef.Atelier.Infrastructure.Pricing;
@@ -78,9 +77,6 @@ builder.Services.AddAtelierApplication();
 builder.Services.AddEmbeddings(builder.Configuration);
 builder.Services.AddKnowledge(builder.Configuration);
 
-// Crew composition infrastructure (ICrewTemplateEmbeddingRepository, etc.)
-builder.Services.AddCrewComposition();
-
 builder.Services.AddGroundingProviders(builder.Configuration);
 builder.Services.AddResearch(builder.Configuration);
 
@@ -92,7 +88,6 @@ builder.Services.Configure<CostTrackingOptions>(builder.Configuration.GetSection
 builder.Services.AddSingleton<IPricingCatalog, PricingCatalog>();
 builder.Services.AddSingleton<DocsService>();
 builder.Services.AddFinalizers(builder.Configuration);
-builder.Services.AddCrewComposition();
 
 builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
 builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));
@@ -118,9 +113,6 @@ builder.Services.AddRequestTimeouts();
 builder.Services.AddPipelineAssemblers();
 builder.Services.AddHostedService<RunOrchestratorService>();
 builder.Services.AddHostedService<OAuthCleanupBackgroundService>();
-builder.Services.Configure<Geef.Atelier.Core.Configuration.PackGcOptions>(
-    builder.Configuration.GetSection(Geef.Atelier.Core.Configuration.PackGcOptions.SectionName));
-builder.Services.AddHostedService<PackArchivalBackgroundService>();
 builder.Services.AddHostedService<ModelCatalogWarmUpService>();
 
 builder.Services.AddHealthChecks()
@@ -167,8 +159,6 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, HttpContextCurrentUserService>();
-builder.Services.AddScoped<IToolDefinitionService, ToolDefinitionService>();
-builder.Services.AddScoped<ISpecializationPackService, SpecializationPackService>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -218,8 +208,6 @@ app.Use(async (ctx, next) =>
 });
 
 app.MapHealthChecks("/health").AllowAnonymous();
-
-app.MapRunHub();
 
 app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
 

@@ -293,11 +293,8 @@ public sealed class RunServiceResumeTests
         new RunService(
             persistence,
             repo,
-            new NoOpCrewService(),
             new NoOpAdvisorConsultationRepository(),
-            new NoOpKnowledgeService(),
             NullLogger<RunService>.Instance,
-            new InMemoryRunWarnings(),
             new InMemoryRunWarnings(),
             orderRepository: orders);
 
@@ -426,9 +423,6 @@ public sealed class RunServiceResumeTests
         public Task<bool> RequestCancellationAsync(Guid runId, CancellationToken ct = default)
             => Task.FromResult(false);
 
-        public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken ct = default)
-            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m));
-
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
@@ -445,9 +439,6 @@ public sealed class RunServiceResumeTests
 
         public Task<bool> RequestCancellationAsync(Guid runId, CancellationToken ct = default)
             => Task.FromResult(false);
-
-        public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken ct = default)
-            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m));
 
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

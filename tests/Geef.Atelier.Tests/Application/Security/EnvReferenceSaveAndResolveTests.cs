@@ -60,7 +60,6 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
         services.AddAtelierApplication();
         services.AddSingleton<IModelCatalog, PassThroughModelCatalog>();
         services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
-        services.AddScoped<IToolDefinitionService, ToolDefinitionService>();
         services.AddSingleton<IHttpClientFactory>(new AnyNameHttpClientFactory(new HttpClient(_handler)));
         services.AddLogging();
         return services.BuildServiceProvider();
@@ -155,25 +154,6 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
             await scope.ServiceProvider.GetRequiredService<IProviderService>().TestConnectionAsync(name);
 
         Assert.Equal("llm.test", _handler.LastUri?.Host);
-    }
-
-    [Fact]
-    public async Task Tool_AllowedSecretIsSaved_ForbiddenIsRejected()
-    {
-        await using var sp = BuildProvider();
-        await using var scope = sp.CreateAsyncScope();
-        var tools = scope.ServiceProvider.GetRequiredService<IToolDefinitionService>();
-        var schema = JsonDocument.Parse("{}").RootElement;
-        ToolDefinition Tool(string name, string secret) =>
-            new(name, name, "d", "rest-api", new Dictionary<string, string>(), secret, schema, ToolAccessClass.ReadOnly, false);
-
-        var okName = Unique("tool-ok-");
-        await tools.SaveAsync(Tool(okName, _allowed));
-        Assert.Equal(_allowed, (await tools.GetByNameAsync(okName))!.SecretRef);
-
-        var badName = Unique("tool-bad-");
-        await Assert.ThrowsAsync<EnvReferenceNotAllowedException>(() => tools.SaveAsync(Tool(badName, "CLI_PROXY_API_KEY")));
-        Assert.Null(await tools.GetByNameAsync(badName));
     }
 
     private sealed class CapturingHandler(string body = "{\"data\":[]}") : HttpMessageHandler

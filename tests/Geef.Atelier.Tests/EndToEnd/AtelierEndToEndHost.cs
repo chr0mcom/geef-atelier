@@ -89,7 +89,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     /// <summary>
     /// Creates an isolated database, boots the application through <c>Program</c> (which runs the
     /// migrations) and verifies that no migration is pending. The orchestrator stays held until
-    /// <see cref="ReleaseOrchestrator"/> or <see cref="SubmitAsync"/>. The intake is off (<c>Orders:IntakeMode=Off</c>) so that
+    /// <see cref="ReleaseOrchestrator"/>. The intake is off (<c>Orders:IntakeMode=Off</c>) so that
     /// orders run exactly as in stage 1 and no clarifier call lands in <see cref="Llm"/>; intake tests switch it on in
     /// <paramref name="configureServices"/>, which runs last and may replace registrations for a single test. The switches of stage 3
     /// are off as well (<c>Direct:FactCheckMode=Off</c>, <c>Direct:WriterNotes=false</c>, <c>Intake:ContentAssumptions=Defaults</c>),
@@ -187,16 +187,6 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
 
     /// <summary>Lets the held orchestrator start polling for pending runs.</summary>
     public void ReleaseOrchestrator() => _gate.Release();
-
-    /// <summary>Submits a run through the real <see cref="IRunService"/> and then releases the orchestrator.</summary>
-    public async Task<Guid> SubmitAsync(SubmitRunRequest request)
-    {
-        await using var scope = Services.CreateAsyncScope();
-        var runService = scope.ServiceProvider.GetRequiredService<IRunService>();
-        var runId = await runService.SubmitRunAsync(request);
-        ReleaseOrchestrator();
-        return runId;
-    }
 
     /// <summary>Runs <paramref name="action"/> inside a fresh DI scope.</summary>
     public async Task<T> WithScopeAsync<T>(Func<IServiceProvider, Task<T>> action)

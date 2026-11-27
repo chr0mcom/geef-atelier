@@ -26,48 +26,10 @@
             @if (_workshopOpen)
             {
                 <div class="nav-dropdown" role="menu">
-                    <NavLink class="nav-link" href="/workshop" Match="NavLinkMatch.All" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Dashboard
-                    </NavLink>
                     <NavLink class="nav-link" href="/runs" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                         Runs
                     </NavLink>
-                    <NavLink class="nav-link" href="/new" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Advanced form (choose a team)
-                    </NavLink>
-                    <div class="nav-dropdown-sep">Crew</div>
-                    <NavLink class="nav-link" href="/crew/templates" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Templates
-                    </NavLink>
-                    <NavLink class="nav-link" href="/crew/knowledge" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Knowledge
-                    </NavLink>
-                    <div class="nav-dropdown-sep">Profiles</div>
-                    <NavLink class="nav-link" href="/crew/profiles/reviewers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Reviewers
-                    </NavLink>
-                    <NavLink class="nav-link" href="/crew/profiles/executors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Executors
-                    </NavLink>
-                    <NavLink class="nav-link" href="/crew/profiles/advisors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Advisors
-                    </NavLink>
-                    <NavLink class="nav-link" href="/crew/profiles/grounding-providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Groundings
-                    </NavLink>
-                    <NavLink class="nav-link" href="/crew/profiles/finalizers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Finalizers
-                    </NavLink>
                     <AuthorizeView Roles="admin">
-                        <NavLink class="nav-link" href="/tools" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                            Tools
-                        </NavLink>
-                    </AuthorizeView>
-                    <NavLink class="nav-link" href="/packs" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Packs
-                    </NavLink>
-                    <AuthorizeView Roles="admin">
-                        <div class="nav-dropdown-sep">Infrastructure</div>
                         <NavLink class="nav-link" href="/crew/providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                             Providers
                         </NavLink>
@@ -79,7 +41,7 @@
 </div>
 
 @code {
-    static readonly string[] WorkshopPrefixes = ["workshop", "runs", "new", "crew/", "tools", "packs"];
+    static readonly string[] WorkshopPrefixes = ["runs", "crew/"];
 
     bool _workshopOpen;
 

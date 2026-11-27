@@ -1,4 +1,3 @@
-using Geef.Atelier.Core.Domain.Dashboard;
 
 namespace Geef.Atelier.Core.Domain.Orders;
 

@@ -20,9 +20,6 @@ internal sealed class StubRunService(RunDetails details, IReadOnlyList<Geef.Atel
         string? requestingUsername = null, CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<RunEntity>>([details.Run]);
 
-    public Task<Guid> SubmitRunAsync(SubmitRunRequest req, CancellationToken ct = default) =>
-        Task.FromResult(Guid.NewGuid());
-
     public Task<RunEntity?> GetRunAsync(Guid id, string? user, CancellationToken ct = default) =>
         Task.FromResult<RunEntity?>(details.Run);
 
@@ -43,9 +40,6 @@ internal sealed class StubRunService(RunDetails details, IReadOnlyList<Geef.Atel
             GroundingConsultations: Array.Empty<GroundingConsultation>(),
             ToolInvocations: [],
             Warnings: warnings));
-
-    public Task<WelcomeStats> GetWelcomeStatsAsync(string? user, CancellationToken ct = default) =>
-        Task.FromResult(new WelcomeStats(0, 0, 0, 0));
 
     public Task<Guid> ResumeRunAsync(ResumeOptions options, string? user, CancellationToken ct = default) =>
         throw new NotImplementedException();

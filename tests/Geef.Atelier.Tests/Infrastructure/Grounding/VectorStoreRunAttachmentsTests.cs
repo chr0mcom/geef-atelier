@@ -168,7 +168,6 @@ public sealed class VectorStoreRunAttachmentsTests
         public Task<IReadOnlyList<RunEntity>> ListAsync(int limit, RunStatus? statusFilter, string? username, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<bool> RequestCancellationAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 

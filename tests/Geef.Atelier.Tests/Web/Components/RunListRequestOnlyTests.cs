@@ -22,14 +22,6 @@ public sealed class RunListRequestOnlyTests : TestContext
     };
 
     [Fact]
-    public void The_run_card_shows_only_the_request()
-    {
-        var cut = RenderComponent<RunCard>(p => p.Add(c => c.Run, Run()));
-
-        Assert.Equal(Request, cut.Find(".run-card-briefing").TextContent.Trim());
-    }
-
-    [Fact]
     public void The_run_row_shows_only_the_request()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;

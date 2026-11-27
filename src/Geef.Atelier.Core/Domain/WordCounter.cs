@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Geef.Atelier.Core.Domain.Dashboard;
+namespace Geef.Atelier.Core.Domain;
 
 /// <summary>Counts whitespace-delimited words in a text string.</summary>
 public static partial class WordCounter

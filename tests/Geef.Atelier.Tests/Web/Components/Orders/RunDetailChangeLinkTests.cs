@@ -152,7 +152,6 @@ public sealed class RunDetailChangeLinkTests : TestContext
 
     private sealed class SnapshotRunService(StubRunService inner, CrewSnapshot snapshot) : IRunService
     {
-        public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken ct = default) => inner.SubmitRunAsync(request, ct);
 
         public Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) =>
             inner.ListRunWarningsAsync(runId, requestingUsername, ct);
@@ -168,8 +167,6 @@ public sealed class RunDetailChangeLinkTests : TestContext
 
         public async Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid id, string? user, CancellationToken ct = default) =>
             (await inner.GetRunWithGroundingAsync(id, user, ct))! with { Snapshot = snapshot };
-
-        public Task<WelcomeStats> GetWelcomeStatsAsync(string? user, CancellationToken ct = default) => inner.GetWelcomeStatsAsync(user, ct);
 
         public Task<Guid> ResumeRunAsync(ResumeOptions options, string? user, CancellationToken ct = default) => inner.ResumeRunAsync(options, user, ct);
 

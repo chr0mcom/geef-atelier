@@ -4,7 +4,6 @@ using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
-using Geef.Atelier.Core.Domain.Dashboard;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Llm;
@@ -176,8 +175,6 @@ public sealed class RunOrchestratorSafeguardTests(PostgresFixture fixture)
             throw new InvalidOperationException("Live update channel is down.");
         }
 
-        public Task NotifyDashboardEventAsync(DashboardEvent dashboardEvent, CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException("Live update channel is down.");
     }
 
     private sealed record LogEntry(string Category, LogLevel Level, string Message);

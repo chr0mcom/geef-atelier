@@ -236,11 +236,8 @@ public sealed class RunServiceUserIsolationTests
         return new RunService(
             new MinimalPersistenceService(),
             repo,
-            new MinimalCrewService(),
             new MinimalAdvisorConsultationRepository(),
-            new NoOpKnowledgeService(),
             NullLogger<RunService>.Instance,
-            warnings,
             warnings);
     }
 
@@ -276,9 +273,6 @@ public sealed class RunServiceUserIsolationTests
         public Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default)
             => Task.FromResult(runId == run.Id ? details : null);
 
-        public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default)
-            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m));
-
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
@@ -301,9 +295,6 @@ public sealed class RunServiceUserIsolationTests
 
         public Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default)
             => Task.FromResult<RunDetails?>(null);
-
-        public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default)
-            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m));
 
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

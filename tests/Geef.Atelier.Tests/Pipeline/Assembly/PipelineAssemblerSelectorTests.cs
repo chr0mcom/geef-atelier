@@ -18,14 +18,10 @@ public sealed class PipelineAssemblerSelectorTests
         Kind = kind, SeedDraftText = seed, OrderId = orderId,
     };
 
-    private static readonly CrewSnapshot Composer = TestCrewSnapshots.Klassik with { TemplateName = SystemCrew.CrewComposerTemplateName };
-
     public static TheoryData<string, Type> Cases => new()
     {
         { "classic", typeof(StandardPipelineAssembler) },
         { "resume", typeof(SeedDraftPipelineAssembler) },
-        { "composition-kind", typeof(CompositionPipelineAssembler) },
-        { "composer-template", typeof(CompositionPipelineAssembler) },
         { "direct", typeof(DirectPipelineAssembler) },
         { "direct-seeded", typeof(DirectPipelineAssembler) },
     };
@@ -37,8 +33,6 @@ public sealed class PipelineAssemblerSelectorTests
         var (run, snapshot) = kind switch
         {
             "resume" => (Run(seed: "draft"), TestCrewSnapshots.Klassik),
-            "composition-kind" => (Run(RunKind.CrewComposition), TestCrewSnapshots.Klassik),
-            "composer-template" => (Run(seed: "draft"), Composer),
             "direct" => (Run(), DirectPipelineHarness.DirectSnapshot),
             "direct-seeded" => (Run(seed: "draft"), DirectPipelineHarness.DirectSnapshot),
             _ => (Run(), TestCrewSnapshots.Klassik),
@@ -57,7 +51,7 @@ public sealed class PipelineAssemblerSelectorTests
 
         Assert.IsType<DirectPipelineAssembler>(selector.Select(Run(), DirectPipelineHarness.DirectSnapshot));
         Assert.IsType<StandardPipelineAssembler>(selector.Select(Run(), TestCrewSnapshots.Klassik));
-        Assert.Equal(4, services.GetServices<IPipelineAssembler>().Count());
+        Assert.Equal(3, services.GetServices<IPipelineAssembler>().Count());
     }
 
     [Fact]

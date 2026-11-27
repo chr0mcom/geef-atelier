@@ -5,6 +5,8 @@ using Geef.Atelier.Tests.Orchestrator;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Application;
 
 [Collection("Postgres")]
@@ -20,7 +22,7 @@ public sealed class RunServiceCancelReturnsFalseForTerminalRunTests(PostgresFixt
         await using (var scope = host.ScopeFactory.CreateAsyncScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-            runId = await svc.SubmitRunAsync(new SubmitRunRequest("Briefing for terminal cancel test", "{}"));
+            runId = await scope.ServiceProvider.CreatePendingAsync("Briefing for terminal cancel test");
         }
 
         // Wait for Completed

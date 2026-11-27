@@ -183,8 +183,7 @@ public sealed class SystemCrewDomainTemplatesTests
     [Fact]
     public void CrewTemplates_HasFourTotalEntries()
     {
-        // klassik + juristisch + akademisch + marketing + crew-composer
-        Assert.Equal(5, SystemCrew.CrewTemplates.Count);
+        Assert.Equal(4, SystemCrew.CrewTemplates.Count);
     }
 
     [Fact]

@@ -3,7 +3,6 @@ using Bunit;
 using Bunit.TestDoubles;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Domain.Dashboard;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Tests.Fakes;
@@ -237,11 +236,7 @@ public sealed class LiveReloadDataAccessTests : TestContext
             return new TrackedSubscription();
         }
 
-        public IDisposable WatchDashboard(ClaimsPrincipal user, bool allUsers, Func<DashboardEvent, Task> onEvent) => new TrackedSubscription();
-
         public Task PublishRunUpdatedAsync(Guid runId, string? owner) => Task.CompletedTask;
-
-        public Task PublishDashboardEventAsync(DashboardEvent dashboardEvent) => Task.CompletedTask;
 
         public Task<IDisposable?> WatchOrderAsync(ClaimsPrincipal user, Guid orderId, Func<Guid, Task> onUpdated, CancellationToken ct = default) =>
             Task.FromResult<IDisposable?>(null);
@@ -265,13 +260,11 @@ public sealed class LiveReloadDataAccessTests : TestContext
             return inner.GetRunWithGroundingAsync(id, requestingUsername, cancellationToken);
         }
 
-        public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default) => inner.SubmitRunAsync(request, cancellationToken);
         public Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => inner.ListRunWarningsAsync(id, requestingUsername, cancellationToken);
         public Task<RunEntity?> GetRunAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => inner.GetRunAsync(id, requestingUsername, cancellationToken);
         public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, string? requestingUsername = null, CancellationToken cancellationToken = default) => inner.ListRunsAsync(limit, statusFilter, requestingUsername, cancellationToken);
         public Task<bool> CancelRunAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => inner.CancelRunAsync(id, requestingUsername, cancellationToken);
         public Task<RunDetails?> GetRunDetailsAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => inner.GetRunDetailsAsync(id, requestingUsername, cancellationToken);
-        public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken cancellationToken = default) => inner.GetWelcomeStatsAsync(requestingUsername, cancellationToken);
         public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default) => inner.ResumeRunAsync(options, requestingUsername, cancellationToken);
         public Task<bool> DeleteRunAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => inner.DeleteRunAsync(id, requestingUsername, cancellationToken);
     }

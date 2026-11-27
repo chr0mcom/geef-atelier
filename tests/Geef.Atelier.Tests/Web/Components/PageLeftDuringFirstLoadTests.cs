@@ -2,10 +2,8 @@ using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using Bunit;
 using Bunit.TestDoubles;
-using Geef.Atelier.Application.Dashboard;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Domain.Dashboard;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Tests.Fakes;
@@ -16,7 +14,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Application_IKnowledgeService = Geef.Atelier.Application.Crew.Knowledge.IKnowledgeService;
-using IndexPage = Geef.Atelier.Web.Components.Pages.Index;
 
 namespace Geef.Atelier.Tests.Web.Components;
 
@@ -74,25 +71,6 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
     }
 
     [Fact]
-    public async Task LeavingTheWorkshopPageDuringTheFirstLoadLeavesNoSubscription()
-    {
-        var dashboard = new HeldDashboardService();
-        Services.AddSingleton<IDashboardService>(dashboard);
-        Services.AddSingleton<IHttpContextAccessor>(new HttpContextAccessor());
-        this.AddTestAuthorization().SetAuthorized("alice");
-        RenderComponent<IndexPage>();
-        await WaitUntilAsync(() => dashboard.Entered);
-
-        DisposeComponents();
-        dashboard.Hold.SetResult();
-        await Task.Delay(300);
-
-        Assert.False(Renderer.UnhandledException.IsCompleted);
-        Assert.Equal(0, _feed.DashboardWatchCalls);
-        Assert.Equal(0, _feed.ActiveSubscriptions);
-    }
-
-    [Fact]
     public async Task AnOpenRunListStillSubscribesAndReleasesTheSubscriptionWhenClosed()
     {
         Services.AddSingleton<IRunService>(new ConcurrencyProbeRunService());
@@ -142,12 +120,10 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
         private int _active;
         private int _runWatchCalls;
         private int _listWatchCalls;
-        private int _dashboardWatchCalls;
 
         public int ActiveSubscriptions => Volatile.Read(ref _active);
         public int RunWatchCalls => Volatile.Read(ref _runWatchCalls);
         public int ListWatchCalls => Volatile.Read(ref _listWatchCalls);
-        public int DashboardWatchCalls => Volatile.Read(ref _dashboardWatchCalls);
 
         public Task<IDisposable?> WatchRunAsync(ClaimsPrincipal user, Guid runId, Func<Guid, Task> onUpdated, CancellationToken ct = default)
         {
@@ -163,16 +139,7 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
             return subscription;
         }
 
-        public IDisposable WatchDashboard(ClaimsPrincipal user, bool allUsers, Func<DashboardEvent, Task> onEvent)
-        {
-            var subscription = NewSubscription();
-            Interlocked.Increment(ref _dashboardWatchCalls);
-            return subscription;
-        }
-
         public Task PublishRunUpdatedAsync(Guid runId, string? owner) => Task.CompletedTask;
-
-        public Task PublishDashboardEventAsync(DashboardEvent dashboardEvent) => Task.CompletedTask;
 
         public Task<IDisposable?> WatchOrderAsync(ClaimsPrincipal user, Guid orderId, Func<Guid, Task> onUpdated, CancellationToken ct = default) =>
             Task.FromResult<IDisposable?>(null);
@@ -199,32 +166,6 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
         }
     }
 
-    /// <summary>
-    /// Dashboard service whose snapshot call waits for <see cref="Hold"/>. The snapshot is an empty shell with only a
-    /// day book: the pages under test are closed before they could render it.
-    /// </summary>
-    private sealed class HeldDashboardService : IDashboardService
-    {
-        public TaskCompletionSource Hold { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public bool Entered { get; private set; }
-
-        public async Task<DashboardSnapshot> GetSnapshotAsync(string username, bool isAdmin, DashboardScope scope, CancellationToken ct = default)
-        {
-            Entered = true;
-            await Hold.Task;
-            return ((DashboardSnapshot)RuntimeHelpers.GetUninitializedObject(typeof(DashboardSnapshot))) with { DayBook = [] };
-        }
-
-        public void InvalidateUser(string username)
-        {
-        }
-
-        public void InvalidateAdmin()
-        {
-        }
-    }
-
     private sealed class HeldDetailRunService(RunDetails details) : IRunService
     {
         private readonly StubRunService _inner = new(details);
@@ -242,13 +183,11 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
             return await _inner.GetRunWithGroundingAsync(id, requestingUsername, cancellationToken);
         }
 
-        public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default) => _inner.SubmitRunAsync(request, cancellationToken);
         public Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => _inner.ListRunWarningsAsync(id, requestingUsername, cancellationToken);
         public Task<RunEntity?> GetRunAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => _inner.GetRunAsync(id, requestingUsername, cancellationToken);
         public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, string? requestingUsername = null, CancellationToken cancellationToken = default) => _inner.ListRunsAsync(limit, statusFilter, requestingUsername, cancellationToken);
         public Task<bool> CancelRunAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => _inner.CancelRunAsync(id, requestingUsername, cancellationToken);
         public Task<RunDetails?> GetRunDetailsAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => _inner.GetRunDetailsAsync(id, requestingUsername, cancellationToken);
-        public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken cancellationToken = default) => _inner.GetWelcomeStatsAsync(requestingUsername, cancellationToken);
         public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default) => _inner.ResumeRunAsync(options, requestingUsername, cancellationToken);
         public Task<bool> DeleteRunAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => _inner.DeleteRunAsync(id, requestingUsername, cancellationToken);
     }

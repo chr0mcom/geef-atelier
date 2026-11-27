@@ -19,18 +19,12 @@ public sealed class ListFlowTests(PlaywrightFixture pw, PostgresFixture pg) : IA
     [Fact]
     public async Task RunsList_ShowsSubmittedRuns()
     {
-        // Submit a run via the UI
+        // Create a run, then open the list
         var page = await pw.Browser.NewPageAsync();
         try
         {
-            await page.GotoAsync($"{_host!.BaseUrl}/new");
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-            await page.FillAsync("textarea#briefing", "List flow test briefing");
-            await page.ClickAsync("button.btn-submit");
-
-            // Wait for redirect to detail page
-            await page.WaitForURLAsync("**/runs/**", new PageWaitForURLOptions { Timeout = 10_000 });
+            var runId = await _host!.CreateRunAsync("List flow test briefing");
+            await page.GotoAsync($"{_host.BaseUrl}/runs/{runId}");
 
             // Navigate to list
             await page.GotoAsync($"{_host.BaseUrl}/runs");

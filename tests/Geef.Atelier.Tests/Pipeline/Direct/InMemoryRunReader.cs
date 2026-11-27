@@ -28,7 +28,5 @@ internal sealed class InMemoryRunReader : IRunRepository
 
     public Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
     public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }

@@ -23,14 +23,8 @@ public sealed class SignalRWithAuthTests(PlaywrightFixture pw, PostgresFixture p
         var page = await pw.Browser.NewPageAsync();
         try
         {
-            await page.GotoAsync($"{_host!.BaseUrl}/new");
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-            await page.FillAsync("textarea#briefing", "SignalR auth test briefing");
-            await page.ClickAsync("button.btn-submit");
-
-            await page.WaitForURLAsync(new Regex(@"/runs/[0-9a-f\-]{36}$"),
-                new PageWaitForURLOptions { Timeout = 15_000 });
+            var runId = await _host!.CreateRunAsync("SignalR auth test briefing");
+            await page.GotoAsync($"{_host.BaseUrl}/runs/{runId}");
 
             await page.WaitForSelectorAsync("[data-status='Completed']",
                 new PageWaitForSelectorOptions { Timeout = 60_000 });

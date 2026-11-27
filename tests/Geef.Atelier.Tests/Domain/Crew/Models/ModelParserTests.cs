@@ -6,25 +6,6 @@ namespace Geef.Atelier.Tests.Domain.Crew.Models;
 public sealed class ModelParserTests
 {
     [Theory]
-    [InlineData("Legal", "rede-gegen-rechtsextremismus", ModelDomain.Legal)]
-    [InlineData("Speech", "rede-gegen-rechtsextremismus", ModelDomain.Speech)]
-    [InlineData("General", "rechtschreibung-lektorat", ModelDomain.General)]
-    [InlineData("Correspondence", "contractor-outreach", ModelDomain.Correspondence)]
-    [InlineData(" academic ", "erc-grant", ModelDomain.Academic)]
-    [InlineData(null, "legal", ModelDomain.Legal)]
-    [InlineData(null, "mietrecht", ModelDomain.General)]
-    [InlineData(null, "zielgruppengerecht-social-media", ModelDomain.General)]
-    [InlineData("General,Legal", "legal", ModelDomain.Legal)]
-    [InlineData("+2", "general", ModelDomain.General)]
-    [InlineData("Juristisch", "general", ModelDomain.General)]
-    public void CrewDomainComesFromModelDomainNeverFromKeywords(string? modelDomain, string domain, ModelDomain expected)
-    {
-        var spec = new Geef.Atelier.Core.Domain.Crew.Composition.CrewSpecArtifact { Domain = domain, MatrixDomain = modelDomain };
-
-        Assert.Equal(expected, spec.EffectiveModelDomain());
-    }
-
-    [Theory]
     [InlineData("FactReviewer", ModelSlot.FactReviewer)]
     [InlineData("fact_reviewer", ModelSlot.FactReviewer)]
     [InlineData("Fact-Reviewer", ModelSlot.FactReviewer)]

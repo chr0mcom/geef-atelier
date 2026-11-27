@@ -29,9 +29,6 @@ public static class GroundingServiceExtensions
         services.AddSingleton<IGroundingProvider, VectorStoreGroundingProvider>();
         services.AddSingleton<IGroundingProvider, StaticContextGroundingProvider>();
         services.AddSingleton<IGroundingProvider, UrlFetchGroundingProvider>();
-        services.AddSingleton<IGroundingProvider, CrewCatalogGroundingProvider>();
-        services.AddSingleton<IGroundingProvider, ToolCatalogGroundingProvider>();
-        services.AddSingleton<IGroundingProvider, PackCatalogGroundingProvider>();
         services.AddSingleton<IGroundingProvider, OrderSourcesGroundingProvider>();
         services.AddSingleton<IGroundingProviderFactory, GroundingProviderFactory>();
 

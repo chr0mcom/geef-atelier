@@ -23,10 +23,6 @@ public sealed class AdminOnlyPagesTests : TestContext
         typeof(ProviderTypeSelection),
         typeof(CliProviderEditor),
         typeof(ProviderView),
-        typeof(ToolsIndex),
-        typeof(ToolEditor),
-        typeof(ToolView),
-        typeof(GroundingProviderEditor),
     ];
 
     public static TheoryData<Type> SecretReferencePages => new(AdminPages);
@@ -54,14 +50,6 @@ public sealed class AdminOnlyPagesTests : TestContext
     }
 
     [Fact]
-    public void GroundingProfileList_StaysOpenForEveryone()
-    {
-        var attribute = typeof(GroundingProvidersIndex).GetCustomAttribute<AuthorizeAttribute>();
-        Assert.NotNull(attribute);
-        Assert.Null(attribute.Policy);
-    }
-
-    [Fact]
     public void AccessDeniedPage_IsReachableForSignedInUsers()
     {
         var attribute = typeof(AccessDenied).GetCustomAttribute<AuthorizeAttribute>();
@@ -86,9 +74,7 @@ public sealed class AdminOnlyPagesTests : TestContext
         cut.Find("button.nav-group-trigger").Click();
 
         var hrefs = cut.FindAll("a.nav-link").Select(a => a.GetAttribute("href")).ToList();
-        Assert.Contains("/crew/profiles/grounding-providers", hrefs);
-        Assert.DoesNotContain("/tools", hrefs);
-        Assert.DoesNotContain("/mcp-servers", hrefs);
+        Assert.Contains("/runs", hrefs);
         Assert.DoesNotContain("/crew/providers", hrefs);
     }
 
@@ -100,8 +86,6 @@ public sealed class AdminOnlyPagesTests : TestContext
         cut.Find("button.nav-group-trigger").Click();
 
         var hrefs = cut.FindAll("a.nav-link").Select(a => a.GetAttribute("href")).ToList();
-        Assert.Contains("/tools", hrefs);
-        Assert.DoesNotContain("/mcp-servers", hrefs);
         Assert.Contains("/crew/providers", hrefs);
     }
 }

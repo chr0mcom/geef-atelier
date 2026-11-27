@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using Geef.Atelier.Application.Composition;
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Grounding;
@@ -14,7 +13,6 @@ using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.Orders;
-using Geef.Atelier.Infrastructure.Composition;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
@@ -970,7 +968,7 @@ internal sealed class RunOrchestratorService(
             var updater = db.Runs.Where(r => r.Id == runId);
             var written = await updater.ExecuteUpdateAsync(s => s
                 .SetProperty(r => r.FinalText,  bestDraft)
-                .SetProperty(r => r.WordCount,  Core.Domain.Dashboard.WordCounter.Count(bestDraft))
+                .SetProperty(r => r.WordCount,  WordCounter.Count(bestDraft))
                 .SetProperty(r => r.FinalizerErrorMessage, note),
                 ct);
             return written > 0;

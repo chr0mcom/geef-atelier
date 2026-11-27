@@ -25,14 +25,8 @@ public sealed class LiveUpdateFlowTests(PlaywrightFixture pw, PostgresFixture pg
         try
         {
             // Submit a run
-            await page.GotoAsync($"{_host!.BaseUrl}/new");
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-            await page.FillAsync("textarea#briefing", "Live update test briefing — pipeline should complete.");
-            await page.ClickAsync("button.btn-submit");
-
-            // Wait for redirect to detail page
-            await page.WaitForURLAsync(new Regex(@"/runs/[0-9a-f\-]{36}$"),
-                new PageWaitForURLOptions { Timeout = 15_000 });
+            var runId = await _host!.CreateRunAsync("Live update test briefing — pipeline should complete.");
+            await page.GotoAsync($"{_host.BaseUrl}/runs/{runId}");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
             // Inject a JS marker that survives SignalR updates but NOT a page reload

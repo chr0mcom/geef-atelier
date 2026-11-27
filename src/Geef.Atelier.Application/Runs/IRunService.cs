@@ -2,18 +2,9 @@ using Geef.Atelier.Core.Domain;
 
 namespace Geef.Atelier.Application.Runs;
 
-/// <summary>Application-service contract for submitting, querying, listing, and cancelling pipeline runs.</summary>
+/// <summary>Application-service contract for querying, listing, cancelling, resuming and deleting pipeline runs.</summary>
 public interface IRunService
 {
-    /// <summary>
-    /// Submits a new run request for processing. With attachments the crew snapshot is stored only after every
-    /// attachment is uploaded and indexed; the orchestrator never claims a run without a snapshot, so the run
-    /// cannot start before its attachments are available. Model-assignment warnings are stored on the new run.
-    /// Every run except learning runs is linked to an order: a task run of a composition and a resumed run join the
-    /// order of their parent, any other run starts a new careful order (entry <see cref="SubmitRunRequest.Entry"/>).
-    /// </summary>
-    Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Returns the warnings recorded for a run (Step47), in the order they were recorded. Returns an empty list
     /// when the run does not exist or <paramref name="requestingUsername"/> is set and does not own it.
@@ -71,15 +62,6 @@ public interface IRunService
     /// </summary>
     Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(
         Guid runId,
-        string? requestingUsername,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Returns aggregated welcome-page statistics.
-    /// When <paramref name="requestingUsername"/> is non-null, stats are scoped to that user's runs.
-    /// Pass null for system-wide stats (admin mode).
-    /// </summary>
-    Task<WelcomeStats> GetWelcomeStatsAsync(
         string? requestingUsername,
         CancellationToken cancellationToken = default);
 

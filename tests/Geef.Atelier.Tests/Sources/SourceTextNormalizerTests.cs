@@ -1,4 +1,4 @@
-using Geef.Atelier.Core.Domain.Dashboard;
+using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Infrastructure.Sources.Extraction;
 

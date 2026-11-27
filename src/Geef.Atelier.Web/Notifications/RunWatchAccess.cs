@@ -3,7 +3,7 @@ using Geef.Atelier.Application.Runs;
 
 namespace Geef.Atelier.Web.Notifications;
 
-/// <summary>Who may watch which live updates; shared by <see cref="Hubs.RunHub"/> and <see cref="IRunUpdateFeed"/>.</summary>
+/// <summary>Who may watch which live updates of <see cref="IRunUpdateFeed"/>.</summary>
 public static class RunWatchAccess
 {
     /// <summary>True when the principal is signed in and carries the admin role.</summary>

@@ -1,7 +1,6 @@
 using System.Globalization;
 using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Core.Configuration;
-using Geef.Atelier.Core.Domain.Dashboard;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence.Sources;
 using Geef.Atelier.Infrastructure.Sources.Extraction;

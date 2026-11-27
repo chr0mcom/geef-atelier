@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Geef.Atelier.Core.Domain.Dashboard;
 using Geef.Atelier.Web.Notifications;
 
 namespace Geef.Atelier.Tests.Web.Components.Orders;
@@ -41,11 +40,7 @@ internal sealed class ScriptedOrderFeed : IRunUpdateFeed
 
     public IDisposable WatchRunList(ClaimsPrincipal user, Func<Guid, Task> onUpdated) => new Release(() => { });
 
-    public IDisposable WatchDashboard(ClaimsPrincipal user, bool allUsers, Func<DashboardEvent, Task> onEvent) => new Release(() => { });
-
     public Task PublishRunUpdatedAsync(Guid runId, string? owner) => Task.CompletedTask;
-
-    public Task PublishDashboardEventAsync(DashboardEvent dashboardEvent) => Task.CompletedTask;
 
     private sealed class Release(Action onDispose) : IDisposable
     {

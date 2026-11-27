@@ -46,31 +46,4 @@ public sealed class RunRepositoryUserFilterTests(PostgresFixture fixture)
         Assert.True(all.Count >= 3, $"Expected at least 3 runs total, got {all.Count}");
     }
 
-    [Fact]
-    public async Task GetWelcomeStatsAsync_WithUsername_CountsOnlyThatUsersRuns()
-    {
-        await using var db = fixture.NewContext();
-        var repo = new RunRepository(db);
-
-        // Add two runs for targetUser to ensure the count is >= 2
-        await CreateRunForUser(db, "targetUser");
-        await CreateRunForUser(db, "targetUser");
-        await CreateRunForUser(db, "otherUser");
-
-        var statsForTarget = await repo.GetWelcomeStatsAsync("targetUser", CancellationToken.None);
-        var statsForOther  = await repo.GetWelcomeStatsAsync("otherUser", CancellationToken.None);
-        var statsForAll    = await repo.GetWelcomeStatsAsync(null, CancellationToken.None);
-
-        // targetUser has at least 2 runs this month
-        Assert.True(statsForTarget.RunsThisMonth >= 2,
-            $"Expected >= 2 runs for targetUser, got {statsForTarget.RunsThisMonth}");
-
-        // otherUser has at least 1 run this month
-        Assert.True(statsForOther.RunsThisMonth >= 1,
-            $"Expected >= 1 run for otherUser, got {statsForOther.RunsThisMonth}");
-
-        // System-wide total is the sum of all users
-        Assert.True(statsForAll.RunsThisMonth >= statsForTarget.RunsThisMonth + statsForOther.RunsThisMonth,
-            "System-wide stats should include all users' runs");
-    }
 }

@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Geef.Atelier.Core.Domain.Dashboard;
 
 namespace Geef.Atelier.Web.Notifications;
 
@@ -23,19 +22,10 @@ public interface IRunUpdateFeed
     IDisposable WatchRunList(ClaimsPrincipal user, Func<Guid, Task> onUpdated);
 
     /// <summary>
-    /// Subscribes to dashboard events of the user's own runs, or of all users when <paramref name="allUsers"/> is set
-    /// and the user is an administrator (non-admins silently get their own events only).
-    /// </summary>
-    IDisposable WatchDashboard(ClaimsPrincipal user, bool allUsers, Func<DashboardEvent, Task> onEvent);
-
-    /// <summary>
     /// Queues a run update for the run topic, the owner's list topic and the admin list topic; returns without waiting
     /// for subscribers.
     /// </summary>
     Task PublishRunUpdatedAsync(Guid runId, string? owner);
-
-    /// <summary>Queues a dashboard event for the owner's and the admin dashboard topic; returns without waiting.</summary>
-    Task PublishDashboardEventAsync(DashboardEvent dashboardEvent);
 
     /// <summary>
     /// Subscribes to updates of order <paramref name="orderId"/>. Returns null (and subscribes nothing) when

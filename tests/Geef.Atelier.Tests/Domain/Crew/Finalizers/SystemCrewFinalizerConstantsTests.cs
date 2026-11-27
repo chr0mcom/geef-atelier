@@ -10,9 +10,9 @@ namespace Geef.Atelier.Tests.Domain.Crew.Finalizers;
 public sealed class SystemCrewFinalizerConstantsTests
 {
     [Fact]
-    public void FinalizerProfiles_Contains18Entries()
+    public void FinalizerProfiles_Contains15Entries()
     {
-        Assert.Equal(18, SystemCrew.FinalizerProfiles.Count);
+        Assert.Equal(15, SystemCrew.FinalizerProfiles.Count);
     }
 
     [Theory]

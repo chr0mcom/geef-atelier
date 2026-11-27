@@ -89,226 +89,6 @@ public static class SystemCrew
         IsSystem: true,
         ModelSlot: ModelSlot.DomainReviewer);
 
-    // ── Auto-Crew: crew-composer executor ──────────────────────────────────────
-
-    /// <summary>Executor for the crew-composer system crew — composes Geef.Atelier crews from task descriptions.</summary>
-    public static readonly ExecutorProfile CrewComposerExecutorProfile = new(
-        Name: "crew-composer-executor",
-        DisplayName: "Crew Composer Executor",
-        Description: "Specialist executor for auto-crew composition runs. Analyzes task descriptions and calls submit_crew_spec with a complete crew configuration following Reuse-First and model-plurality rules.",
-        SystemPrompt: SystemPrompts.CrewComposerExecutor,
-        Provider: ModelMatrix.Primary(ModelSlot.Composer).Provider,
-        Model: ModelMatrix.Primary(ModelSlot.Composer).Model,
-        MaxTokens: 64000,
-        IsSystem: true,
-        ModelSlot: ModelSlot.Composer);
-
-    // ── Auto-Crew: crew-composer reviewers ─────────────────────────────────────
-
-    /// <summary>Deterministic structural validator — actual implementation injected at pipeline build time (Task 7).</summary>
-    public static readonly ReviewerProfile CrewSpecValidatorProfile = new(
-        Name: "crew-spec-validator",
-        DisplayName: "Crew Spec Validator",
-        Description: "Deterministic structural validator for crew specifications. Injected at pipeline build time; this entry provides the profile registration only.",
-        SystemPrompt: SystemPrompts.CrewSpecValidator,
-        Provider: "",
-        Model: "",
-        MaxTokens: 64000,
-        IsSystem: true);
-
-    /// <summary>Checks that the proposed crew has executor, reviewer(s), and finalizer(s); flags missing roles.</summary>
-    public static readonly ReviewerProfile CrewComposerCompletenessProfile = new(
-        Name: "crew-composer-completeness",
-        DisplayName: "Crew Completeness",
-        Description: "Verifies that the proposed crew spec contains all mandatory roles: executor, at least one reviewer, and at least one finalizer. Flags missing domain-specific roles for domain tasks.",
-        SystemPrompt: SystemPrompts.CrewComposerCompleteness,
-        Provider: ModelMatrix.Primary(ModelSlot.FactReviewer).Provider,
-        Model: ModelMatrix.Primary(ModelSlot.FactReviewer).Model,
-        MaxTokens: 64000,
-        IsSystem: true,
-        ModelSlot: ModelSlot.FactReviewer);
-
-    /// <summary>Reviews every new profile's system prompt for completeness and inclusion of the severity taxonomy.</summary>
-    public static readonly ReviewerProfile CrewComposerPromptQualityProfile = new(
-        Name: "crew-composer-prompt-quality",
-        DisplayName: "Prompt Quality",
-        Description: "Audits system prompts in the proposed crew for completeness, task-specificity, and the mandatory severity taxonomy block in reviewer prompts.",
-        SystemPrompt: SystemPrompts.CrewComposerPromptQuality,
-        Provider: ModelMatrix.Primary(ModelSlot.StyleReviewer).Provider,
-        Model: ModelMatrix.Primary(ModelSlot.StyleReviewer).Model,
-        MaxTokens: 64000,
-        IsSystem: true,
-        ModelSlot: ModelSlot.StyleReviewer);
-
-    /// <summary>Checks whether the crew fits the task: domain, models, grounding, and complexity.</summary>
-    public static readonly ReviewerProfile CrewComposerFitProfile = new(
-        Name: "crew-composer-fit",
-        DisplayName: "Crew Fit",
-        Description: "Evaluates whether the proposed crew is appropriate for the task: domain relevance, model choices, grounding configuration, and overall complexity balance.",
-        SystemPrompt: SystemPrompts.CrewComposerFit,
-        Provider: ModelMatrix.Primary(ModelSlot.DomainReviewer).Provider,
-        Model: ModelMatrix.Primary(ModelSlot.DomainReviewer).Model,
-        MaxTokens: 64000,
-        IsSystem: true,
-        ModelSlot: ModelSlot.DomainReviewer);
-
-    /// <summary>Checks that reuse references are correct and the right composition mode was chosen.</summary>
-    public static readonly ReviewerProfile CrewComposerReuseCorrectnessProfile = new(
-        Name: "crew-composer-reuse-correctness",
-        DisplayName: "Reuse Correctness",
-        Description: "Verifies that reused profiles fit the task, detects unnecessary duplicates, and checks that the correct composition mode (existing-template / composed / new) was selected.",
-        SystemPrompt: SystemPrompts.CrewComposerReuseCorrectness,
-        Provider: ModelMatrix.Primary(ModelSlot.DomainReviewer).Provider,
-        Model: ModelMatrix.Primary(ModelSlot.DomainReviewer).Model,
-        MaxTokens: 64000,
-        IsSystem: true,
-        ModelSlot: ModelSlot.DomainReviewer);
-
-    /// <summary>Reviews tool-binding decisions in the proposed crew spec.</summary>
-    public static readonly ReviewerProfile CrewComposerToolBindingProfile = new(
-        Name: "crew-composer-tool-binding",
-        DisplayName: "Tool Binding Review",
-        Description: "Audits tool_names bindings in actor profiles: checks necessity, access-class compliance (ReadOnly only in Phase B), role fit, and catalog membership.",
-        SystemPrompt: SystemPrompts.CrewComposerToolBinding,
-        Provider: ModelMatrix.Primary(ModelSlot.FactReviewer).Provider,
-        Model: ModelMatrix.Primary(ModelSlot.FactReviewer).Model,
-        MaxTokens: 64000,
-        IsSystem: true,
-        ModelSlot: ModelSlot.FactReviewer);
-
-    // ── Auto-Crew: crew-design-advisor ─────────────────────────────────────────
-
-    /// <summary>Strategic advisor consulted once before the first composition draft; orients the executor on domain, risks, and crew archetypes.</summary>
-    public static readonly AdvisorProfile CrewDesignAdvisorProfile = new(
-        Name: "crew-design-advisor",
-        DisplayName: "Crew Design Advisor",
-        Description: "Strategic pre-composition advisor. Analyzes the user's task for domain, quality risks, suitable crew archetypes, grounding needs, and complexity calibration before the executor begins.",
-        SystemPrompt: SystemPrompts.CrewDesignAdvisor,
-        Provider: ModelMatrix.Primary(ModelSlot.StrategicAdvisor).Provider,
-        Model: ModelMatrix.Primary(ModelSlot.StrategicAdvisor).Model,
-        MaxTokens: 64000,
-        Mode: AdvisorMode.Strategic,
-        Trigger: AdvisorTrigger.BeforeFirstExecution,
-        IsSystem: true,
-        ModelSlot: ModelSlot.StrategicAdvisor);
-
-    // ── Auto-Crew: grounding providers ─────────────────────────────────────────
-
-    /// <summary>Crew catalog grounding provider — surfaces existing profiles and templates for Reuse-First lookups.</summary>
-    public static readonly GroundingProviderProfile CrewCatalogDefaultProfile = new(
-        Name: "crew-catalog-default",
-        DisplayName: "Crew Catalog",
-        Description: "Returns the current catalog of system and custom crew profiles and templates. Used by the crew-composer executor to apply Reuse-First before composing new profiles.",
-        ProviderType: GroundingProviderTypes.CrewCatalog,
-        ProviderSettings: new Dictionary<string, string>(),
-        IsSystem: true);
-
-    /// <summary>Tool catalog grounding provider — lists all registered tools for tool-binding awareness in auto-crew composition.</summary>
-    public static readonly GroundingProviderProfile ToolCatalogDefaultProfile = new(
-        Name: "tool-catalog-default",
-        DisplayName: "Tool Catalog",
-        Description: "Lists all registered tools in the central tool catalogue. Used by the crew-composer executor so it can bind tools to actor profiles by name.",
-        ProviderType: GroundingProviderTypes.ToolCatalog,
-        ProviderSettings: new Dictionary<string, string>(),
-        IsSystem: true);
-
-    /// <summary>Pack catalog grounding provider — lists reusable specialization packs for pack-binding awareness in auto-crew composition.</summary>
-    public static readonly GroundingProviderProfile PackCatalogDefaultProfile = new(
-        Name: "pack-catalog-default",
-        DisplayName: "Pack Catalog",
-        Description: "Lists the reusable specialization packs (General + DomainScoped). Used by the crew-composer executor so it can reuse existing packs by name instead of inventing new ones.",
-        ProviderType: GroundingProviderTypes.PackCatalog,
-        ProviderSettings: new Dictionary<string, string>(),
-        IsSystem: true);
-
-    /// <summary>Static-context grounding provider embedding the binding crew design rules.</summary>
-    public static readonly GroundingProviderProfile CrewDesignRulesProfile = new(
-        Name: "crew-design-rules",
-        DisplayName: "Crew Design Rules",
-        Description: "Injects the binding crew-design rules (model plurality, severity taxonomy, naming constraints, minimum crew, reuse-first) as static context into the composition run.",
-        ProviderType: GroundingProviderTypes.StaticContext,
-        ProviderSettings: new Dictionary<string, string>
-        {
-            [GroundingProviderProfile.KeyStaticContent] =
-                "Crew Design Rules (binding for all auto-composed crews):\n" +
-                "\n" +
-                "MODEL RULES (D-066 model matrix — binding):\n" +
-                "- NEVER choose provider or model. Set the crew 'model_domain' and, on every inline LLM part, 'model_slot'. The system assigns the model from the model matrix.\n" +
-                "- Valid model_domain values: General, Correspondence, Legal, Academic, Marketing, Speech, Technical. Legal and Academic enable paid domain reviewers: use them only for real legal or scholarly work. The free 'domain' string is only a naming/pack hint.\n" +
-                "- Valid model_slot values: Executor (executor); FactReviewer, StyleReviewer, DomainReviewer (reviewers); StrategicAdvisor, CriticalAdvisor, DomainExpertAdvisor (advisors); TransformRewrite, TransformCondense (Transform finalizers); Helper (lightweight filter/classifier).\n" +
-                "- Claude and OpenAI models always run through the subscription CLIs (claude-cli, codex-cli); model plurality and cross-vendor reviewers are enforced automatically.\n" +
-                "\n" +
-                "REUSE-FIRST (reduces validation risk to zero):\n" +
-                "- Executor: always a NEW inline, task-specialized profile with model_slot 'Executor'.\n" +
-                "- Default output finalizer: { \"reuse\": \"learning-extractor\" } — deterministic, never needs provider/model.\n" +
-                "- Deterministic finalizer types (file-export, metadata-enrich, external-sink, crew-materialize, learning-extractor, learning-publisher): do NOT set provider or model.\n" +
-                "- LLM-based roles (executor, reviewer, advisor, transform-finalizer) need a model_slot, never provider/model.\n" +
-                "\n" +
-                "OTHER BINDING RULES:\n" +
-                "1. Model plurality: reviewers never share the executor's model; the matrix enforces it — pick the right model_slot per reviewer.\n" +
-                "2. Severity taxonomy: every new REVIEWER prompt MUST include the verbatim taxonomy block (advisors/finalizers/grounding do NOT need it).\n" +
-                "3. Naming: ^[a-z0-9\\-]+$, max 64 chars.\n" +
-                "4. Prompts in English.\n" +
-                "5. Minimum crew: executor + >=1 reviewer + >=1 output finalizer.\n" +
-                "6. Strategy: Parallel by default; Sequential/Priority only when order matters.\n" +
-                "7. Domain coverage: domain-specific tasks need domain-specific reviewers/advisors/grounding.\n" +
-                "8. Reuse-first: prefer existing profiles; no duplicates.\n" +
-                "\n" +
-                "Severity taxonomy (verbatim — copy into every new reviewer prompt):\n" +
-                "- critical: substantial factual or logical error; the reader is actively misinformed.\n" +
-                "- major: important omission or clear inaccuracy that significantly reduces usefulness.\n" +
-                "- minor: style improvement, request for precision; substantially correct.\n" +
-                "- info: optional note; no action required.\n" +
-                "Anti-pattern: \"technically correct\" != critical. If correct but could be more precise -> minor at most.",
-            [GroundingProviderProfile.KeyStaticLabel] = "Crew Design Rules",
-        },
-        IsSystem: true,
-        ToolName: "static-context");
-
-    // ── Auto-Crew: materializer finalizer ──────────────────────────────────────
-
-    /// <summary>Finalizer that materializes the crew-spec JSON artifact into real database entities.</summary>
-    public static readonly FinalizerProfile CrewMaterializerProfile = new(
-        Name: "crew-materializer",
-        DisplayName: "Crew Materializer",
-        Description: "Materializes the JSON crew-spec produced by a composition run into real executor, reviewer, advisor, grounding-provider, and finalizer profile entities in the database.",
-        FinalizerType: FinalizerType.CrewMaterialize,
-        Settings: new Dictionary<string, string>(),
-        IsSystem: true);
-
-    // ── Auto-Crew: crew-composer template ──────────────────────────────────────
-
-    /// <summary>Name constant for the crew-composer system template.</summary>
-    public const string CrewComposerTemplateName = "crew-composer";
-
-    /// <summary>System crew template for auto-crew composition runs.</summary>
-    public static readonly CrewTemplate CrewComposerTemplate = new(
-        Name: CrewComposerTemplateName,
-        DisplayName: "Crew Composer",
-        Description: "Auto-crew composition: analyzes a task description and produces a complete, validated crew specification ready for materialization. Uses Reuse-First, model plurality, and the full severity taxonomy.",
-        ExecutorProfileName: CrewComposerExecutorProfile.Name,
-        ReviewerProfileNames: new[]
-        {
-            CrewSpecValidatorProfile.Name,
-            CrewComposerCompletenessProfile.Name,
-            CrewComposerPromptQualityProfile.Name,
-            CrewComposerFitProfile.Name,
-            CrewComposerReuseCorrectnessProfile.Name,
-            CrewComposerToolBindingProfile.Name,
-        },
-        EvaluationStrategy: EvaluationStrategy.Parallel,
-        ConvergenceOverride: new ConvergencePolicyOverride(
-            MaxIterations: 6,
-            AbortOnCritical: false,
-            DetectRegression: true,
-            StagnationThreshold: 6), // same as MaxIterations → stagnation never fires before budget is exhausted
-        AdvisorProfileNames: new[] { CrewDesignAdvisorProfile.Name },
-        GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name, ToolCatalogDefaultProfile.Name, PackCatalogDefaultProfile.Name },
-        FinalizerProfileNames: new[] { CrewMaterializerProfile.Name },
-        RunFinalizersOnMaxAttempts: false,
-        IsSystem: true,
-        Domain: ModelDomain.General);
-
     /// <summary>The only system template in PS-5: the Klassik crew that reproduces the PS-2 hardcoded behaviour.</summary>
     public static readonly CrewTemplate KlassikTemplate = new(
         Name: KlassikTemplateName,
@@ -449,13 +229,6 @@ public static class SystemCrew
             [ClarityProfile.Name]                           = ClarityProfile,
             [DomainTerminologyReviewerProfile.Name]         = DomainTerminologyReviewerProfile,
             [SubstantiveRigorReviewerProfile.Name]          = SubstantiveRigorReviewerProfile,
-            // Auto-Crew composition reviewers
-            [CrewSpecValidatorProfile.Name]                 = CrewSpecValidatorProfile,
-            [CrewComposerCompletenessProfile.Name]          = CrewComposerCompletenessProfile,
-            [CrewComposerPromptQualityProfile.Name]         = CrewComposerPromptQualityProfile,
-            [CrewComposerFitProfile.Name]                   = CrewComposerFitProfile,
-            [CrewComposerReuseCorrectnessProfile.Name]      = CrewComposerReuseCorrectnessProfile,
-            [CrewComposerToolBindingProfile.Name]           = CrewComposerToolBindingProfile,
         };
 
     /// <summary>All system executor profiles, indexed by name.</summary>
@@ -463,7 +236,6 @@ public static class SystemCrew
         new Dictionary<string, ExecutorProfile>
         {
             [DefaultExecutorProfile.Name]         = DefaultExecutorProfile,
-            [CrewComposerExecutorProfile.Name]    = CrewComposerExecutorProfile,
         };
 
     // ── Domain advisor profiles ─────────────────────────────────────────────────────
@@ -534,7 +306,6 @@ public static class SystemCrew
             [AcademicRigorAdvisorProfile.Name]   = AcademicRigorAdvisorProfile,
             [BriefingClarifierProfile.Name]      = BriefingClarifierProfile,
             [DevilsAdvocateProfile.Name]         = DevilsAdvocateProfile,
-            [CrewDesignAdvisorProfile.Name]      = CrewDesignAdvisorProfile,
         };
 
     /// <summary>All system grounding-provider profiles, indexed by name.</summary>
@@ -545,11 +316,6 @@ public static class SystemCrew
             [TavilyRefinedProfile.Name]              = TavilyRefinedProfile,
             [KnowledgeBaseDefaultProfile.Name]       = KnowledgeBaseDefaultProfile,
             [RunAttachmentsProfile.Name]             = RunAttachmentsProfile,
-            // Auto-Crew grounding providers
-            [CrewCatalogDefaultProfile.Name]         = CrewCatalogDefaultProfile,
-            [CrewDesignRulesProfile.Name]            = CrewDesignRulesProfile,
-            [ToolCatalogDefaultProfile.Name]         = ToolCatalogDefaultProfile,
-            [PackCatalogDefaultProfile.Name]         = PackCatalogDefaultProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>
@@ -560,7 +326,6 @@ public static class SystemCrew
             [JuristischTemplate.Name]     = JuristischTemplate,
             [AkademischTemplate.Name]     = AkademischTemplate,
             [MarketingTemplate.Name]      = MarketingTemplate,
-            [CrewComposerTemplate.Name]   = CrewComposerTemplate,
         };
 
     /// <summary>
@@ -783,8 +548,6 @@ public static class SystemCrew
             [ExecutiveSummaryProfile.Name]    = ExecutiveSummaryProfile,
             [KeyTakeawaysProfile.Name]        = KeyTakeawaysProfile,
             [GlossaryProfile.Name]            = GlossaryProfile,
-            // Auto-Crew
-            [CrewMaterializerProfile.Name]    = CrewMaterializerProfile,
         };
 
     /// <summary>True when the supplied name matches a system finalizer profile, including the retired ones.</summary>

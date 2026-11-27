@@ -86,12 +86,12 @@ public sealed class WorkshopEntryFlowTests(PlaywrightFixture pw, PostgresFixture
             await page.GotoAsync($"{host.BaseUrl}/start");
             await page.Locator("[data-testid='start-page']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
             await WaitInteractiveAsync(page);
-            Assert.Equal("/new", await page.Locator("[data-testid='start-more-options']").GetAttributeAsync("href"));
+            Assert.Equal(0, await page.Locator("[data-testid='start-more-options']").CountAsync());
             await AssertFitsAsync(page, $"switch-off-{palette}");
 
             await page.Locator("[data-testid='nav-workshop']").ClickAsync();
             await page.Locator(".nav-dropdown a[href='/runs']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
-            Assert.True(await page.Locator(".nav-dropdown a[href='/new']").IsVisibleAsync());
+            Assert.Equal(0, await page.Locator(".nav-dropdown a[href='/new']").CountAsync());
             await AssertFitsAsync(page, $"switch-off-open-{palette}");
         }
         finally

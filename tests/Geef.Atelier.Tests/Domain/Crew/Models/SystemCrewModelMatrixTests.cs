@@ -12,12 +12,10 @@ public sealed class SystemCrewModelMatrixTests
     {
         foreach (var e in SystemCrew.ExecutorProfiles.Values)
             Assert.True(e.ModelSlot is { } s && s.IsAllowedFor(ModelActorKind.Executor), e.Name);
-        foreach (var r in SystemCrew.ReviewerProfiles.Values.Where(r => r.Name != SystemCrew.CrewSpecValidatorProfile.Name))
+        foreach (var r in SystemCrew.ReviewerProfiles.Values)
             Assert.True(r.ModelSlot is { } s && s.IsAllowedFor(ModelActorKind.Reviewer), r.Name);
         foreach (var a in SystemCrew.AdvisorProfiles.Values)
             Assert.True(a.ModelSlot is { } s && s.IsAllowedFor(ModelActorKind.Advisor), a.Name);
-
-        Assert.Null(SystemCrew.CrewSpecValidatorProfile.ModelSlot);
     }
 
     [Fact]
@@ -36,7 +34,6 @@ public sealed class SystemCrewModelMatrixTests
         Assert.Equal(ModelDomain.Legal, SystemCrew.JuristischTemplate.Domain);
         Assert.Equal(ModelDomain.Academic, SystemCrew.AkademischTemplate.Domain);
         Assert.Equal(ModelDomain.Marketing, SystemCrew.MarketingTemplate.Domain);
-        Assert.Equal(ModelDomain.General, SystemCrew.CrewComposerTemplate.Domain);
     }
 
     [Fact]
@@ -79,17 +76,6 @@ public sealed class SystemCrewModelMatrixTests
 
         Assert.Equal(ModelSlot.TransformRewrite, TransformSettings.From(SystemCrew.AntiAiVoiceProfile.Settings).ModelSlot);
         Assert.Equal(ModelSlot.TransformCondense, TransformSettings.From(SystemCrew.GlossaryProfile.Settings).ModelSlot);
-    }
-
-    [Fact]
-    public void DesignRulesTellTheComposerToChooseSlotsNotModels()
-    {
-        var rules = SystemCrew.CrewDesignRulesProfile.ProviderSettings[GroundingProviderProfile.KeyStaticContent];
-
-        Assert.Contains("model_slot", rules);
-        Assert.DoesNotContain("gpt-5", rules);
-        Assert.DoesNotContain("grok", rules, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Recommended defaults", rules);
     }
 
 }

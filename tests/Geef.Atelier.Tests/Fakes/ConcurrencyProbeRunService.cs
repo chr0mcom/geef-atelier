@@ -51,7 +51,6 @@ internal sealed class ConcurrencyProbeRunService(RunEntity? run = null, RunDetai
         return run;
     }
 
-    public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<RunWarningEntity>>([]);
@@ -71,8 +70,6 @@ internal sealed class ConcurrencyProbeRunService(RunEntity? run = null, RunDetai
                 GroundingConsultations: [],
                 ToolInvocations: [],
                 Warnings: []));
-
-    public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default) =>
         details is null ? throw new NotSupportedException() : TrackAsync(Guid.NewGuid());

@@ -2,7 +2,6 @@ using System.Reflection;
 using Bunit;
 using Geef.Atelier.Web.Components.Pages;
 using Geef.Atelier.Web.Components.Pages.Public;
-using IndexPage = Geef.Atelier.Web.Components.Pages.Index;
 using Geef.Atelier.Web.Components.UI;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
@@ -11,28 +10,6 @@ namespace Geef.Atelier.Tests.Web.Components;
 
 public sealed class LandingRoutingTests : TestContext
 {
-    // ── Dashboard moved to /workshop ──────────────────────────────────────
-
-    [Fact]
-    public void Index_HasWorkshopRoute()
-    {
-        var attrs = typeof(IndexPage).GetCustomAttributes<RouteAttribute>();
-        Assert.Contains(attrs, r => r.Template == "/workshop");
-    }
-
-    [Fact]
-    public void Index_StillRequiresAuthorization()
-    {
-        Assert.NotNull(typeof(IndexPage).GetCustomAttribute<AuthorizeAttribute>());
-    }
-
-    [Fact]
-    public void Index_DoesNotHaveRootRoute()
-    {
-        var attrs = typeof(IndexPage).GetCustomAttributes<RouteAttribute>();
-        Assert.DoesNotContain(attrs, r => r.Template == "/");
-    }
-
     // ── Landing has root route and AllowAnonymous ────────────────────────
 
     [Fact]

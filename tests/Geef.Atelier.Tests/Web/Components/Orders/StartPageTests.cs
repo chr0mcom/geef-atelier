@@ -75,26 +75,6 @@ public sealed class StartPageTests : TestContext
     }
 
     [Fact]
-    public void TheLinkToTheOlderFormIsShownToAdministrators()
-    {
-        _auth.SetRoles(OwnerScope.AdminRole);
-
-        var cut = RenderComponent<Start>();
-
-        Assert.Equal("/new", cut.Find("[data-testid='start-more-options']").GetAttribute("href"));
-    }
-
-    [Fact]
-    public void TheLinkToTheOlderFormIsShownToEveryoneWhenTheWorkshopSwitchIsOff()
-    {
-        Services.Configure<UiOptions>(o => o.WorkshopForAdminsOnly = false);
-
-        var cut = RenderComponent<Start>();
-
-        Assert.Equal("/new", cut.Find("[data-testid='start-more-options']").GetAttribute("href"));
-    }
-
-    [Fact]
     public void AnEmptyProfileShowsATipThatLeadsToAboutMe()
     {
         var profiles = new FakeProfileService();

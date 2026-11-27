@@ -14,7 +14,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using IndexPage = Geef.Atelier.Web.Components.Pages.Index;
 
 namespace Geef.Atelier.Tests.Web.Components;
 
@@ -28,18 +27,8 @@ public sealed class WorkshopEntryTests : TestContext
 {
     private static readonly Type[] WorkshopPagesOpenToEveryone =
     [
-        typeof(IndexPage),
         typeof(Runs),
         typeof(RunDetail),
-        typeof(New),
-        typeof(CrewTemplatesIndex),
-        typeof(KnowledgeIndex),
-        typeof(ReviewerProfilesIndex),
-        typeof(ExecutorProfilesIndex),
-        typeof(AdvisorProfilesIndex),
-        typeof(GroundingProvidersIndex),
-        typeof(FinalizersIndex),
-        typeof(PacksIndex),
     ];
 
     public static TheoryData<Type> OpenWorkshopPages => new(WorkshopPagesOpenToEveryone);
@@ -100,9 +89,7 @@ public sealed class WorkshopEntryTests : TestContext
 
         var hrefs = cut.FindAll(".nav-dropdown a.nav-link").Select(a => a.GetAttribute("href")).ToList();
         Assert.Equal(
-            new[] { "/workshop", "/runs", "/new", "/crew/templates", "/crew/knowledge", "/crew/learnings",
-                "/crew/profiles/reviewers", "/crew/profiles/executors", "/crew/profiles/advisors", "/crew/profiles/grounding-providers",
-                "/crew/profiles/finalizers", "/tools", "/packs", "/crew/providers" },
+            new[] { "/runs", "/crew/providers" },
             hrefs);
     }
 
@@ -117,9 +104,7 @@ public sealed class WorkshopEntryTests : TestContext
 
         var hrefs = cut.FindAll(".nav-dropdown a.nav-link").Select(a => a.GetAttribute("href")).ToList();
         Assert.Equal(
-            new[] { "/workshop", "/runs", "/new", "/crew/templates", "/crew/knowledge",
-                "/crew/profiles/reviewers", "/crew/profiles/executors", "/crew/profiles/advisors", "/crew/profiles/grounding-providers",
-                "/crew/profiles/finalizers", "/packs" },
+            new[] { "/runs" },
             hrefs);
     }
 
@@ -138,8 +123,8 @@ public sealed class WorkshopEntryTests : TestContext
     }
 
     [Theory]
-    [InlineData(typeof(ConnectedClients), "/workshop", true, false)]
-    [InlineData(typeof(ConnectedClients), "/workshop", false, true)]
+    [InlineData(typeof(ConnectedClients), "/runs", true, false)]
+    [InlineData(typeof(ConnectedClients), "/runs", false, true)]
     [InlineData(typeof(OAuthClients), "/runs", true, false)]
     [InlineData(typeof(OAuthClients), "/runs", false, true)]
     public void The_account_pages_keep_their_old_way_back_for_administrators_and_with_the_switch_off(Type page, string back, bool admin, bool switchOff)

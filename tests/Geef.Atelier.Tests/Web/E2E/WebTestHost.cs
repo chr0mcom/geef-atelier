@@ -23,7 +23,6 @@ using Geef.Atelier.Core.Persistence.Sources;
 using Geef.Atelier.Web.Auth;
 using Geef.Atelier.Web.Components;
 using Geef.Atelier.Web.Endpoints;
-using Geef.Atelier.Web.Hubs;
 using Geef.Atelier.Web.Notifications;
 using Geef.Atelier.Web.Services;
 using Microsoft.AspNetCore.Authentication;
@@ -56,6 +55,13 @@ internal sealed class WebTestHost : IAsyncDisposable
 
     /// <summary>The bearer token accepted by the <c>/mcp</c> endpoint in this test host.</summary>
     public string McpToken => "test-mcp-token";
+
+    /// <summary>Stores a pending run of the signed-in test user and returns its id; the orchestrator picks it up.</summary>
+    public async Task<Guid> CreateRunAsync(string briefing)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        return await scope.ServiceProvider.CreatePendingAsync(briefing, "test-user");
+    }
 
     private WebTestHost(WebApplication app, string baseUrl, SemaphoreSlim gate)
     {
@@ -199,7 +205,6 @@ internal sealed class WebTestHost : IAsyncDisposable
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseAntiforgery();
-        app.MapRunHub();
         app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
         app.MapAuthEndpoints();
         configureApp?.Invoke(app);

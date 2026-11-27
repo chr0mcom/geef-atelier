@@ -25,14 +25,8 @@ public sealed class CancelFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
         try
         {
             // Submit a run — pipeline will stall because gate is closed
-            await page.GotoAsync($"{_host!.BaseUrl}/new");
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-            await page.FillAsync("textarea#briefing", "Cancel flow test — this pipeline will be cancelled.");
-            await page.ClickAsync("button.btn-submit");
-
-            // Wait for redirect to detail page
-            await page.WaitForURLAsync(new Regex(@"/runs/[0-9a-f\-]{36}$"),
-                new PageWaitForURLOptions { Timeout = 15_000 });
+            var runId = await _host!.CreateRunAsync("Cancel flow test — this pipeline will be cancelled.");
+            await page.GotoAsync($"{_host.BaseUrl}/runs/{runId}");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
             // Wait for either Pending or Running status (pipeline stalled at gate)

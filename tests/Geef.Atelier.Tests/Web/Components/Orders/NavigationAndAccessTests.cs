@@ -32,7 +32,7 @@ public sealed class NavigationAndAccessTests : TestContext
     }
 
     [Fact]
-    public void TheWorkshopMenuKeepsDashboardRunsAndTheOldForm()
+    public void TheWorkshopMenuKeepsRunsAndProviders()
     {
         this.AddTestAuthorization().SetAuthorized("root").SetRoles("admin");
         var cut = RenderComponent<NavMenu>();
@@ -41,11 +41,7 @@ public sealed class NavigationAndAccessTests : TestContext
         cut.Find("[data-testid='nav-workshop']").Click();
 
         var hrefs = cut.FindAll(".nav-dropdown a.nav-link").Select(a => a.GetAttribute("href")).ToList();
-        Assert.Contains("/workshop", hrefs);
-        Assert.Contains("/runs", hrefs);
-        Assert.Contains("/new", hrefs);
-        Assert.Contains("/crew/templates", hrefs);
-        Assert.Contains("/crew/knowledge", hrefs);
+        Assert.Equal(new[] { "/runs", "/crew/providers" }, hrefs);
     }
 
     [Fact]

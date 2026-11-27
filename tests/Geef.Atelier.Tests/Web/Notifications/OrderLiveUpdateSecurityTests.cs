@@ -1,8 +1,6 @@
 using System.Security.Claims;
-using Geef.Atelier.Application.Dashboard;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Domain.Dashboard;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Notifications;
@@ -41,7 +39,6 @@ public sealed class OrderLiveUpdateSecurityTests : IAsyncDisposable
         services.AddSingleton<IOrderService>(_orders);
         services.AddSingleton<IRunRepository>(_runs);
         services.AddSingleton<IOrderRepository>(_orderRepository);
-        services.AddSingleton<IDashboardService, InertDashboardService>();
         services.AddRunLiveUpdates();
         _provider = services.BuildServiceProvider();
         _feed = _provider.GetRequiredService<IRunUpdateFeed>();
@@ -180,7 +177,6 @@ public sealed class OrderLiveUpdateSecurityTests : IAsyncDisposable
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IDashboardService, InertDashboardService>();
         services.AddRunLiveUpdates();
         services.AddSingleton<IRunNotifier, NoOpRunNotifier>();
         using var provider = services.BuildServiceProvider();
@@ -248,7 +244,6 @@ public sealed class OrderLiveUpdateSecurityTests : IAsyncDisposable
         public Task<IReadOnlyList<RunEntity>> ListAsync(int limit, RunStatus? statusFilter, string? username, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<bool> RequestCancellationAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
@@ -288,10 +283,4 @@ public sealed class OrderLiveUpdateSecurityTests : IAsyncDisposable
         public Task<bool> TryReserveResearchAsync(Guid orderId, string? user, DateTimeOffset at, DateTimeOffset since, int dailyCap, int userCap, CancellationToken ct = default) => throw new NotImplementedException();
     }
 
-    private sealed class InertDashboardService : IDashboardService
-    {
-        public Task<DashboardSnapshot> GetSnapshotAsync(string username, bool isAdmin, DashboardScope scope, CancellationToken ct = default) => throw new NotSupportedException();
-        public void InvalidateUser(string username) { }
-        public void InvalidateAdmin() { }
-    }
 }

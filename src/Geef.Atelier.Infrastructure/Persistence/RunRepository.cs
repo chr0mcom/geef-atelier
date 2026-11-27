@@ -61,38 +61,6 @@ internal sealed class RunRepository(AtelierDbContext db) : IRunRepository
     }
 
     /// <inheritdoc/>
-    public async Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default)
-    {
-        var startOfMonth = new DateTimeOffset(
-            DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
-
-        IQueryable<RunEntity> baseQ = db.Runs.Where(r => r.CreatedAt >= startOfMonth);
-        if (username is not null)
-            baseQ = baseQ.Where(r => r.CreatedByUser == username);
-
-        var runsThisMonth = await baseQ.CountAsync(cancellationToken);
-
-        var completedThisMonth = await baseQ
-            .Where(r => r.Status == RunStatus.Completed)
-            .CountAsync(cancellationToken);
-
-        var convergenceRate = runsThisMonth > 0 ? (double)completedThisMonth / runsThisMonth : 0.0;
-
-        var runIds = baseQ.Select(r => r.Id);
-        var totalIterationsThisMonth = await db.Iterations
-            .Where(i => runIds.Contains(i.RunId))
-            .CountAsync(cancellationToken);
-
-        var avgIterations = runsThisMonth > 0 ? (double)totalIterationsThisMonth / runsThisMonth : 0.0;
-
-        var totalCostThisMonth = await baseQ
-            .Where(r => r.TotalCostEur != null)
-            .SumAsync(r => r.TotalCostEur!.Value, cancellationToken);
-
-        return new WelcomeStats(runsThisMonth, convergenceRate, avgIterations, totalCostThisMonth);
-    }
-
-    /// <inheritdoc/>
     public async Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default)
         => await db.Runs.Where(r => r.Id == runId).ExecuteDeleteAsync(cancellationToken);
 }
