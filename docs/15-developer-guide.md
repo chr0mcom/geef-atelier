@@ -2,7 +2,7 @@
 
 *[Deutsch](15-developer-guide_de.md) · **English***
 
-*Last updated: 2026-11-27 (second addendum to D-087: one setup, "Extra careful" removed; D-091: stage 8d, one pipeline assembler, ten MCP tools and five stubs, old data and later database cleanup; before that research on for everyone and its guards, addendum to D-074; About me on the result, D-083)*
+*Last updated: 2026-11-27 (D-092: one baseline migration and the start guard; second addendum to D-087: one setup, "Extra careful" removed; D-091: stage 8d, one pipeline assembler, ten MCP tools and five stubs, old data and later database cleanup; before that research on for everyone and its guards, addendum to D-074; About me on the result, D-083)*
 
 This guide is for developers and for people who host Atelier. It gives the map of the current system and points to the detailed
 documents. Setup commands are in the [README](../README.md); the reasons behind every rule are in the
@@ -68,14 +68,8 @@ live catalog (D-066) and frozen in the run's snapshot. The grounding of a run is
 if looked up, the passages) plus the web research (`OrderResearchService` with the Tavily client; `Research:*`, `Tavily:Endpoint`,
 `Tavily:ApiKey`). A start without a search key logs a warning, and research then ends without a search.
 
-Orders stored with the mode `Careful` and runs with the removed template `direct-outline` (second addendum to D-087) are carried
-on by the direct path: every new run uses `direct` (`OrderRunExtensions.ResolveOrderSnapshotAsync`), `SystemCrew.IsDirectPathTemplate`
-still counts `direct-outline`, and `DirectPipelineAssembler` leaves its extra check out when a stored snapshot is executed. The
-enum value and the database columns stay.
-
-`PipelineAssemblerSelector` asks the registered assemblers; the only production one, `DirectPipelineAssembler`, accepts `direct` and,
-for stored runs, `direct-outline`. A run none accepts fails with "This task was set up for a way of working that no longer exists, so it cannot run. Please
-start it again."
+`PipelineAssemblerSelector` asks the registered assemblers; the only production one, `DirectPipelineAssembler`, accepts `direct`.
+A run none accepts fails with "This task was set up in a way this version cannot run. Please start it again."
 
 ## MCP tools
 
@@ -85,18 +79,13 @@ The server offers `submit_order`, `answer_order`, `get_order_status`, `get_order
 `get_run_details` for one version: optional parameters, a description starting with "Removed: use … instead.", and every call fails
 with an error that names the successor.
 
-## Old data
+## Database and migrations
 
-Stage 8d removed code, not data. No migration drops anything, so the previous image stays compatible with the database; snapshots
-keep the `advisors` list so that it can still read them. Finished old orders and runs stay readable (lists, order page, result,
-export, run page). A pending or resumed run of a removed setup fails as above; "Resume" refuses it (`ResumeRules`), and crash
-recovery and cleanup treat old runs as before. A later, separate database cleanup may drop the tables `AdvisorConsultations`,
-`AdvisorProfiles`, `CrewTemplateEmbeddings`, `CrewTemplates`, `ExecutorProfiles`, `FinalizationActorCosts`, `FinalizerProfiles`,
-`GroundingActorCosts`, `GroundingConsultations`, `GroundingProviderProfiles`, `KnowledgeDocumentChunks`, `KnowledgeDocuments`,
-`LearningEntries`, `ReviewerProfiles`, `RunArtifacts`, `StudioSettings`, `TemplateStudioAnalyses`, `mcp_server_configs`,
-`specialization_packs`, `tool_definitions` and `tool_invocations`, the columns `Runs.GroundingCostEur`,
-`Runs.FinalizerCostEur`, `Runs.FinalizerErrorMessage` and `Iterations.AdvisorsTotalCostEur` (later possibly
-`Orders.CrewTemplateName` and `Runs.ParentCompositionRunId`), old composition and learning runs and the exports volume.
+One migration, `Baseline` (D-092), builds the schema from an empty database with the seeds a fresh installation needs; the model
+snapshot matches the model (`BaselineMigrationTests`). Add later changes as migrations on top of it, written by hand or generated
+with `dotnet ef migrations add`; keep them additive where you can, so that the previous image keeps working. The application
+refuses to start on a database that does not start from the baseline (`EnsureStartsFromBaselineAsync`) and changes nothing in it;
+an installation from before D-092 has to be converted first.
 
 ## The explanation page follows the switches
 
@@ -124,8 +113,7 @@ When you add a switch that changes what a person can do, add it to `HowItWorksFe
 - **xUnit + Testcontainers:** `dotnet test` needs a Docker daemon. Prefer real Postgres for anything that touches EF queries or
   migrations.
 - **End-to-end over the real wiring:** `tests/Geef.Atelier.Tests/EndToEnd` starts the application against Postgres and replaces
-  only the HTTP counterparts (D-067). Every new pipeline path gets a test here; data written by older versions has its own tests
-  (`LegacyDataEndToEndTests`).
+  only the HTTP counterparts (D-067). Every new pipeline path gets a test here.
 - **Browser:** Playwright tests in `tests/Geef.Atelier.Tests/Web/E2E` (`WebTestHost`); with `ATELIER_SCREENSHOT_DIR` some of them
   store screenshots.
 - **Measuring tools:** `tools/Eval` (blind pairwise comparison), `tools/IntakeEval` (clarifier), `tools/FactCheckEval` (fact check),
@@ -142,7 +130,8 @@ When you add a switch that changes what a person can do, add it to `HowItWorksFe
 - Never claim more than was checked; never lose a finding silently. "What was checked" consists of fixed sentences and verbatim
   quotes only, never a model's own words about its work (D-073).
 - Fail loud: a missing registration fails at start, a skipped source or failed reviewer becomes a run warning (D-067).
-- Migrations are hand-written, additive and idempotent and need `[DbContext]` and `[Migration]`, otherwise EF skips them silently.
+- A hand-written migration needs `[DbContext]` and `[Migration]`, otherwise EF skips it silently; keep the model snapshot in step
+  (`BaselineMigrationTests` fails when model and migrations differ).
 - The repository is public: no secrets, no operating details, no account names, no real orders in tests or examples.
 - UI texts are English only (D-062); documentation is bilingual (English primary, German `_de.md`).
 - About me is strictly per account: the result fields `TellOnce` and `FromAboutMe` are filled only for the owner of the order, the
@@ -154,7 +143,7 @@ When you add a switch that changes what a person can do, add it to `HowItWorksFe
 ## Hosting
 
 - Docker Compose with the web service, Postgres, the backup container and the CLI gateway `cli-proxy`; see the README for the first
-  setup, backups and restore. The Postgres image is still `pgvector`, because older migrations create the `vector` extension.
+  setup, backups and restore. The Compose files use a `pgvector` Postgres image; the schema needs no extension (D-092).
 - Deploy order when both change: first `cli-proxy`, then `web` (D-064, D-066).
 - Deploy only when no run is `Pending` or `Running` (D-077).
 - After every deploy run `scripts/atelier-smoke.sh` ([ops/atelier-smoke.md](ops/atelier-smoke.md)); `scripts/atelier-watch.sh`

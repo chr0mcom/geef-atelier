@@ -13,7 +13,7 @@ Pfad war nie in die Pipeline eingebaut (D-067).
 
 Eine Werkzeugnutzung durch die Akteure wird durch nichts ersetzt. Der einzige Zugang zum Web ist die Recherche im
 Grounding-Schritt des Direktwegs ([08-crew-system_de.md](08-crew-system_de.md#recherche-im-grounding-schritt-d-074)). Die
-Datenbanktabellen bleiben unangetastet; alte Läufe bleiben lesbar.
+Datenbanktabellen und die alten Läufe wurden beim Aufräumen der Datenbank entfernt (D-092).
 
 Die frühere Beschreibung steht in der Git-Historie dieser Datei.
 

@@ -130,16 +130,10 @@ nächsten Aufträge. Ob der Schreiber es wirklich verwendet, etwa deinen Gruß w
   werden auch die Dateien gelöscht, die kein anderer Auftrag nutzt. Die Originaldatei wird etwa 30 Tage nach dem Ende des letzten
   Auftrags entfernt, der sie nutzte; der daraus gelesene Text bleibt beim Auftrag.
 
-## Aufträge aus früheren Versionen von Atelier
+## Frühere Versionen von Atelier
 
-Fertige Aufträge aus früheren Versionen bleiben unter **My work** lesbar, mit Text und Downloads. Die älteren Arbeitsweisen, mit
-denen sie entstanden sein können, gibt es nicht mehr; ein noch unfertiger Auftrag dieser Art kann deshalb nicht laufen. Er endet
-mit „This task was set up for a way of working that no longer exists, so it cannot run. Please start it again.“ (Diese Aufgabe
-wurde für eine Arbeitsweise angelegt, die es nicht mehr gibt; bitte neu starten.)
-
-Frühere Versionen hatten ein Kästchen **Extra careful**. Es ist weg: Atelier schreibt jeden Text, auch lange, auf demselben Weg.
-Ein fertiger Text, der damit entstand, bleibt lesbar, du kannst ihn herunterladen und ändern, und **Start again** trägt deinen
-Auftrag wie gewohnt ein.
+Frühere Versionen hatten andere Arbeitsweisen und ein Kästchen **Extra careful**. Beides ist weg: Atelier schreibt jeden Text,
+auch lange, auf demselben Weg. Aufträge von vor dem Aufräumen der Datenbank gibt es nicht mehr.
 
 ## Was Atelier um das Schreiben herum tut
 

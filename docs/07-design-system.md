@@ -81,14 +81,11 @@ Code class names stay unchanged (no breaking changes in persistence/schema):
 
 | Code name | UI display |
 |-----------|-----------|
-| `BriefingTreueReviewer` | `BriefingFidelity` |
-| `KlarheitReviewer` | `Clarity` |
-| `requirements-check` (removed) | `Request check` |
+| `deterministic-checks` | `Automatic checks` |
+| `source-fact-check` | `Fact check` |
 | All others | Unchanged (fallback) |
 
-Removed built-in setups keep their former name on the technical run page (`GetTemplateDisplay`: `klassik` → `Classic`,
-`juristisch` → `Legal`, `akademisch` → `Academic`, `marketing` → `Marketing`, `crew-composer` → `Crew Composer`,
-`direct-outline` → `Extra careful`).
+A setup without a display name shows its stored name (`GetTemplateDisplay`).
 
 Implementation: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 
@@ -127,7 +124,7 @@ This list was, at the PS-3 design translation, the state of the not-yet-connecte
 | Element | Stub back then | State today |
 |---------|----------------|----------------|
 | Welcome stats | `—` in stat tiles | Removed with the dashboard (D-091) |
-| Cost display (RunDetail) | `$ —` | ✅ Implemented (cost tracking, `Runs.CostTotal` / `IterationActorCosts`) |
+| Cost display (RunDetail) | `$ —` | ✅ Implemented (cost tracking, `Runs.TotalCostEur` / `IterationActorCosts`) |
 | Account functions | Disabled | ✅ Implemented: multi-user (`/admin/users`), connected clients (`/account/connected-clients`) |
 | "Profile" entry in `UserMenu` | Disabled | ⏳ Still a stub (`.coming-soon`) — the separate profile menu item itself is not yet wired up |
 | Export button (Manuscript) | Disabled | ⏳ Still a stub — DOCX/PDF *export* remains out of scope (see [01-vision-and-scope.md](01-vision-and-scope.md)) |

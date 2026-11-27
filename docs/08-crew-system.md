@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-11-27 (second addendum to D-087: "Extra careful" removed, one setup; D-091: stage 8d, rewritten to what exists now: two setups in code, crew snapshot, model matrix, reviewers of the direct path, old runs; the removed parts are listed at the end; before that 2026-11-26 note on where the crew system fits, D-076: files through the upload ticket; 2026-11-25, D-075 part B: change run, D-074: research in the grounding step; 2026-11-24, D-067: strict snapshot reading; older notes are in the git history)
+Last updated: 2026-11-27 (second addendum to D-087: "Extra careful" removed, one setup; D-091: stage 8d, rewritten to what exists now: two setups in code, crew snapshot, model matrix, reviewers of the direct path, the removed parts are listed at the end; before that 2026-11-26 note on where the crew system fits, D-076: files through the upload ticket; 2026-11-25, D-075 part B: change run, D-074: research in the grounding step; 2026-11-24, D-067: strict snapshot reading; older notes are in the git history)
 
 ## Overview
 
@@ -30,8 +30,8 @@ The earlier system (templates and profiles in the database, editors and further 
 
 `SystemCrew` has exactly one template, `direct`. `ResolveOrderSnapshotAsync` uses it for every new run, and
 `CrewService.ResolveCodeTemplateSnapshotAsync` turns it into the snapshot (build, assign models, resolve model aliases).
-There is one production pipeline assembler, `DirectPipelineAssembler`; it accepts this name and, for stored runs only,
-`direct-outline`.
+There is one production pipeline assembler, `DirectPipelineAssembler`; it accepts this name only. The former variant
+"Extra careful" was removed after its measurement (second addendum to D-087).
 
 | Template | Used for | Writer | Checks |
 |---|---|---|---|
@@ -46,25 +46,18 @@ There is one production pipeline assembler, `DirectPipelineAssembler`; it accept
 It has no advisors, tools or steps after the checks. The **only access to the web** is the research in the grounding
 step ([below](#research-in-the-grounding-step-d-074)).
 
-### The removed variant `direct-outline` (D-087)
-
-"Extra careful" was a second template: a planning call before the writing and a third check, `requirements-check`. It was
-removed after its measurement (second addendum to D-087). Stored runs keep their snapshot and their template name; they count
-as runs of the direct path, so they can be read, resumed and changed (a change uses `direct`). If such a run is executed,
-`DirectPipelineAssembler` leaves `requirements-check` out; there is no planning call.
-
 ## EvaluationStrategies
 
 The enum `EvaluationStrategy` keeps `Parallel` (0), `Sequential` (1), `FailFast` (2) and `Priority` (3), because stored
 snapshots name them. The setup uses `Parallel`: all checks run and all findings are collected.
 
-## CrewSnapshot format (SchemaVersion 3)
+## CrewSnapshot format (SchemaVersion 4)
 
 The example shows the **structure**. Prompts are cut and model ids are placeholders. Enums are stored as numbers.
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "templateName": "direct",
   "executor": {
     "name": "direct-writer", "displayName": "Writer", "description": "...", "systemPrompt": "...",
@@ -77,16 +70,12 @@ The example shows the **structure**. Prompts are cut and model ids are placehold
   ],
   "evaluationStrategy": 0,
   "convergenceOverride": { "maxIterations": 2, "abortOnCritical": false, "detectRegression": false, "stagnationThreshold": 2 },
-  "advisors": [],
   "crewDomain": 0
 }
 ```
 
 - It is serialized with `JsonNamingPolicy.CamelCase`.
-- `advisors` is always empty for new runs. The list stays in the format because images before stage 8d refuse a snapshot
-  without it. Entries in old snapshots are kept as they are and never used.
-- Snapshots of removed ways of working name more fields (for example grounding sources, finishing steps or tool bindings).
-  They are read without those fields.
+- Only a snapshot of the current schema version runs; any other version ends the run with a plain sentence.
 - Aliases are resolved before the snapshot is stored (`CrewSnapshotModelResolver`): the snapshot holds the concrete model
   ids, and a resumed run uses the same ones. If the catalog cannot be reached, the alias stays.
 
@@ -146,21 +135,11 @@ the warning `review.reviewer_failed`.
 - The switches `Convergence:BestDraft`, `WriterBlockingOnly` and `StopWithoutProgress` (D-085) were removed with the old
   review loop.
 
-## Old runs and old snapshots (D-091)
+## Runs from before the database cleanup (D-092)
 
-The database keeps every table and column of the removed parts (no `DROP`), so the previous image stays compatible. A later,
-separate database cleanup may drop them.
-
-| Case | Behaviour |
-|---|---|
-| Finished run or order of a removed setup | Stays readable: lists, "My work", order page, result, export and the technical run page. That page shows the setup name and says "This setup belongs to a way of working that no longer exists; further details are no longer available." |
-| Pending or resumed run of a removed setup (old review loop, composed team, learning run) | Fails with "This task was set up for a way of working that no longer exists, so it cannot run. Please start it again." |
-| "Resume" ("continue") on such a run | Refused with "This task was set up for a way of working that no longer exists, so it cannot be continued. Please start it again." |
-| Stored setup that names a check that no longer exists | Fails with "The saved setup of this task names a check that no longer exists, so it cannot run. Please start it again." |
-
-Crash recovery and cleanup treat old runs as before. `RunKind.Learning` and `RunKind.CrewComposition` stay in the enum only
-for old rows. Findings of old runs keep their reviewer names; `ReviewerDisplay` still shows the oldest ones under their short
-names. Old warning rows keep their text and are still shown.
+The orders and runs of the removed ways of working were deleted with the database cleanup, together with the code that only read
+them. A stored setup that names a check this version does not know fails with "The saved setup of this task names a check that no
+longer exists, so it cannot run. Please start it again."
 
 ## Uploaded files: safe reading (D-069 addendum)
 

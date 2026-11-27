@@ -31,8 +31,8 @@ Das frühere System (Vorlagen und Profile in der Datenbank, Editoren und weitere
 
 `SystemCrew` hat genau eine Vorlage, `direct`. `ResolveOrderSnapshotAsync` nimmt sie für jeden neuen Lauf, und
 `CrewService.ResolveCodeTemplateSnapshotAsync` macht daraus den Snapshot (bauen, Modelle zuweisen, Modell-Aliase auflösen).
-Es gibt einen produktiven Pipeline-Assembler, `DirectPipelineAssembler`; er nimmt diesen Namen an und, nur für gespeicherte
-Läufe, `direct-outline`.
+Es gibt einen produktiven Pipeline-Assembler, `DirectPipelineAssembler`; er nimmt nur diesen Namen an. Die frühere Variante
+„Extra careful“ wurde nach ihrer Messung entfernt (zweiter Zusatz zu D-087).
 
 | Vorlage | Verwendet für | Schreiber | Prüfungen |
 |---|---|---|---|
@@ -47,25 +47,18 @@ Läufe, `direct-outline`.
 Sie hat keine Advisors, Werkzeuge oder Schritte nach den Prüfungen. Der **einzige Zugang zum Web** ist
 die Recherche im Grounding-Schritt ([unten](#recherche-im-grounding-schritt-d-074)).
 
-### Die entfernte Variante `direct-outline` (D-087)
-
-„Extra careful“ war eine zweite Vorlage: ein Planungsaufruf vor dem Schreiben und eine dritte Prüfung, `requirements-check`.
-Sie wurde nach ihrer Messung entfernt (zweiter Zusatz zu D-087). Gespeicherte Läufe behalten Snapshot und Vorlagennamen; sie
-gelten als Läufe des Direktwegs und lassen sich lesen, fortsetzen und ändern (eine Änderung nutzt `direct`). Wird ein solcher
-Lauf ausgeführt, lässt `DirectPipelineAssembler` `requirements-check` aus; einen Planungsaufruf gibt es nicht.
-
 ## EvaluationStrategies
 
 Das Enum `EvaluationStrategy` behält `Parallel` (0), `Sequential` (1), `FailFast` (2) und `Priority` (3), weil gespeicherte
 Snapshots sie nennen. Die Aufstellung nutzt `Parallel`: Alle Prüfungen laufen, alle Befunde werden gesammelt.
 
-## CrewSnapshot-Format (SchemaVersion 3)
+## CrewSnapshot-Format (SchemaVersion 4)
 
 Das Beispiel zeigt den **Aufbau**. Prompts sind gekürzt, Modell-IDs sind Platzhalter. Enums werden als Zahlen gespeichert.
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "templateName": "direct",
   "executor": {
     "name": "direct-writer", "displayName": "Writer", "description": "...", "systemPrompt": "...",
@@ -78,16 +71,12 @@ Das Beispiel zeigt den **Aufbau**. Prompts sind gekürzt, Modell-IDs sind Platzh
   ],
   "evaluationStrategy": 0,
   "convergenceOverride": { "maxIterations": 2, "abortOnCritical": false, "detectRegression": false, "stagnationThreshold": 2 },
-  "advisors": [],
   "crewDomain": 0
 }
 ```
 
 - Serialisiert wird mit `JsonNamingPolicy.CamelCase`.
-- `advisors` ist bei neuen Läufen immer leer. Die Liste bleibt im Format, weil Images vor Stufe 8d einen Snapshot ohne sie
-  ablehnen. Einträge in alten Snapshots bleiben, wie sie sind, und werden nie verwendet.
-- Snapshots entfernter Arbeitsweisen nennen weitere Felder (etwa Grounding-Quellen, Abschlussschritte oder
-  Werkzeug-Bindungen). Sie werden ohne diese Felder gelesen.
+- Nur ein Snapshot der aktuellen Schemaversion läuft; jede andere Version beendet den Lauf mit einem einfachen Satz.
 - Aliase werden aufgelöst, bevor der Snapshot gespeichert wird (`CrewSnapshotModelResolver`): Er hält die konkreten
   Modell-IDs, und ein fortgesetzter Lauf nutzt dieselben. Ist der Katalog nicht erreichbar, bleibt der Alias stehen.
 
@@ -149,21 +138,11 @@ Aufruf scheitert, wird isoliert und blockiert nicht; der Lauf bekommt die Warnun
 - Die Schalter `Convergence:BestDraft`, `WriterBlockingOnly` und `StopWithoutProgress` (D-085) wurden mit der alten
   Prüfschleife entfernt.
 
-## Alte Läufe und alte Snapshots (D-091)
+## Läufe von vor dem Aufräumen der Datenbank (D-092)
 
-Die Datenbank behält alle Tabellen und Spalten der entfernten Teile (kein `DROP`), sodass das vorige Image kompatibel bleibt.
-Eine spätere, eigene Datenbankbereinigung darf sie entfernen.
-
-| Fall | Verhalten |
-|---|---|
-| Fertiger Lauf oder Auftrag einer entfernten Aufstellung | Bleibt lesbar: Listen, „My work“, Auftragsseite, Ergebnis, Export und die technische Laufseite. Diese zeigt den Namen der Aufstellung und sagt „This setup belongs to a way of working that no longer exists; further details are no longer available.“ |
-| Wartender oder fortgesetzter Lauf einer entfernten Aufstellung (alte Prüfschleife, zusammengestelltes Team, Lern-Lauf) | Scheitert mit „This task was set up for a way of working that no longer exists, so it cannot run. Please start it again.“ |
-| „Resume“ („continue“) auf einem solchen Lauf | Wird abgelehnt mit „This task was set up for a way of working that no longer exists, so it cannot be continued. Please start it again.“ |
-| Gespeicherte Aufstellung, die eine nicht mehr vorhandene Prüfung nennt | Scheitert mit „The saved setup of this task names a check that no longer exists, so it cannot run. Please start it again.“ |
-
-Wiederanlauf nach Abstürzen und Aufräumen behandeln alte Läufe wie bisher. `RunKind.Learning` und `RunKind.CrewComposition`
-bleiben nur für alte Zeilen im Enum. Befunde alter Läufe behalten ihre Reviewer-Namen; `ReviewerDisplay` zeigt die ältesten
-weiterhin unter ihren Kurznamen. Alte Warnungszeilen behalten ihren Text und werden weiter angezeigt.
+Die Aufträge und Läufe der entfernten Arbeitsweisen wurden beim Aufräumen der Datenbank gelöscht, zusammen mit dem Code, der nur
+sie las. Eine gespeicherte Aufstellung, die eine Prüfung nennt, die diese Version nicht kennt, scheitert mit „The saved setup of
+this task names a check that no longer exists, so it cannot run. Please start it again.“
 
 ## Hochgeladene Dateien sicher lesen (Zusatz zu D-069)
 

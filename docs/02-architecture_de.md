@@ -2,7 +2,7 @@
 
 *[English](02-architecture.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: „Extra careful“ entfernt, eine Zusammenstellung; D-091: Etappe 8d, Dokument auf den aktuellen Stand gebracht: Es läuft nur noch der Direktweg, die entfernten Teile stehen nicht mehr in der Beschreibung; zuvor 2026-11-26: Verweis auf die Schalter der Auftragsfunktionen und die Seite `/how-it-works`; 2026-11-24, D-067: Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess, Ende-zu-Ende-Tests; 2026-11-22, D-066: Modellmatrix; 2026-08-04, D-064: Modell-Katalog für CLI-Provider)*
+*Letzte Aktualisierung: 2026-11-27 (D-092: eine Baseline-Migration, Tabellen und Spalten entfernter Teile gelöscht; zweiter Zusatz zu D-087: „Extra careful“ entfernt, eine Zusammenstellung; D-091: Etappe 8d, Dokument auf den aktuellen Stand gebracht: Es läuft nur noch der Direktweg, die entfernten Teile stehen nicht mehr in der Beschreibung; zuvor 2026-11-26: Verweis auf die Schalter der Auftragsfunktionen und die Seite `/how-it-works`; 2026-11-24, D-067: Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess, Ende-zu-Ende-Tests; 2026-11-22, D-066: Modellmatrix; 2026-08-04, D-064: Modell-Katalog für CLI-Provider)*
 
 Atelier macht aus dem Anliegen und den Dateien einer Person einen fertigen Text. Die Einheit, die die Person sieht, ist der
 **Auftrag**; **Läufe** sind das technische Protokoll darunter (ein Lauf je Version eines Auftrags). Seit Etappe 8d (D-091)
@@ -77,7 +77,7 @@ Geef.Atelier.slnx
 
 | Tabelle | Inhalt |
 |---|---|
-| `Orders` | Das Anliegen der Person im Wortlaut, Modus (`Direct`/`Careful`), Eingang (`Web`/`Mcp`/`Legacy`), Zustand (`Analyzing`, `NeedsInput`, `Ready`, `Cancelled`), Eigentümer, der Verlauf der Fragen und Antworten, das Rechercheergebnis |
+| `Orders` | Das Anliegen der Person im Wortlaut, Eingang (`Web`/`Mcp`), Zustand (`Analyzing`, `NeedsInput`, `Ready`, `Cancelled`), Eigentümer, der Verlauf der Fragen und Antworten, das Rechercheergebnis |
 | `Sources` | Eine hochgeladene Datei: extrahierter Text mit Seitenmarken (`[[page N]]`), Zähler, Qualität, Warnungen, Pfad des aufbewahrten Originals, Ablauf, solange kein Auftrag sie verwendet |
 | `OrderSources` | Welche Quelle zu welchem Auftrag gehört, mit Rolle, Position und Seitenauswahl (`1-40,55`) |
 | `RunSourceUsages` | Welche Datei in welchen Lauf ging, in welcher Form (`FullText`, `FullTextWithMap`) und mit wie vielen Zeichen |
@@ -102,13 +102,10 @@ dem Text der gezeigten Version vorbelegt (`Runs.SeedDraftText`, `Runs.ParentRunI
 
 Es gibt eine Zusammenstellung, nur im Code (`SystemCrew`): `direct` — Schreiber, automatische Prüfungen ohne Modell
 (`DeterministicChecksReviewer`) und Faktenprüfung (`SourceFactCheckReviewer`); höchstens zwei Durchgänge, also höchstens eine
-Korrektur. Jeder neue Lauf jedes Auftrags nutzt sie, gleich welcher Modus am Auftrag gespeichert ist. Aufträge mit dem
-gespeicherten Modus `Careful` und Läufe mit der entfernten Vorlage `direct-outline` gehören weiter zum Direktweg (zweiter Zusatz
-zu D-087): Dort werden sie gelesen, fortgesetzt und geändert; wird ein gespeicherter `direct-outline`-Lauf ausgeführt, entfällt
-seine Zusatzprüfung `requirements-check`.
+Korrektur. Jeder neue Lauf jedes Auftrags nutzt sie.
 
 `IPipelineAssembler` hat genau einen produktiven Assembler, den `DirectPipelineAssembler`; der `PipelineAssemblerSelector`
-weist jeden Lauf ab, den keiner annimmt (siehe [Altdaten](#altdaten-läufe-entfernter-arbeitsweisen)).
+weist jeden Lauf ab, den keiner annimmt.
 `AtelierPipelineFactory` baut die Geef-Pipeline aus dem Snapshot des Laufs:
 
 1. **`OrderGroundingStep`** lädt den Auftrag und seine Dateien, setzt die Dateien in das Hintergrunddokument, liest die im
@@ -149,24 +146,6 @@ wenigen festen, einfachen Sätzen; die Einzelheiten gehen nur ins Log.
 `Pending`-Läufe ohne Snapshot, die älter sind als diese Instanz, werden `Failed`; Läufe mit Endstatus, aber ohne `Outcome`
 (beim Speichern ihres Ergebnisses gestoppt) bekommen ein Ergebnis und eine Warnung (siehe unten).
 
-### Altdaten: Läufe entfernter Arbeitsweisen
-
-Die Datenbank behält jede Tabelle und Spalte (keine `DROP`-Migration), damit das vorige Image sie weiter lesen kann. Deshalb
-tragen neue Snapshots weiterhin eine (leere) Liste `advisors`.
-
-- Abgeschlossene Läufe und Aufträge der entfernten Wege bleiben lesbar: Listen, „My work“, Auftragsseite, Ergebnis, Export
-  und die technische Laufseite, die den Namen der Zusammenstellung zeigt und sagt, dass sie zu einer Arbeitsweise gehört,
-  die es nicht mehr gibt.
-- Ein wartender Lauf einer entfernten Zusammenstellung (alte Prüfschleife, zusammengestelltes Team, Learning-Lauf) schlägt
-  fehl mit „This task was set up for a way of working that no longer exists, so it cannot run. Please start it again.“
-- „Resume“ wird für einen solchen Lauf abgelehnt („This task was set up for a way of working that no longer exists, so it
-  cannot be continued. Please start it again.“).
-- Ein Snapshot, der eine Prüfung nennt, die es in dieser Version nicht mehr gibt, lässt den Lauf ebenfalls mit einem
-  einfachen Satz fehlschlagen.
-- Ein wartender Auftrag mit dem gespeicherten Modus `Careful` ist in diesem Sinn kein alter Weg: Er läuft auf dem Direktweg.
-- Crash-Wiederherstellung und Aufräumen behandeln alte Läufe wie alle anderen. `RunKind` behält die Werte `Learning` und
-  `CrewComposition`, damit alte Zeilen gelesen werden können.
-
 ## Zusammenstellungen, Snapshots und Modelle
 
 Jeder Lauf speichert einen `CrewSnapshot` (JSON in `Runs.CrewSnapshot`): Schemaversion, Name der Zusammenstellung, das
@@ -178,7 +157,11 @@ als der Schreiber.
 
 ## Datenmodell
 
-Die Migrationen sind handgeschrieben (`InitialCreate` und die Reihe `StepNN`). Das EF-Core-Modell bildet diese Tabellen ab:
+Eine Migration, `Baseline` (D-092), baut das ganze Schema aus einer leeren Datenbank auf und legt die Zeilen an, die eine
+frische Installation braucht (Systemanbieter, Platzhalter der Seiteneinstellungen). Spätere Migrationen kommen darauf. Beim Start
+lehnt `EnsureStartsFromBaselineAsync` eine Datenbank, die nicht von der Baseline ausgeht (Einträge in der Migrationsgeschichte,
+aber nicht die Baseline, oder Tabellen ohne Geschichte), ab, bevor etwas geschrieben wird; eine Datenbank mit der Baseline und
+späteren Migrationen startet weiterhin. Das EF-Core-Modell bildet diese Tabellen ab, und die Datenbank enthält keine anderen:
 
 | Gruppe | Tabellen |
 |---|---|
@@ -188,18 +171,6 @@ Die Migrationen sind handgeschrieben (`InitialCreate` und die Reihe `StepNN`). D
 | Konten und Einstellungen | `Users`, `Providers`, `SiteSettings` |
 | OAuth 2.1 | `OAuthClients`, `OAuthAuthorizationCodes`, `OAuthAccessTokens`, `OAuthRefreshTokens`, `OAuthAuditLog` |
 
-**Tabellen entfernter Teile.** Sie sind nicht mehr abgebildet, **bleiben aber in der Datenbank** bis zu einem eigenen
-Aufräumschritt, der nicht zu Etappe 8d gehört und sie entfernen darf: `AdvisorConsultations`, `AdvisorProfiles`,
-`CrewTemplateEmbeddings`, `CrewTemplates`, `ExecutorProfiles`, `FinalizationActorCosts`, `FinalizerProfiles`,
-`GroundingActorCosts`, `GroundingConsultations`, `GroundingProviderProfiles`, `KnowledgeDocumentChunks`,
-`KnowledgeDocuments`, `LearningEntries`, `ReviewerProfiles`, `RunArtifacts`, `StudioSettings`, `TemplateStudioAnalyses`,
-`mcp_server_configs`, `specialization_packs`, `tool_definitions`, `tool_invocations`. Derselbe Schritt darf die nicht
-abgebildeten Spalten `Runs.GroundingCostEur`, `Runs.FinalizerCostEur`, `Runs.FinalizerErrorMessage` und
-`Iterations.AdvisorsTotalCostEur` entfernen (später vielleicht auch `Orders.CrewTemplateName` und
-`Runs.ParentCompositionRunId`), außerdem alte Kompositions- und Learning-Läufe sowie das frühere Export-Volume.
-`Runs.AdvisorRetryAttempted` ist ebenfalls nicht abgebildet. Weil einige dieser Tabellen Vektorspalten enthalten, nutzen die
-Compose-Dateien weiterhin ein Postgres-Image mit `pgvector`.
-
 ### Runs
 
 | Spalte | Typ | Bemerkung |
@@ -208,27 +179,24 @@ Compose-Dateien weiterhin ein Postgres-Image mit `pgvector`.
 | CreatedAt / StartedAt / CompletedAt | timestamptz | die letzten beiden nullable |
 | Status | varchar(50) | Pending / Running / Completed / Failed / Aborted |
 | BriefingText | text | das Briefing, das der Schreiber bekommt |
-| ConfigJson | jsonb | beim Anlegen gespeicherte Konfiguration |
 | FinalText | text | nullable; der gelieferte Text |
 | WordCount | int | nullable; Wörter von `FinalText` |
 | ErrorMessage | text | nullable; ein fester, einfacher Satz für die Person |
 | TokensTotal | int | über die LLM-Aufrufe summiert |
-| CostTotal, TotalCostEur, LlmCostEur | numeric | die letzten beiden nullable; Kostenerfassung |
+| TotalCostEur, LlmCostEur | numeric | nullable; Kostenerfassung |
 | CachedInputTokens, ReasoningTokens | int | nullable; Teilmengen der Tokens |
 | CancellationRequested | bool | gesetzt, wenn die Person abbrechen will |
 | CreatedByUser | text | nullable; Eigentümer (Trennung nach Nutzern, D-042) |
-| CrewTemplateName | varchar(200) | nullable; Name der Zusammenstellung (`direct` oder bei alten Läufen eine entfernte, zum Beispiel `direct-outline`) |
+| CrewTemplateName | varchar(200) | nullable; Name der Zusammenstellung (`direct`) |
 | CrewSnapshot | jsonb | nullable; der Snapshot der Zusammenstellung |
-| Kind | int | `0 = Standard`; `1 = Learning` und `2 = CrewComposition` gibt es nur in alten Zeilen |
 | ParentRunId | uuid | nullable; der Lauf, den dieser fortsetzt oder ändert |
 | SeedDraftText | text | nullable; Text, von dem der erste Durchgang ausgeht |
 | RevisionHint | text | nullable; die gewünschte Änderung |
-| ParentCompositionRunId | uuid | nullable; nur in alten Zeilen |
 | Outcome | int | nullable; `0 = Converged`, `1 = DeliveredWithOpenPoints`, `2 = Failed`, `3 = Aborted`. Siehe [Lauf-Ergebnis](#lauf-ergebnis-outcome-und-runstatus) |
 | DeliveredIteration | int | nullable; Durchgang, dessen Text geliefert wurde |
 | ReportJson | text | nullable; der `RunReport` des Direktwegs |
-| OrderId | uuid (FK→Orders) | nullable; `ON DELETE CASCADE`. Index `IX_Runs_OrderId_OrderVersion` |
-| OrderVersion | int | nullable; je Auftrag eindeutig für Standardläufe (`UX_Runs_OrderId_OrderVersion_Standard`) |
+| OrderId | uuid (FK→Orders) | nullable; `ON DELETE CASCADE`. Jeder Lauf, den die Anwendung anlegt, hat einen Auftrag |
+| OrderVersion | int | nullable; je Auftrag eindeutig (`UX_Runs_OrderId_OrderVersion`, bedient auch die Suche nach Auftrag) |
 | FactCheckMode | varchar(20) | nullable; der Modus der Faktenprüfung des Laufs |
 
 ### RunWarnings
@@ -241,7 +209,7 @@ Probleme, die ein Lauf umgangen hat, statt anzuhalten (D-067). Werden mit dem La
 | RunId | uuid (FK→Runs) | indiziert |
 | Iteration | int | nullable; Durchgang, in dem das Problem auftrat |
 | Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `run`, `intake` oder `fact-check` (`RunWarningSources`) |
-| Code | varchar(100) | stabiler maschinenlesbarer Code, z.B. `grounding.research_failed`, `grounding.source_warning`, `review.reviewer_failed`, `llm.failover`, `writer.partial_read`, `run.result_not_saved`, `run.restarted_while_finishing` (`RunWarningCodes`, `DirectWarningCodes`). Alte Zeilen können Codes entfernter Teile tragen; sie behalten ihren Text und werden weiter angezeigt |
+| Code | varchar(100) | stabiler maschinenlesbarer Code, z.B. `grounding.research_failed`, `grounding.source_warning`, `review.reviewer_failed`, `llm.failover`, `writer.partial_read`, `run.result_not_saved`, `run.restarted_while_finishing` (`RunWarningCodes`, `DirectWarningCodes`). |
 | Message | text | kurze, einfache englische Erklärung für die Person |
 | CreatedAt | timestamptz | |
 
@@ -284,8 +252,7 @@ er einen Text liefert. `Runs.Outcome` ist das zusätzliche Signal, was der Lauf 
 stehen. Der erste Wert gilt. `Status` und `Outcome` können kurz auseinanderfallen, weil der Event-Sink den Status zuerst
 setzt; Clients warten deshalb, bis der Auftrag fertig ist und ein Ergebnis gesetzt ist (wie `scripts/atelier-smoke.sh`).
 Wird der Dienst dazwischen hart gestoppt, setzt die Crash-Wiederherstellung das Ergebnis: mit Text `Converged` (Status
-`Completed`) oder `DeliveredWithOpenPoints`, ohne Text `Failed`, dazu die Warnung `run.restarted_while_finishing`. Läufe aus
-der Zeit vor der Spalte behalten `NULL`; repariert werden nur Läufe, die nach dem frühesten Lauf mit Ergebnis endeten.
+`Completed`) oder `DeliveredWithOpenPoints`, ohne Text `Failed`, dazu die Warnung `run.restarted_while_finishing`.
 
 ### Warnungen am Lauf
 
@@ -305,9 +272,10 @@ Technisches protokolliert wird, ersetzt `SecretRedactionExtensions` (Core) zugan
 | Situation | Verhalten |
 |---|---|
 | Eine Datenbankmigration schlägt beim Start fehl | Der Start bricht mit einem kritischen Logeintrag ab (`MigrateDatabaseOrFailAsync`). Der Health-Check `pending-migrations` meldet offene Migrationen. |
-| Der Snapshot eines Laufs fehlt, ist unlesbar, leer, von unbekannter Version oder ohne Schreiber, Prüfungen oder Advisor-Liste | `CrewSnapshot.DeserializeForRun` wirft `InvalidCrewSnapshotException`; der Lauf endet als `Failed` mit klarer Meldung. Eine Ersatz-Zusammenstellung gibt es nicht; das tolerante `Deserialize` dient nur der Anzeige. |
+| Die Datenbank geht nicht von der Baseline aus | `EnsureStartsFromBaselineAsync` wirft `IncompatibleDatabaseException`, bevor etwas geschrieben wird; der Start bricht ab (D-092). |
+| Der Snapshot eines Laufs fehlt, ist unlesbar, leer, von anderer Formatversion oder ohne Schreiber oder Prüfungen | `CrewSnapshot.DeserializeForRun` wirft `InvalidCrewSnapshotException`; der Lauf endet als `Failed` mit klarer Meldung. Eine Ersatz-Zusammenstellung gibt es nicht; das tolerante `Deserialize` dient nur der Anzeige. |
 | Ein Snapshot hat keine Prüfungen oder nennt eine unbekannte | `AtelierPipelineFactory` baut die Pipeline nicht; der Lauf endet als `Failed` mit Meldung. |
-| Ein Lauf gehört zu einer entfernten Arbeitsweise | Kein Assembler nimmt ihn an; er schlägt mit dem unter [Altdaten](#altdaten-läufe-entfernter-arbeitsweisen) zitierten Satz fehl. |
+| Ein Lauf hat eine Zusammenstellung, die kein Assembler annimmt | Er schlägt fehl mit „This task was set up in a way this version cannot run. Please start it again.“ |
 | Ein Lauf ohne brauchbaren Snapshot wird fortgesetzt | `RunService.ResumeRunAsync` lehnt mit `RunNotResumableException` ab, statt einen Lauf anzulegen, der nie starten kann. |
 | Der Suchschlüssel fehlt | Eine Warnung mit dem Namen des Schlüssels beim Start (`ResearchKeyGuard`); Werte werden nie protokolliert. |
 
@@ -573,8 +541,8 @@ funktionieren hinter dem Proxy gleich.
 
 ### Postgres und Backup
 
-Die Compose-Datei betreibt einen eigenen Postgres-Container (Image `pgvector/pgvector:pg16`, siehe
-[Datenmodell](#datenmodell)). Der Dienst `postgres-backup` (`prodrigestivill/postgres-backup-local:16`) schreibt täglich um
+Die Compose-Datei betreibt einen eigenen Postgres-Container (Image `pgvector/pgvector:pg16`; das Schema braucht keine
+Erweiterung). Der Dienst `postgres-backup` (`prodrigestivill/postgres-backup-local:16`) schreibt täglich um
 03:00 UTC einen gzip-komprimierten SQL-Dump in das Volume `geef-atelier-backups` (7 tägliche, 4 wöchentliche, 6 monatliche).
 Wiederherstellung: `scripts/restore-backup.sh <datei.sql.gz>`. Hochgeladene Originale liegen auf dem Volume
 `geef-atelier-sources`, außerhalb des Datenbank-Dumps.

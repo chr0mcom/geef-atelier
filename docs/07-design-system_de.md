@@ -81,14 +81,11 @@ Code-Klassen bleiben unverändert (keine Breaking Changes in Persistenz/Schema):
 
 | Code-Name | UI-Anzeige |
 |-----------|-----------|
-| `BriefingTreueReviewer` | `BriefingFidelity` |
-| `KlarheitReviewer` | `Clarity` |
-| `requirements-check` (entfernt) | `Request check` |
+| `deterministic-checks` | `Automatic checks` |
+| `source-fact-check` | `Fact check` |
 | Alle anderen | Unverändert (Fallback) |
 
-Entfernte eingebaute Aufstellungen behalten auf der technischen Laufseite ihren früheren Namen (`GetTemplateDisplay`: `klassik` →
-`Classic`, `juristisch` → `Legal`, `akademisch` → `Academic`, `marketing` → `Marketing`, `crew-composer` → `Crew Composer`,
-`direct-outline` → `Extra careful`).
+Eine Aufstellung ohne Anzeigenamen zeigt ihren gespeicherten Namen (`GetTemplateDisplay`).
 
 Implementierung: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 
@@ -128,7 +125,7 @@ UI-Elemente. Aktueller Status (Mai 2026):
 | Element | Damaliger Stub | Heutiger Stand |
 |---------|----------------|----------------|
 | Welcome-Stats | `—` in Stat-Tiles | Entfallen mit dem Dashboard (D-091) |
-| Cost-Anzeige (RunDetail) | `$ —` | ✅ Implementiert (Cost-Tracking, `Runs.CostTotal` / `IterationActorCosts`) |
+| Cost-Anzeige (RunDetail) | `$ —` | ✅ Implementiert (Cost-Tracking, `Runs.TotalCostEur` / `IterationActorCosts`) |
 | Account-Funktionen | Disabled | ✅ Implementiert: Multi-User (`/admin/users`), verbundene Clients (`/account/connected-clients`) |
 | „Profile"-Eintrag im `UserMenu` | Disabled | ⏳ Weiterhin Stub (`.coming-soon`) — der separate Profil-Menüpunkt selbst ist noch nicht angebunden |
 | Export-Button (Manuscript) | Disabled | ⏳ Weiterhin Stub — DOCX/PDF-*Export* bleibt out of scope (siehe [01-vision-and-scope.md](01-vision-and-scope_de.md)) |

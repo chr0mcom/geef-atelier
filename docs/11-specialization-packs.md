@@ -7,6 +7,6 @@
 Specialization packs (D-061: generic actors plus reusable, scoped specialization layers bound per crew, their pages and their
 composer integration) were **removed in stage 8d (D-091)**, together with crew composition and the profiles they extended.
 Nothing replaces them: the setup that remains is defined in code, with its prompts
-([08-crew-system.md](08-crew-system.md)). The database table stays untouched. Old runs stay readable.
+([08-crew-system.md](08-crew-system.md)). The database table and the old runs were removed with the database cleanup (D-092).
 
 The earlier description is in the git history of this file.

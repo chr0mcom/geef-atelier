@@ -124,14 +124,10 @@ example your sign-off word for word, depends on the text: check the result as al
   also deletes the files that no other request uses. The original file is removed about 30 days after the last request that used it
   finished; the text read from it stays with the request.
 
-## Requests from earlier versions of Atelier
+## Earlier versions of Atelier
 
-Finished requests from earlier versions stay readable under **My work**, with their text and downloads. Atelier no longer has the
-older ways of working they may have been made with, so an unfinished one of those cannot run: it ends with "This task was set up
-for a way of working that no longer exists, so it cannot run. Please start it again."
-
-Earlier versions had a box **Extra careful**. It is gone: Atelier writes every text, long ones too, in the same way. A finished
-text made with it stays readable, you can download it and change it, and **Start again** fills in your request as usual.
+Earlier versions had other ways of working and a box **Extra careful**. They are gone: Atelier writes every text, long ones too, in
+the same way. Requests from before the database was cleaned up are no longer there.
 
 ## What Atelier does around the writing
 

@@ -2,7 +2,7 @@
 
 *[Deutsch](02-architecture_de.md) · **English***
 
-*Last updated: 2026-11-27 (second addendum to D-087: "Extra careful" removed, one setup; D-091: stage 8d, document brought to the current state: only the direct path runs, the removed parts are gone from the description; before that 2026-11-26: pointer to the switches of the order features and the page `/how-it-works`; 2026-11-24, D-067: run warnings, `Runs.Outcome`, fail-loud start and snapshot handling, preparation timeout, in-process live updates, end-to-end tests; 2026-11-22, D-066: model matrix; 2026-08-04, D-064: model catalog for CLI providers)*
+*Last updated: 2026-11-27 (D-092: one baseline migration, tables and columns of removed parts dropped; second addendum to D-087: "Extra careful" removed, one setup; D-091: stage 8d, document brought to the current state: only the direct path runs, the removed parts are gone from the description; before that 2026-11-26: pointer to the switches of the order features and the page `/how-it-works`; 2026-11-24, D-067: run warnings, `Runs.Outcome`, fail-loud start and snapshot handling, preparation timeout, in-process live updates, end-to-end tests; 2026-11-22, D-066: model matrix; 2026-08-04, D-064: model catalog for CLI providers)*
 
 Atelier turns a person's request and files into a finished text. The unit the person sees is the **order**; **runs** are the
 technical record underneath (one run per version of an order). Since stage 8d (D-091) there is **one way of working, the direct
@@ -75,7 +75,7 @@ Geef.Atelier.slnx
 
 | Table | Content |
 |---|---|
-| `Orders` | The person's request word for word, mode (`Direct`/`Careful`), entry (`Web`/`Mcp`/`Legacy`), state (`Analyzing`, `NeedsInput`, `Ready`, `Cancelled`), owner, the record of the questions and answers, the research result |
+| `Orders` | The person's request word for word, entry (`Web`/`Mcp`), state (`Analyzing`, `NeedsInput`, `Ready`, `Cancelled`), owner, the record of the questions and answers, the research result |
 | `Sources` | One uploaded file: extracted text with page markers (`[[page N]]`), counts, quality, warnings, path of the kept original, expiry while no order uses it |
 | `OrderSources` | Which source belongs to which order, with role, position and page selection (`1-40,55`) |
 | `RunSourceUsages` | Which file went into which run, in which mode (`FullText`, `FullTextWithMap`) and with how many characters |
@@ -98,12 +98,10 @@ of the shown version (`Runs.SeedDraftText`, `Runs.ParentRunId`) and carries the 
 
 One setup exists, only in code (`SystemCrew`): `direct` — writer, automatic checks without a model (`DeterministicChecksReviewer`)
 and fact check (`SourceFactCheckReviewer`); at most two passes, that is at most one correction. Every new run of every order uses
-it, whatever the stored mode of the order. Orders stored with the mode `Careful` and runs with the removed template
-`direct-outline` still belong to the direct path (second addendum to D-087): they are read, continued and changed there; if a
-stored `direct-outline` run is executed, its extra check `requirements-check` is left out.
+it.
 
 `IPipelineAssembler` has a single production assembler, `DirectPipelineAssembler`; `PipelineAssemblerSelector` refuses any
-run no assembler accepts (see [Old data](#old-data-runs-of-removed-ways-of-working)). `AtelierPipelineFactory` builds the
+run no assembler accepts. `AtelierPipelineFactory` builds the
 Geef pipeline from the run's snapshot:
 
 1. **`OrderGroundingStep`** loads the order and its files, renders the files into the background document, reads the rules
@@ -142,22 +140,6 @@ only.
 snapshot that are older than this instance become `Failed`; runs with a terminal status but without `Outcome` (stopped while
 their result was being stored) get an outcome and a warning (see below).
 
-### Old data: runs of removed ways of working
-
-The database keeps every table and column (no `DROP` migration), so the previous image can still read it. For that reason new
-snapshots still carry an (empty) `advisors` list.
-
-- Finished runs and orders of the removed ways stay readable: lists, "My work", order page, result, export and the technical
-  run page, which shows the setup name and says that the setup belongs to a way of working that no longer exists.
-- A pending run of a removed setup (old review loop, composed team, learning run) fails with "This task was set up for a way
-  of working that no longer exists, so it cannot run. Please start it again."
-- "Resume" is refused for such a run ("This task was set up for a way of working that no longer exists, so it cannot be
-  continued. Please start it again.").
-- A snapshot that names a check this version no longer has fails the run with a plain sentence as well.
-- A waiting order stored with the mode `Careful` is not an old way in this sense: it runs on the direct path.
-- Crash recovery and cleanup treat old runs like any other. `RunKind` keeps the values `Learning` and `CrewComposition` so
-  that old rows can be read.
-
 ## Setups, snapshots and models
 
 Each run stores a `CrewSnapshot` (JSON in `Runs.CrewSnapshot`): schema version, setup name, the full writer profile, the
@@ -168,7 +150,11 @@ no slot and keeps a fixed binding, on another model than the writer.
 
 ## Data model
 
-Migrations are hand-written (`InitialCreate` and the `StepNN` series). The EF Core model maps these tables:
+One migration, `Baseline` (D-092), builds the whole schema from an empty database and inserts the rows a fresh installation needs
+(system providers, placeholder of the site settings). Later migrations are added on top of it. At start,
+`EnsureStartsFromBaselineAsync` refuses a database that does not start from the baseline (entries in the migration history but not
+the baseline, or tables without a history) before anything is written; a database with the baseline plus later migrations still
+starts. The EF Core model maps these tables, and the database holds no others:
 
 | Group | Tables |
 |---|---|
@@ -178,17 +164,6 @@ Migrations are hand-written (`InitialCreate` and the `StepNN` series). The EF Co
 | Accounts and settings | `Users`, `Providers`, `SiteSettings` |
 | OAuth 2.1 | `OAuthClients`, `OAuthAuthorizationCodes`, `OAuthAccessTokens`, `OAuthRefreshTokens`, `OAuthAuditLog` |
 
-**Tables of removed parts.** They are no longer mapped but **stay in the database** until a separate cleanup step, which is
-not part of stage 8d and may drop them: `AdvisorConsultations`, `AdvisorProfiles`, `CrewTemplateEmbeddings`,
-`CrewTemplates`, `ExecutorProfiles`, `FinalizationActorCosts`, `FinalizerProfiles`, `GroundingActorCosts`,
-`GroundingConsultations`, `GroundingProviderProfiles`, `KnowledgeDocumentChunks`, `KnowledgeDocuments`, `LearningEntries`,
-`ReviewerProfiles`, `RunArtifacts`, `StudioSettings`, `TemplateStudioAnalyses`, `mcp_server_configs`,
-`specialization_packs`, `tool_definitions`, `tool_invocations`. The same step may drop the unmapped columns
-`Runs.GroundingCostEur`, `Runs.FinalizerCostEur`, `Runs.FinalizerErrorMessage` and `Iterations.AdvisorsTotalCostEur`
-(and later possibly `Orders.CrewTemplateName` and `Runs.ParentCompositionRunId`), old composition and learning runs, and
-the former exports volume. `Runs.AdvisorRetryAttempted` is not mapped either. Because some of these tables hold vector
-columns, the compose files still use a Postgres image with `pgvector`.
-
 ### Runs
 
 | Column | Type | Note |
@@ -197,27 +172,24 @@ columns, the compose files still use a Postgres image with `pgvector`.
 | CreatedAt / StartedAt / CompletedAt | timestamptz | the last two nullable |
 | Status | varchar(50) | Pending / Running / Completed / Failed / Aborted |
 | BriefingText | text | the briefing the writer gets |
-| ConfigJson | jsonb | configuration stored at creation time |
 | FinalText | text | nullable; the delivered text |
 | WordCount | int | nullable; words of `FinalText` |
 | ErrorMessage | text | nullable; a fixed plain sentence for the user |
 | TokensTotal | int | accumulated over the LLM calls |
-| CostTotal, TotalCostEur, LlmCostEur | numeric | the last two nullable; cost tracking |
+| TotalCostEur, LlmCostEur | numeric | nullable; cost tracking |
 | CachedInputTokens, ReasoningTokens | int | nullable; subsets of the tokens |
 | CancellationRequested | bool | set when the user wants to cancel |
 | CreatedByUser | text | nullable; owner (run isolation, D-042) |
-| CrewTemplateName | varchar(200) | nullable; setup name (`direct`, or a removed one on old runs, for example `direct-outline`) |
+| CrewTemplateName | varchar(200) | nullable; setup name (`direct`) |
 | CrewSnapshot | jsonb | nullable; the snapshot of the setup |
-| Kind | int | `0 = Standard`; `1 = Learning` and `2 = CrewComposition` exist only on old rows |
 | ParentRunId | uuid | nullable; the run this one resumes or changes |
 | SeedDraftText | text | nullable; text the first pass starts from |
 | RevisionHint | text | nullable; the change the person asked for |
-| ParentCompositionRunId | uuid | nullable; only on old rows |
 | Outcome | int | nullable; `0 = Converged`, `1 = DeliveredWithOpenPoints`, `2 = Failed`, `3 = Aborted`. See [Run outcome](#run-outcome-and-runstatus) |
 | DeliveredIteration | int | nullable; the pass whose text was delivered |
 | ReportJson | text | nullable; the `RunReport` of the direct path |
-| OrderId | uuid (FK→Orders) | nullable; `ON DELETE CASCADE`. Index `IX_Runs_OrderId_OrderVersion` |
-| OrderVersion | int | nullable; unique per order for standard runs (`UX_Runs_OrderId_OrderVersion_Standard`) |
+| OrderId | uuid (FK→Orders) | nullable; `ON DELETE CASCADE`. Every run the application creates has an order |
+| OrderVersion | int | nullable; unique per order (`UX_Runs_OrderId_OrderVersion`, which also serves lookups by order) |
 | FactCheckMode | varchar(20) | nullable; the fact-check mode of the run |
 
 ### RunWarnings
@@ -230,7 +202,7 @@ Problems a run worked around instead of stopping (D-067). Deleted together with 
 | RunId | uuid (FK→Runs) | indexed |
 | Iteration | int | nullable; pass in which the problem occurred |
 | Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `run`, `intake` or `fact-check` (`RunWarningSources`) |
-| Code | varchar(100) | stable machine-readable code, e.g. `grounding.research_failed`, `grounding.source_warning`, `review.reviewer_failed`, `llm.failover`, `writer.partial_read`, `run.result_not_saved`, `run.restarted_while_finishing` (`RunWarningCodes`, `DirectWarningCodes`). Old rows may carry codes of removed parts; they keep their text and are still shown |
+| Code | varchar(100) | stable machine-readable code, e.g. `grounding.research_failed`, `grounding.source_warning`, `review.reviewer_failed`, `llm.failover`, `writer.partial_read`, `run.result_not_saved`, `run.restarted_while_finishing` (`RunWarningCodes`, `DirectWarningCodes`). |
 | Message | text | short plain-English explanation for the user |
 | CreatedAt | timestamptz | |
 
@@ -273,8 +245,7 @@ allow list (`EnvReference:Allowed` on top of a built-in list and the prefix `ATE
 wins. `Status` and `Outcome` can briefly disagree, because the event sink sets the status first; clients therefore wait
 until the order is done and an outcome is set (as `scripts/atelier-smoke.sh` does). If the service is stopped hard in
 between, the crash recovery sets the outcome: with a text `Converged` (status `Completed`) or `DeliveredWithOpenPoints`,
-without one `Failed`, plus the warning `run.restarted_while_finishing`. Runs from before the column existed keep `NULL`;
-only runs that completed after the earliest run with an outcome are repaired.
+without one `Failed`, plus the warning `run.restarted_while_finishing`.
 
 ### Warnings at the run
 
@@ -293,9 +264,10 @@ anything technical is logged, `SecretRedactionExtensions` (Core) replaces creden
 | Situation | Behaviour |
 |---|---|
 | A database migration fails at start-up | The start aborts with a critical log entry (`MigrateDatabaseOrFailAsync`). The health check `pending-migrations` reports pending migrations. |
-| A run's snapshot is missing, unreadable, empty, of an unknown version, or lacks writer, checks or the advisor list | `CrewSnapshot.DeserializeForRun` throws `InvalidCrewSnapshotException`; the run ends `Failed` with a clear message. There is no fallback setup; the tolerant `Deserialize` is for display only. |
+| The database does not start from the baseline | `EnsureStartsFromBaselineAsync` throws `IncompatibleDatabaseException` before anything is written; the start aborts (D-092). |
+| A run's snapshot is missing, unreadable, empty, of another format version, or lacks writer or checks | `CrewSnapshot.DeserializeForRun` throws `InvalidCrewSnapshotException`; the run ends `Failed` with a clear message. There is no fallback setup; the tolerant `Deserialize` is for display only. |
 | A snapshot has no checks, or names an unknown check | `AtelierPipelineFactory` refuses to build the pipeline; the run ends `Failed` with a message. |
-| A run belongs to a removed way of working | No assembler accepts it; it fails with the sentence quoted under [Old data](#old-data-runs-of-removed-ways-of-working). |
+| A run has a setup no assembler accepts | It fails with "This task was set up in a way this version cannot run. Please start it again." |
 | A run without a usable snapshot is resumed | `RunService.ResumeRunAsync` refuses with `RunNotResumableException` instead of creating a run that can never start. |
 | The search key is missing | A warning with the key name at start (`ResearchKeyGuard`); values are never logged. |
 
@@ -559,7 +531,7 @@ behind the proxy.
 
 ### Postgres and backup
 
-The compose file runs its own Postgres container (image `pgvector/pgvector:pg16`, see [Data model](#data-model)). The
+The compose file runs its own Postgres container (image `pgvector/pgvector:pg16`; the schema needs no extension). The
 `postgres-backup` service (`prodrigestivill/postgres-backup-local:16`) writes a gzip-compressed SQL dump daily at 03:00 UTC
 into the volume `geef-atelier-backups` (7 daily, 4 weekly, 6 monthly). Restore: `scripts/restore-backup.sh <file.sql.gz>`.
 Uploaded originals live on the volume `geef-atelier-sources`, outside the database dump.

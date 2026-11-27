@@ -4011,3 +4011,85 @@ Orchestrator-Tests, die Abschlussschritte nutzten, verwenden jetzt den Abschluss
   Stummel.
 
 **Rückweg.** Das vorige Image; in der Datenbank wurde nichts entfernt oder geändert. Im Code nur über Git (Tag vor dem Deploy).
+
+## D-092 — Datenbank und Dateiablage aufgeräumt: eine Baseline-Migration (2026-11-27)
+
+**Kontext.** Nach Stufe 8d (D-091) hielt die Datenbank noch jede Tabelle und Spalte der entfernten Arbeitsweisen, der
+EF-Modell-Snapshot kannte noch entfernte Entitäten, und Teile des Codes gab es nur, um Altdaten zu lesen. Der Betreiber hat das
+Aufräumen erlaubt: Alle gespeicherten Aufträge und Läufe waren Tests.
+
+**Entscheidung — eine Baseline.** Alle früheren Migrationen sind durch eine Migration `Baseline` ersetzt, erzeugt aus dem Modell;
+sie legt auch die Zeilen an, die eine frische Installation braucht (die Systemanbieter und den Platzhalter der
+Seiteneinstellungen), mit demselben Inhalt, den die früheren Migrationen auf einer leeren Datenbank erzeugt haben. Schema und
+Modell passen wieder zusammen: `HasPendingModelChanges` ist falsch (getestet), die Warnung `PendingModelChangesWarning` wird nicht
+mehr unterdrückt, und spätere Migrationen dürfen wieder mit den EF-Werkzeugen erzeugt werden.
+
+**Schutz beim Start.** `EnsureStartsFromBaselineAsync` läuft vor der Migration und liest nur. Eine Datenbank, deren
+Migrationsgeschichte Einträge hat, aber nicht die Baseline, oder eine mit Tabellen ohne Geschichte hält den Start mit einer klaren
+Meldung an; nichts wird angelegt oder geändert. Eine Datenbank mit der Baseline und späteren Migrationen, die diese Version nicht
+kennt, startet weiterhin; der Rückweg auf das vorige Image nach einer additiven Migration funktioniert also wie bisher.
+
+**Umstellung einer bestehenden Installation.** Eine bestehende Datenbank wird einmal außerhalb der Anwendung umgestellt, mit einem
+SQL-Skript in einer Transaktion. Es bricht bei allem Unerwarteten ab (andere Migrationsgeschichte oder anderes Schema, offene
+Verbindungen, laufende Arbeit, Dateien in der Bibliothek) und prüft am Ende, dass das Schema genau der Baseline entspricht und die
+behaltenen Zeilen unverändert sind; ein zweiter Lauf ändert nichts. Behalten werden: alle Konten außer deaktivierten Testkonten,
+die Passwort-Hashes, OAuth-Clients mit noch gültigem Token oder Code (oder jünger als ein Tag), gültige Zugriffstokens, alle nicht
+abgelaufenen Erneuerungstokens (auch benutzte und widerrufene, weil die Erkennung einer Wiederverwendung sie braucht), das
+OAuth-Protokoll, die Anbieter, die Seiteneinstellungen und die About-me-Profile. Gelöscht werden: alle Aufträge, Läufe und alles,
+was zu ihnen gehört, hochgeladene Dateien und Upload-Tickets, gezählte Ablehnungen, abgelaufene Codes und Tokens sowie Clients ohne
+gültiges Token. Die Data-Protection-Schlüssel bleiben unberührt, Anmelde-Cookies und Tokens gelten also weiter. Gespeicherte
+Originale, auf die keine Zeile mehr zeigt, werden danach einmal entfernt; der Aufräumdienst der App tut das bewusst nicht, wenn die
+meisten Dateien unbekannt sind, und behält diesen Schutz.
+
+**Aus der Datenbank entfernt.**
+- Tabellen: `AdvisorConsultations`, `AdvisorProfiles`, `CrewTemplateEmbeddings`, `CrewTemplates`, `ExecutorProfiles`,
+  `FinalizationActorCosts`, `FinalizerProfiles`, `GroundingActorCosts`, `GroundingConsultations`, `GroundingProviderProfiles`,
+  `KnowledgeDocumentChunks`, `KnowledgeDocuments`, `LearningEntries`, `ReviewerProfiles`, `RunArtifacts`, `StudioSettings`,
+  `TemplateStudioAnalyses`, `mcp_server_configs`, `specialization_packs`, `tool_definitions`, `tool_invocations`; die Erweiterung
+  `vector`.
+- Spalten: `Runs.AdvisorRetryAttempted`, `ConfigJson`, `CostTotal`, `GroundingCostEur`, `FinalizerCostEur`,
+  `FinalizerErrorMessage`, `Kind`, `ParentCompositionRunId`; `Orders.Mode`, `Orders.CrewTemplateName`;
+  `Iterations.AdvisorsTotalCostEur`. Spaltenvorgaben, die das Modell nicht kennt, sind weg; die Namen der Constraints folgen dem
+  Modell.
+- Das Compose-Volume für Exporte und sein Einhängepunkt im Image.
+
+**Aus dem Code entfernt** (alles las nur Altdaten): `RunKind` mit Composer- und Lernläufen, `OrderMode` mit dem gespeicherten Modus
+„careful“ und seinen Fortschrittsschritten, der Eingang `Legacy` mit dem Verknüpfen auftragsloser Läufe, der Vorlagenname
+`direct-outline` und seine Prüfung, alte Anzeigenamen von Prüfungen und Aufstellungen, die Ablehnung entfernter Aufstellungen bei
+„Resume“, die Liste `advisors` im Snapshot (das Snapshot-Format ist jetzt Version 4, und nur diese Version läuft), das Lesen von
+Berichten im Schema 1, der Prüfcode `arithmetic.partial`, das Herausputzen des entfallenen Satzes „länger“ aus gespeicherten
+Änderungen, `ActorType.Advisor` und der Sonderfall für Läufe ohne Ergebnis aus der Zeit, bevor es Ergebnisse gab. „Resume“ legt den
+neuen Lauf jetzt in einem Schritt im Auftrag seines Vorgängers an; ein Lauf ohne Auftrag kann nicht fortgesetzt werden.
+
+**Bewusst behalten.** Die fünf MCP-Stummel und der versteckte Parameter `extraCareful` bleiben bis zur nächsten Version (D-087,
+D-091). `RevisionQuick.Longer` bleibt, weil ein Aufrufer, der danach fragt, die Ablehnung bekommt, die sagt, was stattdessen zu tun
+ist. `ModelSlot` behält seine Werte; keine Spalte speichert sie. `Runs.CrewTemplateName` bleibt (neue Läufe schreiben sie, die
+Lauf-Seiten zeigen sie). `Runs.OrderId` bleibt nullable. Die Compose-Dateien behalten ihr Postgres-Image; die Erweiterung braucht
+nichts mehr.
+
+**Indizes**, aus den Abfragen im Code:
+
+| Änderung | Grund |
+|---|---|
+| `IX_Findings_IterationId` neu | Befunde werden je Durchgang gelesen, und das Löschen von Durchgängen löscht sie mit |
+| `IX_RunSourceUsages_SourceId`, `IX_UploadTickets_SourceId`, `IX_OAuthAuthorizationCodes_ClientId` neu | das Löschen einer Quelle oder eines Clients ändert oder löscht diese Zeilen mit |
+| `IX_Orders_CreatedByUser_CreatedAt` → `IX_Orders_CreatedByUser_UpdatedAt` | „My work“ filtert nach Person und sortiert nach `UpdatedAt`, dann `CreatedAt` |
+| `IX_Orders_ResearchAt` (partiell) neu | die Tagesgrenzen der Recherche zählen unter einer Sperre nach `ResearchAt` |
+| `IX_Orders_State` entfernt | die Abfragen nach Zustand nutzen die zwei partiellen Indizes der Klärung |
+| `IX_Runs_CreatedByUser` → `IX_Runs_CreatedByUser_CreatedAt` | die Laufliste filtert nach Person und sortiert nach `CreatedAt` |
+| `UX_Runs_OrderId_OrderVersion` ersetzt den partiellen eindeutigen Index und `IX_Runs_OrderId_OrderVersion` | ein Lauf je Version eines Auftrags; bedient zugleich jede Suche nach Auftrag |
+| `IX_Runs_Status`, `IX_Runs_ParentRunId`, `IX_Runs_ParentCompositionRunId` entfernt | der erste ist ein Präfix von `IX_Runs_Status_CompletedAt`, nach den anderen filtert keine Abfrage |
+| `IX_Sources_OwnerUsername_CreatedAt` entfernt | Suchen nach Eigentümer nutzen `UX_Sources_OwnerUsername_Sha256`; keine Abfrage sortiert die Dateien einer Person nach Datum |
+| drei Indizes von `Providers`, `IX_OAuthAuditLog_EventType` entfernt | eine Handvoll Zeilen; keine Abfrage filtert nach Ereignisart |
+
+Nach der Umstellung wird die Datenbank einmal verdichtet (`VACUUM (FULL, ANALYZE)`).
+
+**Beweis.** Auf einer privaten Kopie: Eine leere Datenbank mit der Baseline und die umgestellte Kopie ergeben dasselbe Schema
+(`pg_dump --schema-only`, mit sortierten Spalten verglichen); ein zweiter Lauf des Skripts ändert nichts; die Anwendung startet
+gegen beide und lehnt die nicht umgestellte ab, ohne sie zu ändern; die Anmeldung funktioniert, und ein Auftrag läuft mit der
+Modell-Attrappe des Testgerüsts bis zur Lieferung. Neue Tests decken die Baseline, ihre Seeds und den Startschutz ab; die Tests der
+alten Migrationen und der Altdaten sind weg.
+
+**Rückweg.** Das vorige Image zusammen mit der unmittelbar vor der Umstellung gezogenen Datenbanksicherung (in eine leere
+Datenbank zurückgespielt) und, falls nötig, der Sicherung der Dateiablage. Das vorige Image kann die umgestellte Datenbank nicht
+lesen.

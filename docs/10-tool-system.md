@@ -11,8 +11,7 @@ MCP server configurations for tools, the agentic tool loop and grounding through
 Its MCP client had already gone in stage 8c (D-089). The agentic path was never wired into the pipeline (D-067).
 
 Nothing replaces tool use by the actors. The only access to the web is the research in the grounding step of the direct path
-([08-crew-system.md](08-crew-system.md#research-in-the-grounding-step-d-074)). The database tables stay untouched; old runs
-stay readable.
+([08-crew-system.md](08-crew-system.md#research-in-the-grounding-step-d-074)). The database tables and the old runs were removed with the database cleanup (D-092).
 
 The earlier description is in the git history of this file.
 

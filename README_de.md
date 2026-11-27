@@ -196,8 +196,8 @@ Korrektur). Das Modell jeder Rolle kommt beim Start eines Laufs aus der Modellma
 Live-Modellkatalog (D-066): Claude läuft über `claude-cli`, OpenAI über `codex-cli`. Jeder Lauf speichert einen **Snapshot** seiner
 Aufstellung und seiner Modelle. Administratoren verwalten die Anbieter unter `/crew/providers`; im Menü „Workshop“, das nur die
 Administration sieht, solange `Ui:WorkshopForAdminsOnly` an ist (ausgeliefert), stehen „Runs“ und „Providers“. Teams,
-Profil-Editoren und die ältere Prüfschleife wurden in Stufe 8d entfernt (D-091); fertige Läufe und Aufträge aus dieser Zeit
-bleiben lesbar.
+Profil-Editoren und die ältere Prüfschleife wurden in Stufe 8d entfernt (D-091); die Daten aus dieser Zeit sind mit dem
+Aufräumen der Datenbank weg (D-092).
 
 ---
 
@@ -325,8 +325,8 @@ Wie die Teile zusammenarbeiten: [Leitfaden für Entwicklung und Betrieb](docs/15
 ## Stack
 
 - .NET 10 / Blazor Server / Minimal API
-- PostgreSQL 16 über `Npgsql.EntityFrameworkCore.PostgreSQL`; die Compose-Dateien nutzen das `pgvector`-Image, weil ältere
-  Migrationen die Erweiterung `vector` anlegen (die Vektor-Wissensbasis selbst wurde entfernt, D-091)
+- PostgreSQL 16 über `Npgsql.EntityFrameworkCore.PostgreSQL`; eine Baseline-Migration baut das Schema auf (D-092). Die
+  Compose-Dateien nutzen ein `pgvector`-Postgres-Image, das Schema braucht aber keine Erweiterung
 - [Geef.Sdk 1.5.0](https://www.nuget.org/packages/Geef.Sdk/)
 - Docker / Traefik
 
@@ -388,5 +388,9 @@ Schutzschaltern, die Werkstatt mit ihren Editoren und dem Dashboard, der Live-Hu
 Messung ebenfalls entfernt (zweiter Zusatz zu D-087). Keine Tabelle oder Spalte wurde gelöscht: Alte Aufträge und Läufe bleiben lesbar, und ein Lauf mit einer
 entfernten Aufstellung scheitert mit einem klaren Satz, statt zu laufen. Die früheren Einträge oben beschreiben, was zu ihrer Zeit
 gebaut wurde.
+
+**Datenbank aufgeräumt (D-092) ✅** Eine Baseline-Migration ersetzt alle früheren; die Tabellen, Spalten und die Erweiterung
+`vector` der entfernten Teile, die alten Testaufträge und der Code, der nur Altdaten las, sind weg. Auf einer nicht umgestellten
+Datenbank startet die Anwendung nicht. Die früheren Einträge oben beschreiben den Stand zu ihrer Zeit.
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope_de.md)

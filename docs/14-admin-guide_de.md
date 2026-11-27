@@ -110,17 +110,12 @@ Rollenbeschreibungen bearbeitest du nicht; diese Editoren wurden in Stufe 8d ent
 - **Läufe** (`/runs`): Jede Version eines Auftrags ist ein Lauf. Die Lauf-Seite zeigt Aufstellung, Runden, Befunde, Tokens und Kosten.
   Einen gescheiterten oder abgebrochenen Lauf des Standardwegs kann man dort fortsetzen („Resume“).
 
-## Aufträge und Läufe aus früheren Versionen
+## Datenbank
 
-Stufe 8d hat die ältere Arbeitsweise entfernt (die Werkstatt mit ihren Teams, Profilen und der Prüfschleife, zusammengestellte
-Teams, das Lernen und die Wissensbasis). In der Datenbank wurde keine Tabelle oder Spalte gelöscht.
-
-- Fertige ältere Aufträge und Läufe bleiben lesbar: Listen, Auftragsseite, Ergebnis, Export und Lauf-Seite. Die Lauf-Seite nennt
-  die Aufstellung und sagt, dass sie zu einer Arbeitsweise gehört, die es nicht mehr gibt.
-- Ein wartender oder fortgesetzter Lauf mit einer entfernten Aufstellung scheitert mit „This task was set up for a way of working that
-  no longer exists, so it cannot run. Please start it again.“
-- „Resume“ wird für Läufe mit einer entfernten Aufstellung abgelehnt mit „This task was set up for a way of working that no longer
-  exists, so it cannot be continued. Please start it again.“
+Eine Baseline-Migration baut das Schema auf (D-092). Auf einer Datenbank, die nicht von ihr ausgeht, startet die Anwendung nicht
+und ändert dort nichts; das Log nennt den Grund. Eine Installation von vor D-092 muss einmal umgestellt werden, vorher wird
+gesichert. Für den Rückweg auf ein Image von vor D-092 diese Sicherung zurückspielen; ein solches Image kann die umgestellte
+Datenbank nicht lesen.
 
 ## Worauf achten
 

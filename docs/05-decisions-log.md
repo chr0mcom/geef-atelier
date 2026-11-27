@@ -4,7 +4,7 @@
 
 *Last updated: 2026-11-27 (D-085: older review loop, three safeguard switches, shipped off; before that 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
-*Last updated: 2026-11-27 (second addendum to D-087: "Extra careful" goes; D-091: cleanup, cut 2, only the standard way remains; before that D-090: gateway failover to the same model only; D-087: “Extra careful” with an outline behind a switch, loop switches per account, measurement prepared; before that D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-27 (D-092: database and file store cleanup, one baseline migration; second addendum to D-087: "Extra careful" goes; D-091: cleanup, cut 2, only the standard way remains; before that D-090: gateway failover to the same model only; D-087: “Extra careful” with an outline behind a switch, loop switches per account, measurement prepared; before that D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -3863,3 +3863,79 @@ completion hook of the assembler (`OnRunFinishedAsync`).
   `skip=true`, `get_order_status`, `get_order_result`); its tool list check expects the order tools and the five stubs.
 
 **Rollback.** The previous image; nothing in the database was dropped or changed. In code only through Git (tag before the deploy).
+
+## D-092 — Database and file store cleanup: one baseline migration (2026-11-27)
+
+**Context.** After stage 8d (D-091) the database still held every table and column of the removed ways of working, the EF model
+snapshot still knew removed entities, and parts of the code existed only to read old data. The operator allowed a cleanup: all
+stored orders and runs were tests.
+
+**Decision — one baseline.** All earlier migrations are replaced by one migration, `Baseline`, generated from the model; it also
+inserts the rows a fresh installation needs (the system providers and the placeholder of the site settings), with the same content
+the earlier migrations produced on an empty database. Schema and model match again: `HasPendingModelChanges` is false (tested), the
+warning `PendingModelChangesWarning` is no longer ignored, and later migrations may be generated with the EF tools again.
+
+**Guard at start.** `EnsureStartsFromBaselineAsync` runs before the migration and only reads. A database whose migration history has
+entries but not the baseline, or one with tables and no history, stops the start with a plain message; nothing is created or
+changed. A database that has the baseline plus later migrations this version does not know still starts, so going back to the
+previous image after an additive migration keeps working as before.
+
+**Conversion of an existing installation.** An existing database is converted once, outside the application, by one SQL script in
+one transaction. It stops on anything unexpected (other migration history or schema, open connections, running work, files kept in
+the library) and checks at the end that the schema equals the baseline exactly and that the kept rows are unchanged; a second run
+changes nothing. Kept: all accounts except disabled test accounts, password hashes, OAuth clients that still have a valid token or
+code (or are newer than a day), valid access tokens, all unexpired refresh tokens (used and revoked ones too, because reuse
+detection needs them), the OAuth audit log, providers, site settings and About me profiles. Deleted: all orders, runs and
+everything that belongs to them, uploaded files and upload tickets, counted refusals, expired codes and tokens and clients without
+a valid token. The data protection keys are not touched, so sign-in cookies and tokens stay valid. Stored originals that no row
+refers to any more are removed once afterwards; the cleanup service of the app deliberately does not do that when most files are
+unknown, and keeps that guard.
+
+**Removed from the database.**
+- Tables: `AdvisorConsultations`, `AdvisorProfiles`, `CrewTemplateEmbeddings`, `CrewTemplates`, `ExecutorProfiles`,
+  `FinalizationActorCosts`, `FinalizerProfiles`, `GroundingActorCosts`, `GroundingConsultations`, `GroundingProviderProfiles`,
+  `KnowledgeDocumentChunks`, `KnowledgeDocuments`, `LearningEntries`, `ReviewerProfiles`, `RunArtifacts`, `StudioSettings`,
+  `TemplateStudioAnalyses`, `mcp_server_configs`, `specialization_packs`, `tool_definitions`, `tool_invocations`; the extension
+  `vector`.
+- Columns: `Runs.AdvisorRetryAttempted`, `ConfigJson`, `CostTotal`, `GroundingCostEur`, `FinalizerCostEur`,
+  `FinalizerErrorMessage`, `Kind`, `ParentCompositionRunId`; `Orders.Mode`, `Orders.CrewTemplateName`;
+  `Iterations.AdvisorsTotalCostEur`. Column defaults the model does not know are gone; constraint names follow the model.
+- The compose volume for exports and its mount point in the image.
+
+**Removed from the code** (all of it only read old data): `RunKind` with composition and learning runs, `OrderMode` with the stored
+mode "careful" and its progress steps, the entry `Legacy` with the linking of orderless runs, the template name `direct-outline`
+and its check, old display names of checks and setups, the refusal of removed setups at "Resume", the list `advisors` in the
+snapshot (the snapshot format is now version 4 and only this version runs), reading reports of schema 1, the check code
+`arithmetic.partial`, cleaning the retired "longer" sentence out of stored changes, `ActorType.Advisor`, and the special case for
+runs without outcome from before outcomes existed. "Resume" now stores the new run in one step in the order of its parent; a run
+without an order cannot be resumed.
+
+**Kept on purpose.** The five MCP stubs and the hidden parameter `extraCareful` stay until the next version (D-087, D-091).
+`RevisionQuick.Longer` stays, because a caller that asks for it gets the refusal that says what to do instead. `ModelSlot` keeps
+its values; no column stores them. `Runs.CrewTemplateName` stays (new runs write it, the run pages show it). `Runs.OrderId` stays
+nullable. The Compose files keep their Postgres image; nothing needs the extension any more.
+
+**Indexes**, from the queries in the code:
+
+| Change | Reason |
+|---|---|
+| `IX_Findings_IterationId` added | findings are read by iteration, and deleting iterations cascades to them |
+| `IX_RunSourceUsages_SourceId`, `IX_UploadTickets_SourceId`, `IX_OAuthAuthorizationCodes_ClientId` added | deleting a source or a client updates or cascades to these rows |
+| `IX_Orders_CreatedByUser_CreatedAt` → `IX_Orders_CreatedByUser_UpdatedAt` | "My work" filters by person and sorts by `UpdatedAt`, then `CreatedAt` |
+| `IX_Orders_ResearchAt` (partial) added | the daily limits of the research count by `ResearchAt` while holding a lock |
+| `IX_Orders_State` removed | the queries by state use the two partial intake indexes |
+| `IX_Runs_CreatedByUser` → `IX_Runs_CreatedByUser_CreatedAt` | the list of runs filters by person and sorts by `CreatedAt` |
+| `UX_Runs_OrderId_OrderVersion` replaces the partial unique index and `IX_Runs_OrderId_OrderVersion` | one run per version of an order; also serves every lookup by order |
+| `IX_Runs_Status`, `IX_Runs_ParentRunId`, `IX_Runs_ParentCompositionRunId` removed | the first is a prefix of `IX_Runs_Status_CompletedAt`, no query filters by the other two |
+| `IX_Sources_OwnerUsername_CreatedAt` removed | lookups by owner use `UX_Sources_OwnerUsername_Sha256`; no query sorts a person's files by date |
+| three indexes of `Providers`, `IX_OAuthAuditLog_EventType` removed | a handful of rows; no query filters by event type |
+
+After the conversion the database is compacted once (`VACUUM (FULL, ANALYZE)`).
+
+**Proof.** On a private copy: an empty database with the baseline and the converted copy give the same schema (`pg_dump
+--schema-only`, compared with sorted columns); a second run of the script changes nothing; the application starts against both and
+refuses the unconverted one without changing it; sign-in works and an order runs to delivery with the stand-in for the models of
+the test scaffolding. New tests cover the baseline, its seeds and the guard; tests of the old migrations and of old data are gone.
+
+**Rollback.** The previous image together with the database backup taken right before the conversion (restored into an empty
+database) and, if needed, the backup of the file store. The previous image cannot read the converted database.

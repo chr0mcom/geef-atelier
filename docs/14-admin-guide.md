@@ -106,17 +106,11 @@ descriptions; those editors were removed in stage 8d (D-091).
 - **Runs** (`/runs`): every version of an order is one run. The run page shows the setup, the rounds, findings, tokens and cost. A
   failed or stopped run of the standard way can be resumed there.
 
-## Orders and runs from earlier versions
+## Database
 
-Stage 8d removed the older way of working (the workshop with its teams, profiles and review loop, composed teams, learning and the
-knowledge base). No table or column was dropped from the database.
-
-- Finished older orders and runs stay readable: the lists, the order page, the result, the export and the run page. The run page
-  names the setup and says that it belongs to a way of working that no longer exists.
-- A waiting or resumed run of a removed setup fails with "This task was set up for a way of working that no longer exists, so it
-  cannot run. Please start it again."
-- "Resume" is refused for runs of a removed setup with "This task was set up for a way of working that no longer exists, so it
-  cannot be continued. Please start it again."
+One baseline migration builds the schema (D-092). The application does not start on a database that does not start from it and
+changes nothing there; the log says why. An installation from before D-092 has to be converted once, with a backup taken first.
+To go back to an image from before D-092, restore that backup; such an image cannot read the converted database.
 
 ## Things to watch
 

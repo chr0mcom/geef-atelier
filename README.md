@@ -193,7 +193,7 @@ There is one setup, defined only in code: `direct` (writer, checks without a mod
 run (D-066): Claude runs through `claude-cli`, OpenAI through `codex-cli`. Every run stores a **snapshot** of its setup and models.
 Administrators manage providers under `/crew/providers`; in the menu "Workshop", which only administrators see while
 `Ui:WorkshopForAdminsOnly` is on (shipped), you find "Runs" and "Providers". Teams, profile editors and the older review loop were
-removed in stage 8d (D-091); finished runs and orders from that time stay readable.
+removed in stage 8d (D-091); the data from that time went with the database cleanup (D-092).
 
 ---
 
@@ -321,8 +321,8 @@ How the parts work together: [guide for developers and hosts](docs/15-developer-
 ## Stack
 
 - .NET 10 / Blazor Server / Minimal API
-- PostgreSQL 16 via `Npgsql.EntityFrameworkCore.PostgreSQL`; the Compose files use the `pgvector` image because older
-  migrations create the `vector` extension (the vector knowledge base itself was removed, D-091)
+- PostgreSQL 16 via `Npgsql.EntityFrameworkCore.PostgreSQL`; one baseline migration builds the schema (D-092). The Compose files
+  use a `pgvector` Postgres image, but the schema needs no extension
 - [Geef.Sdk 1.5.0](https://www.nuget.org/packages/Geef.Sdk/)
 - Docker / Traefik
 
@@ -383,5 +383,9 @@ editors and dashboard, the live dashboard hub, the form `/new` and the older MCP
 standard way remains; "Extra careful" was removed as well after its measurement (second addendum to D-087). No table or column was dropped: old orders and runs
 stay readable, and a run of a removed setup fails with a plain sentence instead of running. Earlier entries above describe what
 was built at their time.
+
+**Database cleanup (D-092) ✅** One baseline migration replaces all earlier ones; the tables, columns and the `vector` extension of
+the removed parts, the old test orders and the code that only read old data are gone. The application refuses to start on a database
+that has not been converted. The older entries above describe the state at their time.
 
 Full scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)

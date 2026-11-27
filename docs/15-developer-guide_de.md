@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](15-developer-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: eine Aufstellung, „Extra careful“ entfernt; D-091: Stufe 8d, ein Pipeline-Assembler, zehn MCP-Werkzeuge und fünf Stummel, Altdaten und spätere Datenbankbereinigung; davor Recherche für alle eingeschaltet und ihre Sperren, Zusatz zu D-074; About me am Ergebnis, D-083)*
+*Letzte Aktualisierung: 2026-11-27 (D-092: eine Baseline-Migration und der Startschutz; zweiter Zusatz zu D-087: eine Aufstellung, „Extra careful“ entfernt; D-091: Stufe 8d, ein Pipeline-Assembler, zehn MCP-Werkzeuge und fünf Stummel, Altdaten und spätere Datenbankbereinigung; davor Recherche für alle eingeschaltet und ihre Sperren, Zusatz zu D-074; About me am Ergebnis, D-083)*
 
 Dieser Leitfaden ist für Entwicklerinnen und Entwickler und für alle, die Atelier selbst betreiben. Er gibt die Karte des heutigen
 Systems und verweist auf die ausführlichen Dokumente. Die Einrichtungsbefehle stehen im [README](../README_de.md); die Gründe
@@ -69,14 +69,8 @@ Alle Pfade liegen unter `src/Geef.Atelier.*`.
 (`OrderResearchService` mit dem Tavily-Client; `Research:*`, `Tavily:Endpoint`, `Tavily:ApiKey`). Ein Start ohne Suchschlüssel
 schreibt eine Warnung ins Log, und die Recherche endet dann ohne Suche.
 
-Aufträge mit dem gespeicherten Modus `Careful` und Läufe mit der entfernten Vorlage `direct-outline` (zweiter Zusatz zu D-087)
-führt der Direktweg weiter: Jeder neue Lauf nutzt `direct` (`OrderRunExtensions.ResolveOrderSnapshotAsync`),
-`SystemCrew.IsDirectPathTemplate` zählt `direct-outline` weiter mit, und `DirectPipelineAssembler` lässt dessen Zusatzprüfung weg,
-wenn ein gespeicherter Snapshot ausgeführt wird. Enum-Wert und Datenbankspalten bleiben.
-
-`PipelineAssemblerSelector` fragt die registrierten Assembler; der einzige produktive, `DirectPipelineAssembler`, nimmt `direct` und,
-für gespeicherte Läufe, `direct-outline` an. Ein Lauf, den keiner annimmt, scheitert mit „This task was set up for a way of working that no longer exists, so it
-cannot run. Please start it again.“
+`PipelineAssemblerSelector` fragt die registrierten Assembler; der einzige produktive, `DirectPipelineAssembler`, nimmt `direct`
+an. Ein Lauf, den keiner annimmt, scheitert mit „This task was set up in a way this version cannot run. Please start it again.“
 
 ## MCP-Werkzeuge
 
@@ -86,19 +80,13 @@ Der Server bietet `submit_order`, `answer_order`, `get_order_status`, `get_order
 `get_run_details` für eine Version: optionale Parameter, eine Beschreibung, die mit „Removed: use … instead.“ beginnt, und jeder
 Aufruf scheitert mit einer Fehlermeldung, die den Nachfolger nennt.
 
-## Altdaten
+## Datenbank und Migrationen
 
-Stufe 8d hat Code entfernt, keine Daten. Keine Migration löscht etwas, das vorige Image bleibt also mit der Datenbank verträglich;
-Snapshots behalten die Liste `advisors`, damit es sie weiter lesen kann. Fertige alte Aufträge und Läufe bleiben lesbar (Listen,
-Auftragsseite, Ergebnis, Export, Lauf-Seite). Ein wartender oder fortgesetzter Lauf mit einer entfernten Aufstellung scheitert wie oben;
-„Resume“ lehnt ihn ab (`ResumeRules`), und Wiederherstellung nach Abstürzen und Aufräumen behandeln alte Läufe wie bisher. Eine
-spätere, eigene Datenbankbereinigung darf die Tabellen `AdvisorConsultations`, `AdvisorProfiles`, `CrewTemplateEmbeddings`,
-`CrewTemplates`, `ExecutorProfiles`, `FinalizationActorCosts`, `FinalizerProfiles`, `GroundingActorCosts`,
-`GroundingConsultations`, `GroundingProviderProfiles`, `KnowledgeDocumentChunks`, `KnowledgeDocuments`, `LearningEntries`,
-`ReviewerProfiles`, `RunArtifacts`, `StudioSettings`, `TemplateStudioAnalyses`, `mcp_server_configs`, `specialization_packs`,
-`tool_definitions` und `tool_invocations` löschen, dazu die Spalten `Runs.GroundingCostEur`, `Runs.FinalizerCostEur`,
-`Runs.FinalizerErrorMessage` und `Iterations.AdvisorsTotalCostEur` (später möglicherweise `Orders.CrewTemplateName` und
-`Runs.ParentCompositionRunId`), alte Composer- und Lernläufe und das Export-Volume.
+Eine Migration, `Baseline` (D-092), baut das Schema aus einer leeren Datenbank auf, mit den Seeds, die eine frische Installation
+braucht; der Modell-Snapshot passt zum Modell (`BaselineMigrationTests`). Spätere Änderungen kommen als Migrationen darauf, von
+Hand geschrieben oder mit `dotnet ef migrations add` erzeugt; wo es geht additiv, damit das vorige Image weiterläuft. Auf einer
+Datenbank, die nicht von der Baseline ausgeht, startet die Anwendung nicht (`EnsureStartsFromBaselineAsync`) und ändert nichts
+daran; eine Installation von vor D-092 muss erst umgestellt werden.
 
 ## Die Erklärseite folgt den Schaltern
 
@@ -129,8 +117,7 @@ die Seite auf.
 - **xUnit + Testcontainers:** `dotnet test` braucht einen Docker-Daemon. Für alles, was EF-Abfragen oder Migrationen berührt,
   echtes Postgres bevorzugen.
 - **Ende-zu-Ende über die echte Verdrahtung:** `tests/Geef.Atelier.Tests/EndToEnd` startet die Anwendung gegen Postgres und
-  ersetzt nur die HTTP-Gegenstellen (D-067). Jeder neue Pipeline-Weg bekommt hier einen Test; von älteren Versionen geschriebene
-  Daten haben eigene Tests (`LegacyDataEndToEndTests`).
+  ersetzt nur die HTTP-Gegenstellen (D-067). Jeder neue Pipeline-Weg bekommt hier einen Test.
 - **Browser:** Playwright-Tests in `tests/Geef.Atelier.Tests/Web/E2E` (`WebTestHost`); mit `ATELIER_SCREENSHOT_DIR` legen einige
   davon Bildschirmfotos ab.
 - **Messwerkzeuge:** `tools/Eval` (blinder Paarvergleich), `tools/IntakeEval` (Klärer), `tools/FactCheckEval` (Faktenprüfung),
@@ -148,8 +135,8 @@ die Seite auf.
   wörtlichen Zitaten, nie aus eigenen Worten eines Modells über seine Arbeit (D-073).
 - Laut statt still: Eine fehlende Registrierung scheitert beim Start, eine übersprungene Quelle oder ein ausgefallener Prüfer wird
   zur Warnung am Lauf (D-067).
-- Migrationen sind handgeschrieben, additiv und idempotent und brauchen `[DbContext]` und `[Migration]`, sonst überspringt EF sie
-  still.
+- Eine handgeschriebene Migration braucht `[DbContext]` und `[Migration]`, sonst überspringt EF sie still; der Modell-Snapshot muss
+  Schritt halten (`BaselineMigrationTests` schlägt fehl, wenn Modell und Migrationen abweichen).
 - Das Repository ist öffentlich: keine Geheimnisse, keine Betriebsdetails, keine Kontonamen, keine echten Aufträge in Tests oder
   Beispielen.
 - UI-Texte nur Englisch (D-062); Doku zweisprachig (Englisch führend, Deutsch als `_de.md`).
@@ -164,7 +151,7 @@ die Seite auf.
 ## Betrieb
 
 - Docker Compose mit Webdienst, Postgres, Backup-Container und dem CLI-Gateway `cli-proxy`; Ersteinrichtung, Sicherung und
-  Wiederherstellung im README. Das Postgres-Image ist weiter `pgvector`, weil ältere Migrationen die Erweiterung `vector` anlegen.
+  Wiederherstellung im README. Die Compose-Dateien nutzen ein `pgvector`-Postgres-Image; das Schema braucht keine Erweiterung (D-092).
 - Ändern sich beide, gilt die Reihenfolge: erst `cli-proxy`, dann `web` (D-064, D-066).
 - Nur ausliefern, wenn kein Lauf `Pending` oder `Running` ist (D-077).
 - Nach jedem Deploy `scripts/atelier-smoke.sh` ausführen ([ops/atelier-smoke.md](ops/atelier-smoke.md)); `scripts/atelier-watch.sh`
