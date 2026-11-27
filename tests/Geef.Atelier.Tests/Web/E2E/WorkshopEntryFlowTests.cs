@@ -11,7 +11,8 @@ namespace Geef.Atelier.Tests.Web.E2E;
 /// <summary>
 /// Stage 8a (D-077) in a real browser on a phone, in a dark and a light theme: a person who is not an administrator sees only
 /// "New" and "My work", no link to the older form and no technical details, and nothing scrolls sideways. The workshop pages
-/// still open when their address is typed. With the switch off the menu is back and fits as well.
+/// still open when their address is typed. With the switch off the menu is back and fits as well. Before "How it was made" is opened,
+/// the order page has to be interactive: rendering it interactively replaces the prerendered page and would close it again.
 /// </summary>
 [Collection("Playwright")]
 public sealed class WorkshopEntryFlowTests(PlaywrightFixture pw, PostgresFixture pg) : IAsyncLifetime
@@ -49,7 +50,6 @@ public sealed class WorkshopEntryFlowTests(PlaywrightFixture pw, PostgresFixture
             await AssertFitsAsync(page, $"start-{palette}");
 
             await page.GotoAsync($"{_host.BaseUrl}/orders/{view.OrderId}");
-            // The prerendered page is replaced when the page becomes interactive; opening "How it was made" before that would be undone.
             await page.Locator("[data-testid='order-page'][data-interactive='true'] [data-testid='order-result']")
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = 30_000 });
             await page.Locator("[data-testid='order-how-made'] summary").ClickAsync();

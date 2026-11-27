@@ -6,13 +6,16 @@ using Microsoft.Playwright;
 
 namespace Geef.Atelier.Tests.Web.E2E;
 
+/// <summary>
+/// The technical run page follows a run live. The gate of the fake model starts closed, so the run cannot end before the page is
+/// open; a marker set in the page then shows that the finished status arrived without a reload.
+/// </summary>
 [Collection("Playwright")]
 public sealed class LiveUpdateFlowTests(PlaywrightFixture pw, PostgresFixture pg) : IAsyncLifetime
 {
     private WebTestHost? _host;
 
     public async Task InitializeAsync() =>
-        // The gate starts closed: the run cannot finish before the page is open and watching.
         _host = await WebTestHost.StartAsync(pg, initialGateCount: 0);
 
     public async Task DisposeAsync()
@@ -31,14 +34,12 @@ public sealed class LiveUpdateFlowTests(PlaywrightFixture pw, PostgresFixture pg
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 90_000 });
             Assert.Equal(0, await page.Locator("[data-status='Completed']").CountAsync());
 
-            // Inject a JS marker that survives live updates but NOT a page reload
             await page.EvaluateAsync("() => { window.__noReloadMarker = true; }");
 
             _host.Gate.Release(100);
             var status = await WaitForEndAsync(runId);
             Assert.Equal(RunStatus.Completed, status);
 
-            // The finished status must reach the open page without a reload
             await page.WaitForSelectorAsync("[data-status='Completed']",
                 new PageWaitForSelectorOptions { Timeout = 60_000 });
 
