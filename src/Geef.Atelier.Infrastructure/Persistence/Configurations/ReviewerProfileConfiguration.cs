@@ -30,13 +30,5 @@ internal sealed class ReviewerProfileConfiguration : IEntityTypeConfiguration<Re
         builder.Property(r => r.IsSystem).IsRequired().HasDefaultValue(false);
         builder.Property(r => r.ModelSlot).HasTolerantEnumConversion();
         builder.Property(r => r.ModelDomain).HasTolerantEnumConversion();
-
-        builder.Property(r => r.ToolNames)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v ?? (IReadOnlyList<string>)Array.Empty<string>(), JsonOpts),
-                v => (IReadOnlyList<string>)(JsonSerializer.Deserialize<List<string>>(v, JsonOpts) ?? new List<string>()),
-                ListComparer)
-            .HasDefaultValueSql("'[]'::jsonb");
     }
 }

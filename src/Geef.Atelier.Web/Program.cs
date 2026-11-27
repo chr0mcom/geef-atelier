@@ -24,7 +24,6 @@ using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Infrastructure.Sources.Extraction;
 using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.Orders;
-using Geef.Atelier.Infrastructure.Tools;
 using Geef.Atelier.Mcp;
 using Geef.Atelier.Web.Auth;
 using Geef.Atelier.Web.Components;
@@ -79,9 +78,6 @@ builder.Services.AddKnowledge(builder.Configuration);
 
 builder.Services.AddGroundingProviders(builder.Configuration);
 builder.Services.AddResearch(builder.Configuration);
-
-// Tool execution infrastructure (IToolExecutor + IToolSchemaProvider)
-builder.Services.AddToolExecutor();
 
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection("Pricing"));
 builder.Services.Configure<CostTrackingOptions>(builder.Configuration.GetSection("CostTracking"));

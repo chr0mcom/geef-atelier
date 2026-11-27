@@ -44,13 +44,5 @@ internal sealed class FinalizerProfileConfiguration : IEntityTypeConfiguration<F
                 DictComparer)
             .IsRequired()
             .HasDefaultValueSql("'{}'::jsonb");
-
-        builder.Property(p => p.ToolNames)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v ?? (IReadOnlyList<string>)Array.Empty<string>(), JsonOpts),
-                v => (IReadOnlyList<string>)(JsonSerializer.Deserialize<List<string>>(v, JsonOpts) ?? new List<string>()),
-                ListComparer)
-            .HasDefaultValueSql("'[]'::jsonb");
     }
 }

@@ -18,10 +18,6 @@ namespace Geef.Atelier.Core.Domain.Crew.Profiles;
 /// True for profiles defined as code constants in <see cref="SystemCrew"/>; false for user-created
 /// profiles persisted in the database. System profiles are read-only at runtime.
 /// </param>
-/// <param name="ToolNames">
-/// Optional list of tool names (from the tool catalogue) that this executor may call during an
-/// agentic tool-use loop. When empty the executor uses the standard single-shot completion path.
-/// </param>
 /// <param name="ModelSlot">
 /// Role in the model matrix (D-066). When set, the model is assigned from <see cref="Models.ModelMatrix"/> at run
 /// start; <c>null</c> means the provider/model above were chosen manually and are used as-is.
@@ -36,6 +32,5 @@ public sealed record ExecutorProfile(
     string Model,
     int? MaxTokens,
     bool IsSystem,
-    IReadOnlyList<string>? ToolNames = null,
     Models.ModelSlot? ModelSlot = null,
     Models.ModelDomain? ModelDomain = null);

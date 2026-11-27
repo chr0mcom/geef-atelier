@@ -5,7 +5,6 @@ using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Application.Security;
 using Geef.Atelier.Application.Sources;
-using Geef.Atelier.Application.Tools;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Orders;
@@ -44,7 +43,6 @@ public sealed class ProductionWiringEndToEndTests(PostgresFixture postgres)
             services.GetRequiredService<IProviderService>(),
             services.GetRequiredService<ILlmClientResolver>(),
             services.GetRequiredService<IModelCatalog>(),
-            services.GetRequiredService<IToolExecutor>(),
         };
 
         Assert.All(consumers, consumer => Assert.Same(configured, PolicyOf(consumer)));
@@ -81,7 +79,7 @@ public sealed class ProductionWiringEndToEndTests(PostgresFixture postgres)
 
         Assert.NotNull(orderService);
         Assert.NotNull(host.Services.GetRequiredService<IPipelineAssemblerSelector>());
-        Assert.Equal(4, host.Services.GetServices<IPipelineAssembler>().Count());
+        Assert.Single(host.Services.GetServices<IPipelineAssembler>());
         Assert.Single(host.Services.GetServices<IPipelineAssembler>().OfType<DirectPipelineAssembler>());
 
         Assert.Single(host.Services.GetServices<Microsoft.Extensions.Hosting.IHostedService>().OfType<SourceCleanupBackgroundService>());

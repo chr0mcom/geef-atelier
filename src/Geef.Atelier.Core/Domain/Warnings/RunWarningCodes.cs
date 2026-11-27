@@ -6,9 +6,6 @@ public static class RunWarningCodes
     /// <summary>A grounding source failed (provider error, missing key, unknown type) and was left out.</summary>
     public const string GroundingProviderSkipped = "grounding.provider_skipped";
 
-    /// <summary>A tool-backed grounding source returned an error. Reserved; failures currently use <see cref="GroundingProviderSkipped"/>.</summary>
-    public const string GroundingToolFailed = "grounding.tool_failed";
-
     /// <summary>
     /// A knowledge source has an unknown search setting (<c>Scope</c>); only the shared documents were searched and
     /// attachments were left out.

@@ -38,7 +38,6 @@ internal sealed class StubRunService(RunDetails details, IReadOnlyList<Geef.Atel
             RecoveryAdvisors: [],
             AdvisorsByIteration: Enumerable.Empty<AdvisorConsultation>().ToLookup(x => x.IterationNumber),
             GroundingConsultations: Array.Empty<GroundingConsultation>(),
-            ToolInvocations: [],
             Warnings: warnings));
 
     public Task<Guid> ResumeRunAsync(ResumeOptions options, string? user, CancellationToken ct = default) =>

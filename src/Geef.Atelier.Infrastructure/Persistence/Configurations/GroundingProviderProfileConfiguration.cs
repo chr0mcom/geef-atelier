@@ -25,8 +25,6 @@ internal sealed class GroundingProviderProfileConfiguration : IEntityTypeConfigu
         builder.Property(p => p.Description).IsRequired();
         builder.Property(p => p.ProviderType).HasMaxLength(64).IsRequired();
         builder.Property(p => p.IsSystem).IsRequired().HasDefaultValue(false);
-        builder.Property(p => p.ToolName).HasMaxLength(100).IsRequired(false);
-
         builder.Property(p => p.ProviderSettings)
             .HasColumnType("jsonb")
             .HasConversion(

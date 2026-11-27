@@ -38,13 +38,5 @@ internal sealed class AdvisorProfileConfiguration : IEntityTypeConfiguration<Adv
         builder.Property(a => a.IsSystem).IsRequired().HasDefaultValue(false);
         builder.Property(a => a.ModelSlot).HasTolerantEnumConversion();
         builder.Property(a => a.ModelDomain).HasTolerantEnumConversion();
-
-        builder.Property(a => a.ToolNames)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v ?? (IReadOnlyList<string>)Array.Empty<string>(), JsonOpts),
-                v => (IReadOnlyList<string>)(JsonSerializer.Deserialize<List<string>>(v, JsonOpts) ?? new List<string>()),
-                ListComparer)
-            .HasDefaultValueSql("'[]'::jsonb");
     }
 }

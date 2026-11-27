@@ -4,7 +4,6 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Crew.Specialization;
-using Geef.Atelier.Core.Domain.Tools;
 using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Application.Crew;
@@ -50,28 +49,6 @@ public static class CrewSnapshotBuilder
             CrewDomain: template.Domain ?? Core.Domain.Crew.Models.ModelDomain.General);
     }
 
-    /// <summary>
-    /// Builds a snapshot from a named crew template, resolving all profiles and embedding
-    /// fully-dereferenced tool definitions for every actor that declares <c>ToolNames</c>.
-    /// </summary>
-    public static async Task<CrewSnapshot> BuildWithToolsAsync(
-        CrewTemplate template,
-        Func<string, CancellationToken, Task<ExecutorProfile?>> executorLookup,
-        Func<string, CancellationToken, Task<ReviewerProfile?>> reviewerLookup,
-        Func<string, CancellationToken, Task<AdvisorProfile?>> advisorLookup,
-        Func<string, CancellationToken, Task<GroundingProviderProfile?>> groundingLookup,
-        Func<string, CancellationToken, Task<FinalizerProfile?>>? finalizerLookup,
-        Func<string, CancellationToken, Task<ToolDefinition?>> toolLookup,
-        ILogger? logger = null,
-        CancellationToken cancellationToken = default)
-    {
-        var base_ = await BuildAsync(template, executorLookup, reviewerLookup, advisorLookup,
-            groundingLookup, finalizerLookup, cancellationToken);
-
-        var toolBindings = await ResolveToolBindingsAsync(base_, toolLookup, logger, cancellationToken);
-        return base_ with { ToolBindings = toolBindings };
-    }
-
     /// <summary>Builds a snapshot from an inline crew spec (no template name), resolving all referenced profiles.</summary>
     public static async Task<CrewSnapshot> BuildAsync(
         CrewSpec spec,
@@ -104,28 +81,6 @@ public static class CrewSnapshotBuilder
             GroundingProviders: groundingProviders,
             Finalizers: finalizers,
             CrewDomain: spec.Domain ?? Core.Domain.Crew.Models.ModelDomain.General);
-    }
-
-    /// <summary>
-    /// Builds a snapshot from an inline crew spec, resolving all profiles and embedding
-    /// fully-dereferenced tool definitions for every actor that declares <c>ToolNames</c>.
-    /// </summary>
-    public static async Task<CrewSnapshot> BuildWithToolsAsync(
-        CrewSpec spec,
-        Func<string, CancellationToken, Task<ExecutorProfile?>> executorLookup,
-        Func<string, CancellationToken, Task<ReviewerProfile?>> reviewerLookup,
-        Func<string, CancellationToken, Task<AdvisorProfile?>> advisorLookup,
-        Func<string, CancellationToken, Task<GroundingProviderProfile?>> groundingLookup,
-        Func<string, CancellationToken, Task<FinalizerProfile?>>? finalizerLookup,
-        Func<string, CancellationToken, Task<ToolDefinition?>> toolLookup,
-        ILogger? logger = null,
-        CancellationToken cancellationToken = default)
-    {
-        var base_ = await BuildAsync(spec, executorLookup, reviewerLookup, advisorLookup,
-            groundingLookup, finalizerLookup, cancellationToken);
-
-        var toolBindings = await ResolveToolBindingsAsync(base_, toolLookup, logger, cancellationToken);
-        return base_ with { ToolBindings = toolBindings };
     }
 
     /// <summary>
@@ -294,66 +249,4 @@ public static class CrewSnapshotBuilder
         return result;
     }
 
-    /// <summary>
-    /// Builds the <see cref="CrewSnapshot.ToolBindings"/> dictionary by resolving every tool name
-    /// declared across all actors (executor, reviewers, advisors, finalizers).
-    /// Returns <c>null</c> when no actor declares any tool names.
-    /// Missing tools are logged as warnings and silently skipped.
-    /// </summary>
-    private static async Task<IReadOnlyDictionary<string, IReadOnlyList<ToolDefinition>>?> ResolveToolBindingsAsync(
-        CrewSnapshot snapshot,
-        Func<string, CancellationToken, Task<ToolDefinition?>> toolLookup,
-        ILogger? logger,
-        CancellationToken cancellationToken)
-    {
-        var bindings = new Dictionary<string, IReadOnlyList<ToolDefinition>>(StringComparer.Ordinal);
-
-        await AddActorToolsAsync(
-            snapshot.Executor.Name,
-            snapshot.Executor.ToolNames,
-            toolLookup, bindings, logger, cancellationToken);
-
-        foreach (var reviewer in snapshot.Reviewers)
-            await AddActorToolsAsync(reviewer.Name, reviewer.ToolNames, toolLookup, bindings, logger, cancellationToken);
-
-        foreach (var advisor in snapshot.Advisors)
-            await AddActorToolsAsync(advisor.Name, advisor.ToolNames, toolLookup, bindings, logger, cancellationToken);
-
-        if (snapshot.Finalizers is not null)
-            foreach (var finalizer in snapshot.Finalizers)
-                await AddActorToolsAsync(finalizer.Name, finalizer.ToolNames, toolLookup, bindings, logger, cancellationToken);
-
-        return bindings.Count > 0 ? bindings : null;
-    }
-
-    private static async Task AddActorToolsAsync(
-        string actorName,
-        IReadOnlyList<string>? toolNames,
-        Func<string, CancellationToken, Task<ToolDefinition?>> toolLookup,
-        Dictionary<string, IReadOnlyList<ToolDefinition>> bindings,
-        ILogger? logger,
-        CancellationToken cancellationToken)
-    {
-        if (toolNames is not { Count: > 0 })
-            return;
-
-        var resolved = new List<ToolDefinition>(toolNames.Count);
-        foreach (var toolName in toolNames)
-        {
-            var tool = await toolLookup(toolName, cancellationToken);
-            if (tool is not null)
-            {
-                resolved.Add(tool);
-            }
-            else
-            {
-                logger?.LogWarning(
-                    "Tool '{ToolName}' declared by actor '{ActorName}' not found in catalogue — skipped in snapshot.",
-                    toolName, actorName);
-            }
-        }
-
-        if (resolved.Count > 0)
-            bindings[actorName] = resolved;
-    }
 }

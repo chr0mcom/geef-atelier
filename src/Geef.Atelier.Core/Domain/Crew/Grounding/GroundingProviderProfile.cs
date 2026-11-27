@@ -18,20 +18,13 @@ namespace Geef.Atelier.Core.Domain.Crew.Grounding;
 /// Designed to be extensible for a future <c>VectorStoreGroundingProvider</c> without a schema change.
 /// </param>
 /// <param name="IsSystem">True for code-constant profiles defined in <see cref="SystemCrew"/>.</param>
-/// <param name="ToolName">
-/// Optional reference to a <c>ToolDefinition.Name</c> that backs this provider.
-/// When set, <c>MultiProviderGroundingStep</c> uses <c>ToolBackedGroundingProvider</c> instead of
-/// the legacy <c>ProviderType</c>-based factory path.  Backward-compatible: existing profiles
-/// without a <c>ToolName</c> continue to use the factory path unchanged.
-/// </param>
 public sealed record GroundingProviderProfile(
     string Name,
     string DisplayName,
     string Description,
     string ProviderType,
     Dictionary<string, string> ProviderSettings,
-    bool IsSystem,
-    string? ToolName = null)
+    bool IsSystem)
 {
     public const string KeyRefinementProvider     = "refinementProvider";
     public const string KeyRefinementModel        = "refinementModel";

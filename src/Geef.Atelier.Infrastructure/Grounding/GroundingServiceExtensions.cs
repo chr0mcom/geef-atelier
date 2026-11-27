@@ -32,10 +32,6 @@ public static class GroundingServiceExtensions
         services.AddSingleton<IGroundingProvider, OrderSourcesGroundingProvider>();
         services.AddSingleton<IGroundingProviderFactory, GroundingProviderFactory>();
 
-        // Tool-backed provider: delegates to IToolExecutor when a profile has ToolName set.
-        // Registered as scoped (same lifetime as IToolExecutor which depends on scoped repos).
-        services.AddScoped<ToolBackedGroundingProvider>();
-
         services.AddScoped<IGroundingRefiner, GroundingRefiner>();
 
         services.AddHttpClient("url-fetch", client =>

@@ -3,7 +3,6 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Crew.Specialization;
-using Geef.Atelier.Core.Domain.Tools;
 
 namespace Geef.Atelier.Core.Domain.Crew;
 
@@ -38,13 +37,6 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// When <c>true</c>, finalizers also execute if the run exhausts max iterations without converging.
 /// Trailing-optional; defaults to <c>false</c> for backward compatibility.
 /// </param>
-/// <param name="ToolBindings">
-/// Fully-dereferenced tool definitions keyed by actor profile name (e.g. <c>"briefing-fidelity"</c>).
-/// Populated at snapshot-build time for every actor that declares <c>ToolNames</c>, so that tool
-/// semantics remain reproducible even after the catalogue is updated.
-/// <c>null</c> when no actor in this snapshot uses tools (schema v1 snapshots also read as null).
-/// Trailing-optional for backward compatibility with v1 snapshots.
-/// </param>
 /// <param name="PromptCompositions">
 /// Per-actor record of how each generic role prompt was composed with its bound specialization packs
 /// (role prompt + composed effective prompt + pack provenance). Populated at snapshot-build time for
@@ -67,7 +59,6 @@ public sealed record CrewSnapshot(
     IReadOnlyList<GroundingProviderProfile>? GroundingProviders = null,
     IReadOnlyList<FinalizerProfile>? Finalizers = null,
     bool RunFinalizersOnMaxAttempts = false,
-    IReadOnlyDictionary<string, IReadOnlyList<ToolDefinition>>? ToolBindings = null,
     IReadOnlyList<ActorPromptComposition>? PromptCompositions = null,
     Models.ModelDomain? CrewDomain = null)
 {

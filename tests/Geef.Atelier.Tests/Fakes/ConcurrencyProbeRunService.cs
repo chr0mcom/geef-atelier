@@ -68,7 +68,6 @@ internal sealed class ConcurrencyProbeRunService(RunEntity? run = null, RunDetai
                 RecoveryAdvisors: [],
                 AdvisorsByIteration: Enumerable.Empty<AdvisorConsultation>().ToLookup(x => x.IterationNumber),
                 GroundingConsultations: [],
-                ToolInvocations: [],
                 Warnings: []));
 
     public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default) =>

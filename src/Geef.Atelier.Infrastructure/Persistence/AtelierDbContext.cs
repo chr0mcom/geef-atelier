@@ -9,7 +9,6 @@ using Geef.Atelier.Core.Domain.OAuth;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Core.Domain.Sources;
-using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 using Geef.Atelier.Infrastructure.Persistence.Entities;
@@ -71,8 +70,6 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<OAuthRefreshToken> OAuthRefreshTokens => Set<OAuthRefreshToken>();
     internal DbSet<OAuthAuditLogEntry> OAuthAuditLog => Set<OAuthAuditLogEntry>();
 
-    internal DbSet<ToolDefinitionEntity> ToolDefinitions => Set<ToolDefinitionEntity>();
-    internal DbSet<ToolInvocation> ToolInvocations => Set<ToolInvocation>();
 
 
     internal DbSet<SpecializationPackEntity> SpecializationPacks => Set<SpecializationPackEntity>();

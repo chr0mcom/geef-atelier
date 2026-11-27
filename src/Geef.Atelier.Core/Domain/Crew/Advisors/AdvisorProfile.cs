@@ -15,11 +15,6 @@ namespace Geef.Atelier.Core.Domain.Crew.Advisors;
 /// <param name="Mode">Behavioural archetype that determines how the response is integrated.</param>
 /// <param name="Trigger">When during the pipeline run the advisor is consulted.</param>
 /// <param name="IsSystem">True for profiles defined as code constants; false for user-created profiles.</param>
-/// <param name="ToolNames">
-/// Optional list of tool names (from the tool catalogue) that this advisor may call during an
-/// agentic tool-use loop before providing its final advice. When empty the advisor uses the
-/// standard single-shot completion path.
-/// </param>
 /// <param name="ModelSlot">
 /// Role in the model matrix (D-066). When set, the model is assigned from <see cref="Models.ModelMatrix"/> at run
 /// start; <c>null</c> means the provider/model above were chosen manually and are used as-is.
@@ -36,6 +31,5 @@ public sealed record AdvisorProfile(
     AdvisorMode Mode,
     AdvisorTrigger Trigger,
     bool IsSystem,
-    IReadOnlyList<string>? ToolNames = null,
     Models.ModelSlot? ModelSlot = null,
     Models.ModelDomain? ModelDomain = null);

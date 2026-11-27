@@ -7,7 +7,6 @@ using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Core.Persistence.Profiles;
 using Geef.Atelier.Core.Persistence.Sources;
 using Geef.Atelier.Core.Persistence.Providers;
-using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.SiteSettings;
 using Geef.Atelier.Infrastructure.Persistence.Crew;
@@ -51,8 +50,6 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IOAuthAuditLogRepository, OAuthAuditLogRepository>();
         services.AddScoped<ISiteSettingsRepository, SiteSettingsRepository>();
         services.AddScoped<ISiteSettingsService, SiteSettingsService>();
-        services.AddScoped<IToolDefinitionRepository, ToolDefinitionRepository>();
-        services.AddScoped<IToolInvocationRepository, ToolInvocationRepository>();
         services.AddScoped<ISpecializationPackRepository, SpecializationPackRepository>();
         services.AddScoped<IRunWarningRepository, RunWarningRepository>();
         services.AddSingleton<IRunWarningSink, RunWarningSink>();

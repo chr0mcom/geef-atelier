@@ -7,13 +7,11 @@ using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
-using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.Orders;
-using Geef.Atelier.Core.Persistence.Tools;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -26,7 +24,6 @@ internal sealed class RunService(
     ILogger<RunService>                   logger,
     IRunWarningRepository                 warningRepository,
     IGroundingConsultationRepository?     groundingConsultationRepository = null,
-    IToolInvocationRepository?            toolInvocationRepository = null,
     IOrderRepository?                     orderRepository = null,
     IOptions<OrderOptions>?               orderOptions = null) : IRunService
 {
@@ -251,10 +248,6 @@ internal sealed class RunService(
             ? await groundingConsultationRepository.GetByRunIdAsync(runId, cancellationToken)
             : [];
 
-        IReadOnlyList<ToolInvocation> toolInvocations = toolInvocationRepository is not null
-            ? await toolInvocationRepository.GetByRunIdAsync(runId, cancellationToken)
-            : [];
-
         IReadOnlyList<RunWarningEntity> warnings = warningRepository is not null
             ? await warningRepository.ListByRunAsync(runId, cancellationToken)
             : [];
@@ -267,7 +260,6 @@ internal sealed class RunService(
             recoveryAdvisors,
             advisorsByIteration,
             groundingConsultations,
-            toolInvocations,
             warnings);
     }
 

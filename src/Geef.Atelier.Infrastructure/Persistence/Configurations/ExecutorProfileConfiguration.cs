@@ -30,13 +30,5 @@ internal sealed class ExecutorProfileConfiguration : IEntityTypeConfiguration<Ex
         builder.Property(e => e.IsSystem).IsRequired().HasDefaultValue(false);
         builder.Property(e => e.ModelSlot).HasTolerantEnumConversion();
         builder.Property(e => e.ModelDomain).HasTolerantEnumConversion();
-
-        builder.Property(e => e.ToolNames)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v ?? (IReadOnlyList<string>)Array.Empty<string>(), JsonOpts),
-                v => (IReadOnlyList<string>)(JsonSerializer.Deserialize<List<string>>(v, JsonOpts) ?? new List<string>()),
-                ListComparer)
-            .HasDefaultValueSql("'[]'::jsonb");
     }
 }
