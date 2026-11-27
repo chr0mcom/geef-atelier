@@ -11,7 +11,7 @@ from typing import Callable, Protocol
 
 from .claude_call import call_claude
 from .cli_runner import Runner, run_cli
-from .mcp import DELIVERED_OUTCOMES, TERMINAL_STATUSES, AtelierToolAdapter, McpClient
+from .mcp import DELIVERED_OUTCOMES, AtelierToolAdapter, McpClient
 from .tasks import Task
 
 WRITER_SYSTEM_PROMPT = (
@@ -91,9 +91,12 @@ class ReferenceArm:
 
 
 class AtelierMcpArm:
-    """Arm (b): the running Atelier, driven through its MCP endpoint (submit, poll until ``outcome`` is set, fetch result)."""
+    """
+    Arm (b): the running Atelier, driven through its MCP endpoint: submit the order, skip questions if Atelier asks any, wait
+    until the order is done and its ``outcome`` is set, then fetch the result.
+    """
 
-    def __init__(self, adapter: AtelierToolAdapter, name: str = "atelier", poll_interval_s: float = 15.0,
+    def __init__(self, adapter: AtelierToolAdapter, name: str = "atelier", poll_interval_s: float = 10.0,
                  timeout_s: float = 3600.0, sleep: Callable[[float], None] = time.sleep,
                  clock: Callable[[], float] = time.monotonic):
         self.name = name
@@ -105,37 +108,41 @@ class AtelierMcpArm:
 
     def produce(self, task: Task) -> ArmOutput:
         started = self.clock()
-        run_id = self.adapter.submit(task.brief, task.attachments)
-        state = self.adapter.state(run_id)
+        order_id = self.adapter.submit(task.brief, task.attachments)
+        skipped = False
+        state = self.adapter.state(order_id)
         while not state.is_final:
             if self.clock() - started > self.timeout_s:
-                if state.status in TERMINAL_STATUSES:
+                if state.done:
                     raise TimeoutError(
-                        f"Atelier-Lauf {run_id} nach {self.timeout_s:.0f} s im Status {state.status}, aber ohne outcome; "
-                        "der Text ist erst mit gesetztem outcome endgültig")
-                raise TimeoutError(f"Atelier-Lauf {run_id} nach {self.timeout_s:.0f} s nicht fertig "
-                                   f"(Status {state.status}, ohne outcome)")
-            self.sleep(self.poll_interval_s)
-            state = self.adapter.state(run_id)
-        text = self.adapter.result_text(run_id)
+                        f"Atelier-Auftrag {order_id} nach {self.timeout_s:.0f} s im Zustand {state.state} fertig, aber ohne "
+                        "outcome; der Text ist erst mit gesetztem outcome endgültig")
+                raise TimeoutError(f"Atelier-Auftrag {order_id} nach {self.timeout_s:.0f} s nicht fertig "
+                                   f"(Zustand {state.state}, ohne outcome)")
+            if state.needs_answers and not skipped:
+                self.adapter.skip_questions(order_id)
+                skipped = True
+            else:
+                self.sleep(self.poll_interval_s)
+            state = self.adapter.state(order_id)
+        text = self.adapter.result_text(order_id)
         duration = round(self.clock() - started, 1)
         if state.outcome not in DELIVERED_OUTCOMES:
-            raise RuntimeError(f"Atelier-Lauf {run_id} endete mit outcome {state.outcome} (Status {state.status}) "
-                               f"ohne verwertbaren Text ({state.error or 'kein Fehlertext'})")
+            raise RuntimeError(f"Atelier-Auftrag {order_id} endete mit outcome {state.outcome} (Zustand {state.state}) "
+                               "ohne verwertbaren Text")
         if not text:
-            raise RuntimeError(f"Atelier-Lauf {run_id} endete mit {state.outcome} ohne Text ({state.error or 'kein Fehlertext'})")
-        return ArmOutput(text.strip(), duration, {"run_id": run_id, "status": state.status, "outcome": state.outcome,
-                                                  "error": state.error})
+            raise RuntimeError(f"Atelier-Auftrag {order_id} endete mit {state.outcome} ohne Text (Zustand {state.state})")
+        return ArmOutput(text.strip(), duration, {"order_id": order_id, "state": state.state, "outcome": state.outcome,
+                                                  "questions_skipped": skipped})
 
 
 def atelier_arm_from_env(name: str = "atelier") -> AtelierMcpArm:
-    """Builds arm (b) from EVAL_ATELIER_URL and EVAL_ATELIER_TOKEN (optional EVAL_ATELIER_CREW)."""
+    """Builds arm (b) from EVAL_ATELIER_URL and EVAL_ATELIER_TOKEN."""
     url = os.environ.get("EVAL_ATELIER_URL")
     token = os.environ.get("EVAL_ATELIER_TOKEN")
     if not url or not token:
         raise RuntimeError("Arm 'atelier' braucht EVAL_ATELIER_URL und EVAL_ATELIER_TOKEN")
-    adapter = AtelierToolAdapter(McpClient(url, token), crew_template=os.environ.get("EVAL_ATELIER_CREW") or None)
-    return AtelierMcpArm(adapter, name=name)
+    return AtelierMcpArm(AtelierToolAdapter(McpClient(url, token)), name=name)
 
 
 def load_plugin(spec: str) -> Callable[..., Arm]:

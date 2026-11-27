@@ -18,9 +18,9 @@ def tool(name, props=(), required=(), description="A tool."):
             "inputSchema": {"type": "object", "properties": {p: {"type": "string"} for p in props}, "required": list(required)}}
 
 
-def contract_tools(legacy=True):
+def contract_tools(tickets=False):
     tools = [
-        tool("submit_order", ("request", "extraCareful", "attachments"), ("request",)),
+        tool("submit_order", ("request", "attachments"), ("request",)),
         tool("answer_order", ("orderId", "answers", "skip"), ("orderId",)),
         tool("get_order_status", ("orderId", "waitSeconds"), ("orderId",)),
         tool("get_order_result", ("orderId",), ("orderId",)),
@@ -33,11 +33,10 @@ def contract_tools(legacy=True):
     ]
     tools[4]["inputSchema"]["properties"]["quick"] = {"type": "array", "items": {"type": "string"}}
     tools[5]["inputSchema"]["properties"]["format"] = {"type": "string", "enum": ["md", "docx", "pdf"]}
-    if legacy:
-        for name in mc.LEGACY_TOOLS:
-            description = (f"{mc.LEGACY_PREFIX}{mc.SUCCESSORS[name]} instead. Old text." if name in mc.SUCCESSORS
-                           else "Old tool.")
-            tools.append(tool(name, description=description))
+    tools.extend(tool(name, description=f"{mc.RETIRED_PREFIX}{new} instead. Every call returns an error that names it.")
+                 for name, new in mc.RETIRED_TOOLS.items())
+    if tickets:
+        tools.append(tool("prepare_attachment", ("fileName",)))
     return tools
 
 
@@ -228,28 +227,41 @@ def test_import_claude_session_keeps_order_durations_errors_and_unreadable_answe
     assert {c["source"] for c in calls} == {mc.CLAUDE_CODE}
 
 
-def test_tool_list_of_the_contract_passes_with_and_without_legacy():
-    assert mc.check_tool_list(contract_tools(), legacy=True) == []
-    assert mc.check_tool_list(contract_tools(legacy=False), legacy=False) == []
+def test_tool_list_of_the_contract_passes_with_and_without_upload_tickets():
+    assert mc.check_tool_list(contract_tools()) == []
+    assert mc.check_tool_list(contract_tools(tickets=True)) == []
+
+
+def test_the_expected_tools_are_the_ten_order_tools_and_five_stubs():
+    assert len(mc.ORDER_TOOLS + mc.TICKET_TOOLS) == 10
+    assert sorted(mc.RETIRED_TOOLS) == ["get_run_details", "get_run_result", "get_run_status", "submit_auto_crew_request",
+                                        "submit_request"]
+
+
+def test_profile_may_offer_exactly_the_saving_parameters():
+    tools = contract_tools()
+    profile = next(t for t in tools if t["name"] == "profile")
+    profile["inputSchema"]["properties"] = {p: {"type": "string"} for p in mc.PROFILE_SAVING_PARAMETERS}
+    assert mc.check_tool_list(tools) == []
 
 
 def test_tool_list_differences_are_named():
     tools = contract_tools()
-    assert any("zu viel" in p for p in mc.check_tool_list(tools, legacy=False))
-    assert any("fehlen: profile" in p for p in mc.check_tool_list([t for t in tools if t["name"] != "profile"], True))
+    assert any("zu viel: list_runs" in p for p in mc.check_tool_list([*tools, tool("list_runs")]))
+    assert any("fehlen: profile" in p for p in mc.check_tool_list([t for t in tools if t["name"] != "profile"]))
     broken = contract_tools()
     by_name = {t["name"]: t for t in broken}
     by_name["revise_order"]["inputSchema"]["required"] = ["orderId", "change"]
     by_name["profile"]["inputSchema"]["properties"]["displayName"] = {"type": "string"}
     by_name["export_order"]["inputSchema"]["properties"]["format"]["enum"] = ["md", "html"]
-    by_name["list_runs"]["description"] = "Lists recent runs."
-    by_name["get_run_result"]["description"] = f"{mc.LEGACY_PREFIX}get_order_status instead."
-    problems = mc.check_tool_list(broken, legacy=True)
+    by_name["get_run_status"]["description"] = "Lists the status."
+    by_name["get_run_result"]["description"] = f"{mc.RETIRED_PREFIX}get_order_status instead."
+    problems = mc.check_tool_list(broken)
+    assert any(p.startswith("get_run_status: Beschreibung") for p in problems)
+    assert any(p.startswith("get_run_result: Beschreibung") for p in problems)
     assert any(p.startswith("revise_order: Pflichtparameter") for p in problems)
-    assert any(p.startswith("profile: hat Parameter displayName") for p in problems)
+    assert any(p.startswith("profile: hat unbekannte Parameter displayName") for p in problems)
     assert any(p.startswith("export_order: format") for p in problems)
-    assert any(p.startswith("list_runs:") for p in problems)
-    assert any(p.startswith("get_run_result:") for p in problems)
 
 
 def test_gate_m_passes_with_a_complete_claude_code_transcript():
@@ -321,7 +333,7 @@ def test_gate_m_needs_claude_code_and_a_tool_list():
 
 
 def test_gate_m_fails_on_a_wrong_tool_list():
-    report = mc.evaluate_gate_m(contract_tools(legacy=False), gate_m_calls(), legacy=True)
+    report = mc.evaluate_gate_m([t for t in contract_tools() if t["name"] != "submit_request"], gate_m_calls())
     assert report["verdict"] == "failed"
     assert any(f.startswith("Werkzeugliste:") for f in report["failures"])
 
@@ -406,7 +418,7 @@ def test_main_tools_import_evaluate_and_vmcp(tmp_path):
     lines = []
     assert mc.main(["tools", "--out", str(tmp_path / "tools.json")], connector=lambda _: Client(), echo=lines.append) == 0
     stored = json.loads((tmp_path / "tools.json").read_text(encoding="utf-8"))
-    assert len(stored["tools"]) == len(mc.ORDER_TOOLS) + len(mc.LEGACY_TOOLS)
+    assert len(stored["tools"]) == len(mc.ORDER_TOOLS) + len(mc.RETIRED_TOOLS)
 
     session = tmp_path / "sitzung.jsonl"
     session.write_text("\n".join(session_lines()) + "\n", encoding="utf-8")
@@ -420,8 +432,9 @@ def test_main_tools_import_evaluate_and_vmcp(tmp_path):
     assert mc.main(["evaluate", "--tools", str(tmp_path / "tools.json"), "--transcript", str(tmp_path / "m.jsonl"),
                     "--out", str(tmp_path / "m-gate.json")], echo=lines.append) == 0
     assert json.loads((tmp_path / "m-gate.json").read_text(encoding="utf-8"))["verdict"] == "passed"
-    assert mc.main(["evaluate", "--tools", str(tmp_path / "tools.json"), "--transcript", str(tmp_path / "m.jsonl"),
-                    "--legacy", "false", "--out", str(tmp_path / "m-gate.json")], echo=lines.append) == 1
+    (tmp_path / "wrong-tools.json").write_text(json.dumps({"tools": contract_tools()[1:]}), encoding="utf-8")
+    assert mc.main(["evaluate", "--tools", str(tmp_path / "wrong-tools.json"), "--transcript", str(tmp_path / "m.jsonl"),
+                    "--out", str(tmp_path / "m-gate.json")], echo=lines.append) == 1
 
     write_lines(tmp_path / "v.jsonl", vmcp_calls(50_200))
     assert mc.main(["vmcp", "--transcript", str(tmp_path / "v.jsonl"), "--out", str(tmp_path / "v.json")],

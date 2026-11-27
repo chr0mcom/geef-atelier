@@ -4006,7 +4006,8 @@ Orchestrator-Tests, die Abschlussschritte nutzten, verwenden jetzt den Abschluss
   `StudioSettings`, `TemplateStudioAnalyses`, `mcp_server_configs`, `specialization_packs`, `tool_definitions`, `tool_invocations`, die
   Spalten oben und die alten Zusammenstellungs- und Lernläufe entfernen; das Compose-Volume für Exporte wird nicht mehr genutzt.
 - `ModelSlot` behält seine Werte (Snapshots speichern Zahlen); die Matrixzeilen ausgemusterter Slots bleiben bis zum Aufräumen.
-- Der Arm `atelier` des Auswertungswerkzeugs in `tools/Eval` ruft noch `submit_request` auf; die Messungen des Standardwegs nutzen die
-  Auftragswerkzeuge.
+- Der Arm `atelier` des Auswertungswerkzeugs in `tools/Eval` nutzt die Auftragswerkzeuge (`submit_order`, `answer_order` mit
+  `skip=true`, `get_order_status`, `get_order_result`); seine Prüfung der Werkzeugliste erwartet die Auftragswerkzeuge und die fünf
+  Stummel.
 
 **Rückweg.** Das vorige Image; in der Datenbank wurde nichts entfernt oder geändert. Im Code nur über Git (Tag vor dem Deploy).

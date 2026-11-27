@@ -33,7 +33,7 @@ Usage (from ``tools/Eval``)::
 
     python3 -m geef_eval.mcp_contract tools --out <dir>/tools.json [--env-file <file>]
     python3 -m geef_eval.mcp_contract import --session <session.jsonl> [--session ...] --server <name> --out <dir>/transcript.jsonl
-    python3 -m geef_eval.mcp_contract evaluate --tools <dir>/tools.json --transcript <dir>/transcript.jsonl --out <dir>/m-gate.json [--legacy true|false]
+    python3 -m geef_eval.mcp_contract evaluate --tools <dir>/tools.json --transcript <dir>/transcript.jsonl --out <dir>/m-gate.json
     python3 -m geef_eval.mcp_contract vmcp --transcript <dir>/vmcp.jsonl --out <dir>/vmcp-gate.json
 
 Sign-in for ``tools``: ``--env-file`` with ``ATELIER_SMOKE_USER``, ``ATELIER_SMOKE_PASSWORD``, ``ATELIER_SMOKE_CLIENT_ID``,
@@ -69,14 +69,15 @@ from .mcp import HttpReply, McpClient, McpError
 
 ORDER_TOOLS = ("submit_order", "answer_order", "get_order_status", "get_order_result",
                "revise_order", "export_order", "cancel_order", "list_orders", "profile")
-LEGACY_TOOLS = ("analyze_template_proposal", "cancel_run", "download_run_artifact", "get_provider_models", "get_run_details",
-                "get_run_result", "get_run_status", "list_advisor_profiles", "list_crew_templates",
-                "list_grounding_provider_profiles", "list_knowledge_documents", "list_learnings", "list_providers",
-                "list_reviewer_profiles", "list_run_artifacts", "list_runs", "materialize_template_proposal",
-                "submit_auto_crew_request", "submit_request")
-SUCCESSORS = {"submit_request": "submit_order", "get_run_status": "get_order_status", "get_run_result": "get_order_result",
-              "cancel_run": "cancel_order", "list_runs": "list_orders"}
-LEGACY_PREFIX = "Older tool, kept for now: use "
+#: Offered beside the order tools only while ``Uploads:Tickets`` is ``On``.
+TICKET_TOOLS = ("prepare_attachment",)
+#: Stubs of removed older tools, listed for one version, each with the order tool its description names (D-091).
+RETIRED_TOOLS = {"submit_request": "submit_order", "submit_auto_crew_request": "submit_order",
+                 "get_run_status": "get_order_status", "get_run_result": "get_order_result",
+                 "get_run_details": "get_order_result"}
+RETIRED_PREFIX = "Removed: use "
+#: The values ``profile`` saves while ``Orders:TellOnce`` is not ``Off``; without saving it has no parameter.
+PROFILE_SAVING_PARAMETERS = frozenset({"name", "signature", "formality", "language"})
 LIST_ORDER_FIELDS = ("orderId", "title", "state", "version", "updatedAt", "wordCount")
 # The server leaves out fields whose value is null (MCP serializer), so an order without a text has no wordCount and, before
 # its first version, no version; these two may be missing, the others never.
@@ -346,13 +347,11 @@ def _properties(tool: dict) -> tuple[dict, list]:
     return props, required
 
 
-def _first_sentence(text: str) -> str:
-    end = text.find("instead.")
-    return text[: end + len("instead.")] if end >= 0 else text.split(". ")[0]
-
-
-def check_tool_list(tools: list[dict], legacy: bool) -> list[str]:
-    """What differs from the tool list of contract 4.4 (``legacy`` = ``Mcp:LegacyTools``); empty when it matches."""
+def check_tool_list(tools: list[dict]) -> list[str]:
+    """
+    What differs from the tool list the server offers: the order tools, the five stubs of removed tools and, with upload
+    tickets, ``prepare_attachment``, with the parameters of contract 4.4; empty when it matches.
+    """
     problems: list[str] = []
     by_name: dict[str, dict] = {}
     for tool in tools:
@@ -360,10 +359,10 @@ def check_tool_list(tools: list[dict], legacy: bool) -> list[str]:
         if name in by_name:
             problems.append(f"Werkzeug doppelt: {name}")
         by_name[name] = tool
-    expected = set(ORDER_TOOLS) | (set(LEGACY_TOOLS) if legacy else set())
+    expected = set(ORDER_TOOLS) | set(RETIRED_TOOLS)
     if missing := sorted(expected - set(by_name)):
         problems.append(f"Werkzeuge fehlen: {', '.join(missing)}")
-    if extra := sorted(set(by_name) - expected):
+    if extra := sorted(set(by_name) - expected - set(TICKET_TOOLS)):
         problems.append(f"Werkzeuge zu viel: {', '.join(extra)}")
 
     def need(tool_name: str, *names: str) -> dict:
@@ -403,15 +402,14 @@ def check_tool_list(tools: list[dict], legacy: bool) -> list[str]:
             problems.append(f"list_orders: Pflichtparameter {sorted(required)} (4.4: limit wahlweise)")
     if "profile" in by_name:
         props, _ = _properties(by_name["profile"])
-        if props:
-            problems.append(f"profile: hat Parameter {', '.join(sorted(props))} (4.4: nur lesen, keine Parameter)")
+        if unknown := sorted(set(props) - PROFILE_SAVING_PARAMETERS):
+            problems.append(f"profile: hat unbekannte Parameter {', '.join(unknown)}")
         if "About me" not in str(by_name["profile"].get("description") or ""):
             problems.append("profile: Beschreibung nennt „About me“ nicht als Ort zum Ändern")
-    if legacy:
-        for old, new in SUCCESSORS.items():
-            description = str(by_name.get(old, {}).get("description") or "")
-            if old in by_name and not (description.startswith(LEGACY_PREFIX) and new in _first_sentence(description)):
-                problems.append(f"{old}: Beschreibung beginnt nicht mit „{LEGACY_PREFIX}{new} instead.“")
+    for old, new in RETIRED_TOOLS.items():
+        description = str(by_name.get(old, {}).get("description") or "")
+        if old in by_name and not description.startswith(f"{RETIRED_PREFIX}{new} instead."):
+            problems.append(f"{old}: Beschreibung beginnt nicht mit „{RETIRED_PREFIX}{new} instead.“")
     return problems
 
 
@@ -480,7 +478,7 @@ def _export_problem(call: dict) -> str | None:
     return None
 
 
-def evaluate_gate_m(tools: list[dict] | None, calls: list[dict], legacy: bool = True) -> dict:
+def evaluate_gate_m(tools: list[dict] | None, calls: list[dict]) -> dict:
     """Gate M; ``verdict`` is ``passed``, ``failed`` or ``not_evaluable``."""
     problems: list[str] = []
     failures: list[str] = []
@@ -490,7 +488,7 @@ def evaluate_gate_m(tools: list[dict] | None, calls: list[dict], legacy: bool = 
         problems.append("Werkzeugliste fehlt (mcp_contract tools)")
         list_problems: list[str] = []
     else:
-        list_problems = check_tool_list(tools, legacy)
+        list_problems = check_tool_list(tools)
         failures.extend(f"Werkzeugliste: {p}" for p in list_problems)
     if not calls:
         problems.append("Mitschnitt ohne Aufrufe")
@@ -617,7 +615,7 @@ def evaluate_gate_m(tools: list[dict] | None, calls: list[dict], legacy: bool = 
         problems.append(f"Schritte fehlen im Mitschnitt: {', '.join(missing)}")
     verdict = "failed" if failures else ("not_evaluable" if problems else "passed")
     return {"gate": "M", "verdict": verdict, "failures": failures, "problems": problems, "steps": steps,
-            "tool_list": {"legacy": legacy, "problems": list_problems, "count": len(tools or [])}, "clients": clients,
+            "tool_list": {"problems": list_problems, "count": len(tools or [])}, "clients": clients,
             "calls": len(relevant)}
 
 
@@ -723,7 +721,6 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
     ev = sub.add_parser("evaluate", help="Tor M")
     ev.add_argument("--tools", required=True, type=Path)
     ev.add_argument("--transcript", required=True, type=Path)
-    ev.add_argument("--legacy", choices=("true", "false"), default="true", help="erwarteter Wert von Mcp:LegacyTools")
     ev.add_argument("--out", required=True, type=Path)
     vm = sub.add_parser("vmcp", help="V-MCP")
     vm.add_argument("--transcript", required=True, type=Path)
@@ -775,7 +772,7 @@ def main(argv: list[str] | None = None, *, connector: Callable[[Path | None], Co
         echo(f"Eingabe nicht lesbar: {exc}")
         return 2
     if args.command == "evaluate":
-        report = evaluate_gate_m(listed, calls, legacy=args.legacy == "true")
+        report = evaluate_gate_m(listed, calls)
         _write_json(args.out, report)
         _print_m(report, echo)
         return {"passed": 0, "failed": 1}.get(report["verdict"], 4)

@@ -50,12 +50,12 @@ python3 tools/Eval/eval.py all --run-name probe --tasks tools/Eval/beispiele \
 |---|---|
 | `roh` | ein Aufruf `claude -p --model opus` ohne Werkzeuge, Prompt per stdin, leeres Arbeitsverzeichnis; Anhänge als `<anhang>`-Blöcke vor dem Kurzauftrag |
 | `roh-sonnet` | wie `roh`, mit Sonnet |
-| `atelier` | das laufende Atelier über den MCP-Endpunkt: einreichen, alle 15 s Status abfragen (bis 60 min), bis `outcome` gesetzt ist, erst dann das Ergebnis holen (ein terminaler Status allein reicht nicht: der Text ist erst mit `outcome` endgültig, also nach den Abschlussschritten). Als Ergebnis zählen `Converged` und `DeliveredWithOpenPoints` mit Text; damit zählt ein Lauf mit Status `Failed`, der einen besten Text liefert, weiter als Ergebnis (Entscheidung vom 2026-07-17). `outcome` `Failed` oder `Aborted` ist ein Fehler des Arms, ebenso ein Zeitlimit ohne `outcome`. Braucht ein Atelier ab Etappe 0 (Feld `outcome`, Step47) |
+| `atelier` | das laufende Atelier über den MCP-Endpunkt mit den Auftragswerkzeugen: `submit_order`; stellt Atelier Rückfragen, einmal `answer_order` mit `skip=true`; dann `get_order_status` (der Server wartet je Aufruf bis zu 25 s auf eine Änderung, dazwischen 10 s Pause, bis 60 min), bis der Auftrag fertig ist **und** `outcome` gesetzt ist, erst dann `get_order_result` (der Text ist erst mit `outcome` endgültig). Als Ergebnis zählen `Converged` und `DeliveredWithOpenPoints` mit Text (Entscheidung vom 2026-07-17). `outcome` `Failed` oder `Aborted` ist ein Fehler des Arms, ebenso ein gescheiterter oder gestoppter Auftrag ohne Lauf und ein Zeitlimit ohne `outcome` |
 | `referenz` | der `referenztext` aus der Aufgabe (feste Vergleichsgröße, auch für Probeläufe) |
 | eigene | `--plugin name=paket.modul:Fabrik` oder `--plugin name=pfad/datei.py:Fabrik`; die Fabrik wird mit `name=` aufgerufen und liefert ein Objekt mit `name` und `produce(task) -> ArmOutput` |
 
-Die Namen der MCP-Werkzeuge ändern sich in späteren Etappen (`submit_order` …). Sie stehen nur in
-`geef_eval/mcp.py`, Klasse `AtelierToolAdapter` (`DEFAULT_TOOL_NAMES`); dort oder in einer Unterklasse anpassen.
+Die Namen der MCP-Werkzeuge stehen für diesen Arm nur in `geef_eval/mcp.py`, Klasse `AtelierToolAdapter`. Anhänge gehen als
+Base64 in `attachments` mit (das Upload-Ticket nutzt der Arm nicht).
 
 ## Bewertung
 
@@ -108,7 +108,6 @@ und beliebig vielen `# Anhang: name.md`.
 | `EVAL_OUT_DIR` | Ausgabeordner (Standard `~/.local/state/geef-eval`) |
 | `EVAL_ATELIER_URL` | Basis-URL des Ateliers; `/mcp` wird angehängt. Weiterleitungen werden nicht verfolgt (das Token bleibt beim eingestellten Ursprung); bei einer Weiterleitung die Zieladresse eintragen |
 | `EVAL_ATELIER_TOKEN` | Bearer-Token für den MCP-Endpunkt |
-| `EVAL_ATELIER_CREW` | optional: Crew-Vorlage für den Arm `atelier` (sonst Standard des Ateliers) |
 | `EVAL_SEED` | Seed der Reihenfolge (statt `--seed`); muss beim Fortsetzen zum gespeicherten Seed passen |
 | `EVAL_CODEX_MAX` | Obergrenze der Codex-Jurorenaufrufe je Lauf; ohne Wert bleibt der Codex-Juror aus |
 
@@ -487,7 +486,7 @@ python3 -m geef_eval.mcp_contract tools --out $EVAL_M_DIR/tools.json [--env-file
 python3 -m geef_eval.mcp_contract import --session ~/.claude/projects/<ordner>/<sitzung>.jsonl --server <name> \
   --out $EVAL_M_DIR/transcript.jsonl
 python3 -m geef_eval.mcp_contract evaluate --tools $EVAL_M_DIR/tools.json --transcript $EVAL_M_DIR/transcript.jsonl \
-  --out $EVAL_M_DIR/m-gate.json [--legacy true|false]
+  --out $EVAL_M_DIR/m-gate.json
 python3 -m geef_eval.mcp_contract vmcp --transcript $EVAL_VMCP_DIR/transcript.jsonl --out $EVAL_VMCP_DIR/vmcp-gate.json
 ```
 
@@ -496,10 +495,11 @@ Mitschnitt (eine JSON-Zeile je Aufruf mit Werkzeug, Argumenten, Beginn, Dauer = 
 Aufruf, also eher zu lang, Fehler und Antwort). Beide Tore nennen Claude Code als Client; ein Mitschnitt aus einer anderen Quelle
 ist nicht auswertbar.
 
-- **Werkzeugliste (4.4):** genau die neun Auftragswerkzeuge, mit `--legacy true` (ausgeliefert) zusätzlich die 19 bisherigen;
-  Parameter von `revise_order` (nur `orderId` Pflicht, `quick` Liste, Beschreibung nennt `get_order_status`), `export_order`
-  (`version` wahlweise, `format` nur md/docx/pdf), `list_orders` (`limit` wahlweise), `profile` ohne Parameter und mit
-  „About me“ in der Beschreibung; die fünf Altwerkzeuge mit Nachfolger beginnen mit „Older tool, kept for now: use … instead.“
+- **Werkzeugliste:** die neun Auftragswerkzeuge und die fünf Stummel entfernter Werkzeuge, mit Upload-Ticket zusätzlich
+  `prepare_attachment` (D-091); Parameter von `revise_order` (nur `orderId` Pflicht, `quick` Liste, Beschreibung nennt
+  `get_order_status`), `export_order` (`version` wahlweise, `format` nur md/docx/pdf), `list_orders` (`limit` wahlweise),
+  `profile` höchstens mit den vier Speicher-Parametern und mit „About me“ in der Beschreibung; jeder Stummel beginnt mit
+  „Removed: use … instead.“
 - **Tor M:** Kette für Auftrag A `submit_order` (mit `needs_input`) → `answer_order` → `get_order_status` → `get_order_result`
   → `revise_order` (`version` 2, `notices`) → `get_order_result` (`version` 2) → `export_order` md **ohne `version`** (Inhalt =
   `text` der Datei; jeder md-Export ohne `version` nach diesem `get_order_result` ist textgleich mit dessen Version 2, verglichen

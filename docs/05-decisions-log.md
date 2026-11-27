@@ -3858,7 +3858,7 @@ completion hook of the assembler (`OnRunFinishedAsync`).
   `StudioSettings`, `TemplateStudioAnalyses`, `mcp_server_configs`, `specialization_packs`, `tool_definitions`, `tool_invocations`, the
   columns above, and the old composition and learning runs; the compose volume for exports is no longer used.
 - `ModelSlot` keeps its values (snapshots store numbers); the matrix rows of retired slots stay until the cleanup.
-- The arm `atelier` of the evaluation harness in `tools/Eval` still calls `submit_request`; the measurements of the standard way use
-  the order tools.
+- The arm `atelier` of the evaluation harness in `tools/Eval` uses the order tools (`submit_order`, `answer_order` with
+  `skip=true`, `get_order_status`, `get_order_result`); its tool list check expects the order tools and the five stubs.
 
 **Rollback.** The previous image; nothing in the database was dropped or changed. In code only through Git (tag before the deploy).

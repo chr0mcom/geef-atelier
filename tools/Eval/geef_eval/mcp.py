@@ -161,44 +161,44 @@ def _first_text(result: dict) -> str:
 
 
 @dataclass(frozen=True)
-class AtelierRunState:
+class AtelierOrderState:
     """
-    Status of one Atelier run as seen over MCP. ``outcome`` is the "everything is stored" signal of the Atelier
-    (stage 0): it is set only after the final text and the finishing steps are saved, so the text is final only once
-    it is set. A terminal ``status`` alone is not enough.
+    Status of one Atelier order as seen over ``get_order_status``. A text is final only when the order is ``done`` and the
+    ``outcome`` of its current run is set (it is set after everything is stored). A done order that is ``failed`` or ``stopped``
+    is final even without an outcome, because it may have ended before a run started.
     """
 
-    status: str
-    error: str | None = None
+    state: str
+    done: bool = False
     outcome: str | None = None
 
     @property
     def is_final(self) -> bool:
-        return bool(self.outcome)
+        return self.done and (bool(self.outcome) or self.state in UNDELIVERABLE_STATES)
+
+    @property
+    def needs_answers(self) -> bool:
+        return self.state == NEEDS_INPUT
 
 
-TERMINAL_STATUSES = frozenset({"Completed", "Failed", "Aborted"})
+NEEDS_INPUT = "needs_input"
+UNDELIVERABLE_STATES = frozenset({"failed", "stopped"})
 DELIVERED_OUTCOMES = frozenset({"Converged", "DeliveredWithOpenPoints"})
 
 
 class AtelierToolAdapter:
     """
-    Maps the three steps the eval needs (submit, status, result) onto the Atelier's MCP tools. The tool
-    names will change in later stages (``submit_order`` …); a subclass or ``tool_names`` override keeps
-    the rest of the tool untouched.
+    Maps the steps the eval needs (submit, skip questions, status, result) onto the order tools of the Atelier:
+    ``submit_order``, ``answer_order`` (always ``skip=true``: nobody is there to answer), ``get_order_status`` (the server
+    waits up to ``wait_seconds`` for a change) and ``get_order_result``.
     """
 
-    DEFAULT_TOOL_NAMES = {"submit": "submit_request", "status": "get_run_status", "result": "get_run_result"}
-
-    def __init__(self, client: McpClient, tool_names: dict[str, str] | None = None, crew_template: str | None = None):
+    def __init__(self, client: McpClient, wait_seconds: int = 25):
         self.client = client
-        self.tool_names = {**self.DEFAULT_TOOL_NAMES, **(tool_names or {})}
-        self.crew_template = crew_template
+        self.wait_seconds = wait_seconds
 
     def submit(self, brief: str, attachments: tuple[Attachment, ...]) -> str:
-        arguments: dict = {"briefingText": brief}
-        if self.crew_template:
-            arguments["crewTemplate"] = self.crew_template
+        arguments: dict = {"request": brief}
         if attachments:
             arguments["attachments"] = json.dumps([
                 {
@@ -208,23 +208,26 @@ class AtelierToolAdapter:
                 }
                 for a in attachments
             ])
-        reply = self.client.call_tool(self.tool_names["submit"], arguments)
-        run_id = reply.get("runId") if isinstance(reply, dict) else None
-        if not run_id:
-            raise McpError(f"Antwort von {self.tool_names['submit']} enthält keine runId: {str(reply)[:200]}")
-        return str(run_id)
+        reply = self.client.call_tool("submit_order", arguments)
+        order_id = reply.get("orderId") if isinstance(reply, dict) else None
+        if not order_id:
+            raise McpError(f"Antwort von submit_order enthält keine orderId: {str(reply)[:200]}")
+        return str(order_id)
 
-    def state(self, run_id: str) -> AtelierRunState:
-        reply = self.client.call_tool(self.tool_names["status"], {"runId": run_id})
+    def skip_questions(self, order_id: str) -> None:
+        self.client.call_tool("answer_order", {"orderId": order_id, "skip": True})
+
+    def state(self, order_id: str) -> AtelierOrderState:
+        reply = self.client.call_tool("get_order_status", {"orderId": order_id, "waitSeconds": self.wait_seconds})
         if not isinstance(reply, dict):
             raise McpError(f"Unerwartete Statusantwort: {str(reply)[:200]}")
         outcome = reply.get("outcome")
-        return AtelierRunState(str(reply.get("status")), reply.get("errorMessage"),
-                               outcome.strip() if isinstance(outcome, str) and outcome.strip() else None)
+        return AtelierOrderState(str(reply.get("state")), reply.get("done") is True,
+                                 outcome.strip() if isinstance(outcome, str) and outcome.strip() else None)
 
-    def result_text(self, run_id: str) -> str | None:
-        reply = self.client.call_tool(self.tool_names["result"], {"runId": run_id})
+    def result_text(self, order_id: str) -> str | None:
+        reply = self.client.call_tool("get_order_result", {"orderId": order_id})
         if not isinstance(reply, dict):
             return None
-        text = reply.get("finalText")
+        text = reply.get("text")
         return text if isinstance(text, str) and text.strip() else None
