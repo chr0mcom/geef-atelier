@@ -23,7 +23,7 @@ public sealed class GroundingProviderEditorEditTests : TestContext
         Dictionary<string, string>? settings = null) =>
         new(Name: name, DisplayName: name + " Display", Description: "desc",
             ProviderType: providerType, ProviderSettings: settings ?? new(),
-            MaxQueriesPerRun: 2, IsSystem: isSystem);
+            IsSystem: isSystem);
 
     [Fact]
     public void EditMode_NameInputIsEditable()

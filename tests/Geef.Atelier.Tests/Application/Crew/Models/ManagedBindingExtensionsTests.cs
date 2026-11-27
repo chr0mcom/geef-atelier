@@ -37,7 +37,7 @@ public sealed class ManagedBindingExtensionsTests
                 [GroundingProviderProfile.KeyRefinementProvider] = "claude-cli",
                 [GroundingProviderProfile.KeyRefinementModel] = "claude-sonnet-latest",
                 [GroundingProviderProfile.KeyModelSlot] = "Executor",
-            }, null, false);
+            }, false);
 
         var ex = Assert.Throws<InvalidOperationException>(() => profile.ForSave());
         Assert.Contains("grounding refiner", ex.Message);
@@ -102,7 +102,7 @@ public sealed class ManagedBindingExtensionsTests
     }
 
     private static GroundingProviderProfile Grounding(Dictionary<string, string> settings) =>
-        new("g", "G", "d", "tavily", settings, 1, false);
+        new("g", "G", "d", "tavily", settings, false);
 
     private static FinalizerProfile Transform(Dictionary<string, string> settings) =>
         new("t", "T", "d", FinalizerType.Transform, settings, false);

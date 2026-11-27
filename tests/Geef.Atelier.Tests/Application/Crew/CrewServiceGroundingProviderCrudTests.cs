@@ -102,7 +102,6 @@ public sealed class CrewServiceGroundingProviderCrudTests
         Description: "desc",
         ProviderType: "tavily",
         ProviderSettings: new Dictionary<string, string> { ["Tier"] = "basic" },
-        MaxQueriesPerRun: 1,
         IsSystem: false);
 
     private sealed class InMemoryGroundingProviderProfileRepository : IGroundingProviderProfileRepository

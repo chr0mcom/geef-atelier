@@ -144,5 +144,5 @@ public sealed class StandardOrderWebSearchTests(PostgresFixture postgres)
         CrewSnapshot.CurrentSchemaVersion, templateName, SystemCrew.DefaultExecutorProfile, [], EvaluationStrategy.Parallel, null, [], providers);
 
     private static GroundingProviderProfile Profile(string name, string type) =>
-        new(name, name, "Synthetic test source.", type, new Dictionary<string, string>(), 1, IsSystem: false);
+        new(name, name, "Synthetic test source.", type, new Dictionary<string, string>(), IsSystem: false);
 }

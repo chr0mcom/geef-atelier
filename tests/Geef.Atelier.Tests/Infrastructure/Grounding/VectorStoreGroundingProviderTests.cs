@@ -125,7 +125,6 @@ public sealed class VectorStoreGroundingProviderTests
             Description: "Vector-store knowledge base.",
             ProviderType: "vector-store",
             ProviderSettings: settings,
-            MaxQueriesPerRun: null,
             IsSystem: true);
 
     // --- stubs ---

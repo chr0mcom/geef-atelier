@@ -234,14 +234,6 @@
                     </div>
                 }
 
-                @if (_form.ProviderType != "static-context")
-                {
-                    <div class="field">
-                        <label>Max queries per run</label>
-                        <InputNumber @bind-Value="_form.MaxQueriesPerRun" data-testid="input-max-queries" />
-                        <small class="form-hint">1–5, default 1.</small>
-                    </div>
-                }
             </div>
 
             @* ── §3 AI refinement (optional, collapsible) ── *@
@@ -560,9 +552,6 @@
 
         public string Scope { get; set; } = "global";
 
-        [System.ComponentModel.DataAnnotations.Range(1, 5, ErrorMessage = "Must be between 1 and 5")]
-        public int? MaxQueriesPerRun { get; set; } = 1;
-
         public bool RefinementEnabled { get; set; }
         public string RefinementProvider { get; set; } = "";
         public string RefinementModel { get; set; } = "";
@@ -608,7 +597,6 @@
                 TopK = int.TryParse(topKStr, out var tk) ? tk : 5,
                 TagFilter = tagFilter ?? "",
                 Scope = string.IsNullOrWhiteSpace(scope) ? "global" : scope,
-                MaxQueriesPerRun = p.MaxQueriesPerRun,
                 RefinementEnabled = p.RefinementBinding is not null,
                 RefinementProvider = p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementProvider, ""),
                 RefinementModel = p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementModel, ""),
@@ -676,15 +664,12 @@
                     settings[GroundingProviderProfile.KeyRefinementInstructions] = RefinementInstructions.Trim();
             }
 
-            var maxQueries = ProviderType is "static-context" ? MaxQueriesPerRun ?? 1 : MaxQueriesPerRun;
-
             return new GroundingProviderProfile(
                 Name: SystemCrew.EnsureCustomPrefix(Name),
                 DisplayName: DisplayName,
                 Description: Description,
                 ProviderType: ProviderType,
                 ProviderSettings: settings,
-                MaxQueriesPerRun: maxQueries,
                 IsSystem: false);
         }
     }

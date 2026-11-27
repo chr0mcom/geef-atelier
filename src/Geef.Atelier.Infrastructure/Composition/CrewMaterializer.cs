@@ -429,7 +429,6 @@ internal sealed class CrewMaterializer(
             Description:      "Auto-composed grounding provider",
             ProviderType:     part.ProviderType ?? "tavily",
             ProviderSettings: settings,
-            MaxQueriesPerRun: null,
             IsSystem:         false);
     }
 

@@ -42,10 +42,6 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
             .HasColumnType("jsonb")
             .IsRequired(false);
 
-        builder.Property(r => r.AdvisorRetryAttempted)
-            .IsRequired()
-            .HasDefaultValue(false);
-
         builder.Property(r => r.TotalCostEur)
             .HasColumnType("numeric(10,6)")
             .IsRequired(false);

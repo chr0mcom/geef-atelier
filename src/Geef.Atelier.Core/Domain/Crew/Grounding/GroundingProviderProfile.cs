@@ -17,7 +17,6 @@ namespace Geef.Atelier.Core.Domain.Crew.Grounding;
 /// For Tavily: <c>Tier</c> (basic|advanced), <c>MaxResults</c>, <c>IncludeAnswer</c>.
 /// Designed to be extensible for a future <c>VectorStoreGroundingProvider</c> without a schema change.
 /// </param>
-/// <param name="MaxQueriesPerRun">Safety cap on provider calls per run. <c>null</c> means 1 (default).</param>
 /// <param name="IsSystem">True for code-constant profiles defined in <see cref="SystemCrew"/>.</param>
 /// <param name="ToolName">
 /// Optional reference to a <c>ToolDefinition.Name</c> that backs this provider.
@@ -31,7 +30,6 @@ public sealed record GroundingProviderProfile(
     string Description,
     string ProviderType,
     Dictionary<string, string> ProviderSettings,
-    int? MaxQueriesPerRun,
     bool IsSystem,
     string? ToolName = null)
 {

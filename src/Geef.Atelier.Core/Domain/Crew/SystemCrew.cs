@@ -201,7 +201,6 @@ public static class SystemCrew
         Description: "Returns the current catalog of system and custom crew profiles and templates. Used by the crew-composer executor to apply Reuse-First before composing new profiles.",
         ProviderType: GroundingProviderTypes.CrewCatalog,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>Tool catalog grounding provider — lists all registered tools for tool-binding awareness in auto-crew composition.</summary>
@@ -211,7 +210,6 @@ public static class SystemCrew
         Description: "Lists all registered tools in the central tool catalogue. Used by the crew-composer executor so it can bind tools to actor profiles by name.",
         ProviderType: GroundingProviderTypes.ToolCatalog,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>Pack catalog grounding provider — lists reusable specialization packs for pack-binding awareness in auto-crew composition.</summary>
@@ -221,7 +219,6 @@ public static class SystemCrew
         Description: "Lists the reusable specialization packs (General + DomainScoped). Used by the crew-composer executor so it can reuse existing packs by name instead of inventing new ones.",
         ProviderType: GroundingProviderTypes.PackCatalog,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>Static-context grounding provider embedding the binding crew design rules.</summary>
@@ -265,7 +262,6 @@ public static class SystemCrew
                 "Anti-pattern: \"technically correct\" != critical. If correct but could be more precise -> minor at most.",
             [GroundingProviderProfile.KeyStaticLabel] = "Crew Design Rules",
         },
-        MaxQueriesPerRun: 1,
         IsSystem: true,
         ToolName: "static-context");
 
@@ -404,7 +400,6 @@ public static class SystemCrew
             ["MinRelevanceScore"] = "0.4",
             ["ExtractQuery"] = "true",
         },
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>System grounding-provider profile for Tavily Advanced web-search with LLM-based citation filtering (1 credit/search, ~10 sources).</summary>
@@ -426,7 +421,6 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyRefinementMaxTokens]   = "2048",
             [GroundingProviderProfile.KeyRefinementMode]        = "0",
         },
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>System grounding-provider profile for the full knowledge base (vector-store, Top-5 results, no tag filter).</summary>
@@ -436,7 +430,6 @@ public static class SystemCrew
         Description: "Searches the full knowledge base for briefing-relevant passages using semantic similarity. Returns the top 5 most similar chunks.",
         ProviderType: "vector-store",
         ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "global" },
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>System grounding-provider profile for run-local attachments uploaded with the briefing.</summary>
@@ -446,7 +439,6 @@ public static class SystemCrew
         Description: "Uses documents uploaded with the briefing as a grounding source. Activated automatically when attachments are present.",
         ProviderType: "vector-store",
         ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "run-local" },
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>
@@ -464,7 +456,6 @@ public static class SystemCrew
             ["crossDomainPenalty"] = "0.5",
             ["maxLearnings"]       = "4",
         },
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>All system reviewer profiles, indexed by name.</summary>
@@ -889,7 +880,6 @@ public static class SystemCrew
         Description: "Passes the files attached to the order in full text.",
         ProviderType: GroundingProviderTypes.OrderSources,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>

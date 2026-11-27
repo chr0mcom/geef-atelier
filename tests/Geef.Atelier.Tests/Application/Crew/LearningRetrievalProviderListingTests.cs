@@ -72,7 +72,6 @@ public sealed class LearningRetrievalProviderListingTests
             Description: "Exists in DB but not in SystemCrew code constants",
             ProviderType: "unknown-type",
             ProviderSettings: [],
-            MaxQueriesPerRun: 1,
             IsSystem: true);
 
         var repo          = new InMemoryGroundingProviderProfileRepository([orphan]);

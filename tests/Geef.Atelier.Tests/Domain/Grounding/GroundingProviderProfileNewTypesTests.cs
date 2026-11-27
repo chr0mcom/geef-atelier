@@ -10,7 +10,6 @@ public sealed class GroundingProviderProfileNewTypesTests
             Description: "",
             ProviderType: "static-context",
             ProviderSettings: settings ?? new(),
-            MaxQueriesPerRun: 1,
             IsSystem: false);
 
     // ── StaticContent / StaticLabel ──────────────────────────────────────────

@@ -142,7 +142,6 @@ public sealed class MultiProviderGroundingStepWarningTests
         Description: "test",
         ProviderType: providerType,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: null,
         IsSystem: false);
 
     private static ToolDefinition StaticTool() =>

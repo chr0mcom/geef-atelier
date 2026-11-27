@@ -23,12 +23,6 @@ public sealed class SystemCrewKnowledgeBaseProfileTests
     }
 
     [Fact]
-    public void KnowledgeBaseDefaultProfile_HasMaxQueriesPerRunOf1()
-    {
-        Assert.Equal(1, SystemCrew.KnowledgeBaseDefaultProfile.MaxQueriesPerRun);
-    }
-
-    [Fact]
     public void KnowledgeBaseDefaultProfile_HasExpectedName()
     {
         Assert.Equal("knowledge-base-default", SystemCrew.KnowledgeBaseDefaultProfile.Name);

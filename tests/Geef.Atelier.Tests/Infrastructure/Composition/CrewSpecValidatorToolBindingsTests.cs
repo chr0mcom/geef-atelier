@@ -343,7 +343,6 @@ public sealed class CrewSpecValidatorToolBindingsTests
                 Name: name, DisplayName: name, Description: string.Empty,
                 ProviderType: "static-context",
                 ProviderSettings: new Dictionary<string, string>(),
-                MaxQueriesPerRun: null,
                 IsSystem: false);
             return Task.FromResult<GroundingProviderProfile?>(p);
         }

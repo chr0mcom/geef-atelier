@@ -36,7 +36,6 @@ public sealed class ToolCatalogGroundingProviderTests
             Description: "Test profile.",
             ProviderType: GroundingProviderTypes.ToolCatalog,
             ProviderSettings: new Dictionary<string, string>(),
-            MaxQueriesPerRun: 1,
             IsSystem: true);
 
     private static (ToolCatalogGroundingProvider Provider, InMemoryToolCatalogConsultationRepository ConsultRepo)

@@ -96,16 +96,6 @@ public sealed class GroundingProviderEditorNewTypesTests : TestContext
         cut.Find("[data-testid='input-static-content']");
     }
 
-    [Fact]
-    public void StaticContext_HidesMaxQueriesPerRunField()
-    {
-        SetupServices();
-        var cut = RenderComponent<GroundingProviderEditor>();
-        cut.Find("[data-testid='input-provider-type']").Change("static-context");
-        // input-max-queries is hidden for static-context (always 1, no user input)
-        Assert.Throws<Bunit.ElementNotFoundException>(() => cut.Find("[data-testid='input-max-queries']"));
-    }
-
     // ── url-fetch ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -124,15 +114,6 @@ public sealed class GroundingProviderEditorNewTypesTests : TestContext
         var cut = RenderComponent<GroundingProviderEditor>();
         cut.Find("[data-testid='input-provider-type']").Change("url-fetch");
         cut.Find("[data-testid='input-max-content-per-url']");
-    }
-
-    [Fact]
-    public void UrlFetch_ShowsMaxQueriesPerRunField()
-    {
-        SetupServices();
-        var cut = RenderComponent<GroundingProviderEditor>();
-        cut.Find("[data-testid='input-provider-type']").Change("url-fetch");
-        cut.Find("[data-testid='input-max-queries']");
     }
 
     // ── Stub ──────────────────────────────────────────────────────────────────

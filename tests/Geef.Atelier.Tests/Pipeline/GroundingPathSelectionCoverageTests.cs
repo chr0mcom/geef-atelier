@@ -26,7 +26,7 @@ public sealed class GroundingPathSelectionCoverageTests
         {
             Assert.False(SystemCrew.GroundingProviderProfiles.ContainsKey(name));
             var fromOlderSnapshot = new Geef.Atelier.Core.Domain.Crew.Grounding.GroundingProviderProfile(
-                name, name, "older snapshot", "academic-search", [], null, IsSystem: true, ToolName: "academic-search");
+                name, name, "older snapshot", "academic-search", [], IsSystem: true, ToolName: "academic-search");
             Assert.False(fromOlderSnapshot.UsesToolPath());
             return;
         }

@@ -45,7 +45,7 @@ public sealed class RetiredProfileTypesTests(PostgresFixture fixture)
         foreach (var retired in GroundingProviderTypes.Retired)
         {
             var profile = new GroundingProviderProfile(Unique("custom-retired-"), "R", "d", retired,
-                new Dictionary<string, string> { ["apiKeyEnv"] = "CLI_PROXY_API_KEY" }, null, false);
+                new Dictionary<string, string> { ["apiKeyEnv"] = "CLI_PROXY_API_KEY" }, false);
             await Assert.ThrowsAsync<InvalidOperationException>(() => crew.CreateCustomGroundingProviderProfileAsync(profile));
             await Assert.ThrowsAsync<InvalidOperationException>(() => crew.UpdateCustomGroundingProviderProfileAsync(profile));
             Assert.Null(await crew.GetGroundingProviderProfileAsync(profile.Name));

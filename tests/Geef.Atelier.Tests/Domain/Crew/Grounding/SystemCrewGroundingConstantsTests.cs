@@ -29,12 +29,6 @@ public sealed class SystemCrewGroundingConstantsTests
     }
 
     [Fact]
-    public void TavilyBasicProfile_HasMaxQueriesPerRunOf1()
-    {
-        Assert.Equal(1, SystemCrew.TavilyBasicProfile.MaxQueriesPerRun);
-    }
-
-    [Fact]
     public void GroundingProviderProfiles_ContainsTavilyBasic()
     {
         Assert.True(SystemCrew.GroundingProviderProfiles.ContainsKey("tavily-basic"));

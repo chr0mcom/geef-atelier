@@ -1,3 +1,4 @@
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Core.Domain.Crew;
@@ -177,7 +178,6 @@ public sealed class AtelierPipelineFactoryWithVectorStoreTests
             Description: "Vector-store knowledge base.",
             ProviderType: "vector-store",
             ProviderSettings: settings,
-            MaxQueriesPerRun: null,
             IsSystem: true);
 
     // --- stubs ---

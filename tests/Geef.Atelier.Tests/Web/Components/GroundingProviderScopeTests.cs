@@ -24,7 +24,7 @@ public sealed class GroundingProviderScopeTests : TestContext
         if (scope != null) settings["Scope"] = scope;
         return new(Name: name, DisplayName: name + " Display", Description: "desc",
             ProviderType: "vector-store", ProviderSettings: settings,
-            MaxQueriesPerRun: 1, IsSystem: isSystem);
+            IsSystem: isSystem);
     }
 
     [Fact]

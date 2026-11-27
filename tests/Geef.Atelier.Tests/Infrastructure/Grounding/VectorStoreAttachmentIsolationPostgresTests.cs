@@ -255,7 +255,7 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
 
     private static GroundingProviderProfile Profile(Dictionary<string, string> settings) =>
         new("studio-made-knowledge", "Knowledge", "made through the template studio", "vector-store", settings,
-            MaxQueriesPerRun: null, IsSystem: false);
+            IsSystem: false);
 
     private static float[] Vector() => Enumerable.Repeat(0.01f, Dimensions).ToArray();
 

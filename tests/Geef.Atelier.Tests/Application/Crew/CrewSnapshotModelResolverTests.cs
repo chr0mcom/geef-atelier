@@ -83,7 +83,7 @@ public sealed class CrewSnapshotModelResolverTests
                 {
                     [GroundingProviderProfile.KeyRefinementProvider] = "claude-cli",
                     [GroundingProviderProfile.KeyRefinementModel] = "claude-opus-latest",
-                }, null, false, null),
+                }, false, null),
             ],
         };
 

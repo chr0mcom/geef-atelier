@@ -2,7 +2,7 @@ using Geef.Sdk.Context;
 using Geef.Sdk.Providers;
 using Geef.Sdk.Results;
 
-namespace Geef.Atelier.Infrastructure.Pipeline;
+namespace Geef.Atelier.Tests.Fakes;
 
 internal sealed class StubReviewer : IReviewer
 {

@@ -10,7 +10,6 @@ public sealed class GroundingProviderProfileRefinementTests
             Description: "",
             ProviderType: "tavily",
             ProviderSettings: settings ?? new(),
-            MaxQueriesPerRun: 1,
             IsSystem: false);
 
     [Fact]
