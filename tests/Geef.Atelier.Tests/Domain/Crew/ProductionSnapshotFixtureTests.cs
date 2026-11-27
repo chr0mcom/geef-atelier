@@ -1,5 +1,15 @@
+using System.Runtime.CompilerServices;
+using Geef.Atelier.Application.Crew.Finalizers;
+using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
+using Geef.Atelier.Core.Domain.Crew.Grounding;
+using Geef.Atelier.Infrastructure.Finalizers;
+using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Pipeline;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit.Abstractions;
 
 namespace Geef.Atelier.Tests.Domain.Crew;
 
@@ -13,8 +23,14 @@ namespace Geef.Atelier.Tests.Domain.Crew;
 /// that happen to be there. Without it the minimum is 1, which only proves that the directory is not empty. Example:
 /// <c>ATELIER_SNAPSHOT_FIXTURES=&lt;export-dir&gt; ATELIER_SNAPSHOT_FIXTURES_MIN=&lt;number of exported runs&gt; dotnet test …</c>.
 /// </para>
+/// <para>
+/// Against the model reduced in stage 8c (D-089), every grounding type a snapshot names must have a provider registered by
+/// <see cref="GroundingServiceExtensions.AddGroundingProviders"/> or be one of <see cref="GroundingProviderTypes.Retired"/>, and
+/// every finalizer type must be a defined value with an executor registered by <see cref="FinalizerServiceExtensions.AddFinalizers"/>
+/// or a retired one. Retired entries are skipped with a warning when a run uses them; the test reports how many snapshots carry them.
+/// </para>
 /// </summary>
-public sealed class ProductionSnapshotFixtureTests
+public sealed class ProductionSnapshotFixtureTests(ITestOutputHelper output)
 {
     [SnapshotFixturesFact]
     public void EveryProductionSnapshotIsUsableForARun()
@@ -25,6 +41,10 @@ public sealed class ProductionSnapshotFixtureTests
             $"{SnapshotFixturesFactAttribute.Variable} holds {files.Count} snapshots, expected at least {minimum} " +
             $"({SnapshotFixturesFactAttribute.MinimumVariable}); the export looks incomplete.");
         var problems = new List<string>();
+        var registeredGrounding = RegisteredGroundingTypes();
+        var registeredFinalizers = RegisteredFinalizerTypes();
+        var withRetiredGrounding = 0;
+        var withRetiredFinalizer = 0;
 
         foreach (var file in files)
         {
@@ -40,7 +60,21 @@ public sealed class ProductionSnapshotFixtureTests
                 {
                     if (profile.IsSystem && GroundingPathSelection.ProviderTypePathSystemProfiles.Contains(profile.Name) && profile.UsesToolPath())
                         problems.Add($"{name}: system profile {profile.Name} would still take the tool path");
+                    if (!registeredGrounding.Contains(profile.ProviderType) && !profile.ProviderType.IsRetiredGroundingType())
+                        problems.Add($"{name}: grounding type '{profile.ProviderType}' is neither registered nor retired");
                 }
+                if ((snapshot.GroundingProviders ?? []).Any(p => p.ProviderType.IsRetiredGroundingType()))
+                    withRetiredGrounding++;
+
+                foreach (var finalizer in snapshot.Finalizers ?? [])
+                {
+                    if (!Enum.IsDefined(finalizer.FinalizerType))
+                        problems.Add($"{name}: finalizer type {(int)finalizer.FinalizerType} is not defined");
+                    else if (!registeredFinalizers.Contains(finalizer.FinalizerType) && !finalizer.FinalizerType.IsRetired())
+                        problems.Add($"{name}: finalizer type {finalizer.FinalizerType} has no executor and is not retired");
+                }
+                if ((snapshot.Finalizers ?? []).Any(f => f.FinalizerType.IsRetired()))
+                    withRetiredFinalizer++;
             }
             catch (InvalidCrewSnapshotException ex)
             {
@@ -48,7 +82,39 @@ public sealed class ProductionSnapshotFixtureTests
             }
         }
 
+        output.WriteLine($"{files.Count} snapshots read; {withRetiredGrounding} name a retired grounding type, {withRetiredFinalizer} a retired finalizer type.");
         Assert.True(problems.Count == 0, $"{problems.Count} of {files.Count} snapshots are not usable:\n{string.Join("\n", problems)}");
+    }
+
+    [Fact]
+    public void The_registered_types_are_read_from_the_production_registration()
+    {
+        var grounding = RegisteredGroundingTypes();
+        var finalizers = RegisteredFinalizerTypes();
+
+        Assert.Contains(GroundingProviderTypes.Tavily, grounding);
+        Assert.Contains(GroundingProviderTypes.UrlFetch, grounding);
+        Assert.DoesNotContain(grounding, t => t.IsRetiredGroundingType());
+        Assert.Contains(FinalizerType.MetadataEnrich, finalizers);
+        Assert.DoesNotContain(finalizers, t => t.IsRetired());
+    }
+
+    private static IReadOnlySet<string> RegisteredGroundingTypes()
+    {
+        var services = new ServiceCollection().AddGroundingProviders(new ConfigurationBuilder().Build());
+        return services
+            .Where(d => d.ServiceType == typeof(IGroundingProvider) && d.ImplementationType is not null)
+            .Select(d => ((IGroundingProvider)RuntimeHelpers.GetUninitializedObject(d.ImplementationType!)).ProviderType)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlySet<FinalizerType> RegisteredFinalizerTypes()
+    {
+        var services = new ServiceCollection().AddFinalizers(new ConfigurationBuilder().Build());
+        return services
+            .Where(d => d.ServiceType == typeof(IFinalizerExecutor) && d.ImplementationType is not null)
+            .Select(d => ((IFinalizerExecutor)RuntimeHelpers.GetUninitializedObject(d.ImplementationType!)).Type)
+            .ToHashSet();
     }
 }
 
