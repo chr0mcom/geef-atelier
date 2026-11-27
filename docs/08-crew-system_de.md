@@ -105,7 +105,7 @@ Die Schritte 2–6 sind eine einzige Regel (`ModelChooser`): Harte Regeln (H1 nu
 - **Nächtlicher Job:** `scripts/cli-proxy-selfupdate.sh` (Cron 03:40) hält die CLIs im Container und auf dem Host aktuell und stellt das Host-Standardmodell von codex auf die neueste Sol-Version. Hintergrund: Neue Modelle gibt der Server nur an aktuelle CLI-Versionen frei.
 - **Code-Änderung nötig** ist nur noch bei einer neuen Modelllinie, einem neuen Anbieter oder einer neuen Rolle: die Zeile in `ModelMatrix` ändern. Der Konsistenztest `ModelMatrixTests` meldet Drift zu `CodexSubscriptionModels`, `StaticModelFallback.ForCodexCli`, `SystemProviders` und `_FALLBACK_MODELS` im cli-proxy.
 
-**Composer-Settings:** Inline-Grounding und -Finalizer des Composers dürfen nur unkritische Einstellungen setzen (Whitelist `CrewPartSettingsPolicy`). Ziele, Zugangsdaten, Variablennamen und Modellbindungen werden verworfen und als Warnung gemeldet. Inline-`rest-api` und Inline-`ExternalSink` sind kritisch; dafür ein freigegebenes Profil wiederverwenden.
+**Composer-Settings:** Inline-Grounding und -Finalizer des Composers dürfen nur unkritische Einstellungen setzen (Whitelist `CrewPartSettingsPolicy`). Ziele, Zugangsdaten, Variablennamen und Modellbindungen werden verworfen und als Warnung gemeldet. Inline-Grounding eines nicht registrierten Typs ist kritisch. Seit Stufe 8c (D-089) kennt der Composer `rest-api`, `academic-search`, `news-search` und `ExternalSink` nicht mehr.
 
 Verwaltete Profile folgen nach dem Deploy automatisch; manuelle Profile bleiben unverändert.
 
@@ -160,7 +160,7 @@ die Anzeige. Ein Lauf mit Anhängen wird ohne Snapshot abgelegt, bis seine Anhä
 Pipeline nicht, und der Lauf endet `Failed` mit Meldung. Der frühere `AutoApproveReviewer`, der jeden
 Entwurf still freigab, ist entfernt. Eine Crew-Vorlage ohne Reviewer lässt sich weder anlegen noch
 speichern (`CrewTemplateRules.EnsureHasReviewer`, genutzt von `CrewService` und vom Vorlagen-Editor);
-Template Studio und Composer verlangen ebenfalls einen Reviewer.
+der Composer verlangt ebenfalls einen Reviewer.
 
 ## Advisor-Pässe (PS-7)
 
@@ -218,17 +218,7 @@ Advisor-LLM-Calls sind nicht best-effort. Eine Exception in `ProfileBasedAdvisor
 
 ### Convergence-Failure-Retry-Mechanismus
 
-```
-Pipeline → ConvergenceFailedException
-  → RunOrchestratorService.TryConvergenceFailureRetryAsync
-      1. Prüft RunEntity.AdvisorRetryAttempted — true → eskaliert zu Failed (kein zweiter Retry)
-      2. Setzt AdvisorRetryAttempted = true in DB
-      3. Aktiviert OnConvergenceFailure-Advisors im nächsten Run-Kontext
-      4. Startet Pipeline-Durchlauf erneut (einmalig)
-      5. Zweites ConvergenceFailedException → Failed (kein weiterer Retry)
-```
-
-**Single-Retry-Cap:** `RunEntity.AdvisorRetryAttempted` (Migration Step11) verhindert Endlos-Schleifen. Multi-Retry mit konfigurierbarer Wiederholungsanzahl ist als Future Work dokumentiert.
+Der in D-031(e) geplante einmalige Retry mit `OnConvergenceFailure`-Advisors wurde nie verdrahtet; `RunEntity.AdvisorRetryAttempted` wurde nie geschrieben. Seit Stufe 8c (D-089) ist die Eigenschaft aus dem Modell entfernt; die Spalte bleibt mit dem Standardwert `false` in der Datenbank.
 
 ### DB-Tabellen (Migration Step11AdvisorSystem)
 
@@ -237,7 +227,7 @@ Pipeline → ConvergenceFailedException
 | `AdvisorProfiles` | Custom Advisor-Profile (System-Advisors leben als Code-Konstanten in `SystemCrew`). |
 | `AdvisorConsultations` | Persistierte Advisor-Outputs pro Iteration und Advisor (RunId, IterationNumber, AdvisorName, OutputText, CreatedAt). |
 
-Spalte `RunEntity.AdvisorRetryAttempted` (bool, nullable) auf `Runs`-Tabelle.
+Spalte `AdvisorRetryAttempted` (bool, NOT NULL DEFAULT false) auf der `Runs`-Tabelle, nie geschrieben und seit D-089 nicht mehr zugeordnet.
 
 ### UI-Komponenten (PS-7)
 
@@ -270,12 +260,12 @@ public enum FinalizerType
 {
     FileExport    = 0,
     MetadataEnrich = 1,
-    ExternalSink  = 2,
+    [Obsolete] ExternalSink = 2,   // in Stufe 8c ausgemustert (D-089)
     Transform     = 3,
 }
 ```
 
-`FinalizerType` ist **nach der Erstellung unveränderlich**. Typisierte Settings-Records (`FileExportSettings`, `MetadataEnrichSettings`, `WebhookSinkSettings`, `EmailSinkSettings`, `TransformSettings`) kapseln das `Dictionary<string,string> Settings` für typsicheren Zugriff.
+`FinalizerType` ist **nach der Erstellung unveränderlich**. Typisierte Settings-Records (`FileExportSettings`, `MetadataEnrichSettings`, `TransformSettings`) kapseln das `Dictionary<string,string> Settings` für typsicheren Zugriff.
 
 ### Pipeline-Position
 
@@ -306,7 +296,9 @@ Jede Finalizer-Ausführung hinterlässt einen `RunArtifact`-Datensatz:
 | `StatusMessage` | string? | Lesbarer Status (für `Status`-Artefakte) |
 | `CreatedAt` | DateTime | Erstellungszeitpunkt |
 
-### System-Finalizer-Profile (17)
+### System-Finalizer-Profile
+
+`webhook-sink` und `email-sink` (`ExternalSink`) wurden in Stufe 8c entfernt (D-089); ihre Zeilen bleiben in der Datenbank, Listen lassen sie aus, und ein Lauf überspringt sie mit einer Warnung.
 
 | Name | Typ | Beschreibung |
 |---|---|---|
@@ -319,8 +311,6 @@ Jede Finalizer-Ausführung hinterlässt einen `RunArtifact`-Datensatz:
 | `add-front-matter` | MetadataEnrich | Fügt YAML-Front-Matter mit Run-Metadaten voran |
 | `add-word-count-footer` | MetadataEnrich | Hängt eine Wortzahl-Fußzeile an den Draft |
 | `add-reading-level` | MetadataEnrich | Hängt eine Lesbarkeits-Annotation (Flesch–Kincaid) an |
-| `webhook-sink` | ExternalSink | Sendet das Artefakt per POST an eine konfigurierte Webhook-URL |
-| `email-sink` | ExternalSink | Versendet das Artefakt als E-Mail-Anhang |
 | `anti-ai-voice` | Transform | Schreibt den Draft um, um erkennbare KI-Formulierungen zu reduzieren |
 | `tone-formalization` | Transform | Hebt das Register des Drafts auf formell/akademisch an |
 | `tone-casual` | Transform | Senkt das Register des Drafts auf konversationell ab |
@@ -403,11 +393,11 @@ Grounding-Provider reichern das Briefing vor der GEEF-Ausführungsschleife mit e
 
 **Ist-Zustand (D-067):**
 
-- Die fünf System-Profile `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` und `academic-default` laufen über ihren unten genannten typspezifischen Provider, nicht über den Tool-Pfad, auch bei älteren Snapshots, die noch einen `ToolName` tragen. Nur eigene Profile mit `ToolName` nutzen den Tool-gestützten Provider ([10-tool-system](10-tool-system_de.md#a-t9--grounding-neuaufbau-auf-zentrale-tools)).
+- Die fünf System-Profile `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` und `academic-default` (in Stufe 8c ausgemustert, D-089; bleibt für ältere Snapshots in der Regel) laufen über ihren unten genannten typspezifischen Provider, nicht über den Tool-Pfad, auch bei älteren Snapshots, die noch einen `ToolName` tragen. Nur eigene Profile mit `ToolName` nutzen den Tool-gestützten Provider ([10-tool-system](10-tool-system_de.md#a-t9--grounding-neuaufbau-auf-zentrale-tools)).
 - Ein Provider, der übersprungen wird oder scheitert (fehlender Schlüssel, unbekannter Typ, Fehler), wird zur Warnung am Lauf (`grounding.provider_skipped`) statt zu still leerem Kontext. Der Code `grounding.tool_failed` ist reserviert und wird derzeit nie geschrieben; auch Fehler von Tool-Quellen laufen über `grounding.provider_skipped`.
 - **Keine Suche außerhalb bei Standardaufträgen (D-079):** Ein Lauf eines Auftrags mit der Standard-Crew („Extra careful“ im Web oder über MCP, `submit_request` ohne `crewTemplate`/`customCrew`) behält nur die Quellen, die in Atelier bleiben (`vector-store`, `order-sources`, `learning-retrieval`, `static-context` und die Kataloge, nie über den Tool-Pfad); Web-, Nachrichten-, Wissenschafts-, REST-, URL- und Tool-Quellen fallen vor dem Bau der Pipeline weg, auch wenn der Lauf mit einem gespeicherten Snapshot fortgesetzt wird, der sie noch nennt. Ein bewusst genanntes Template (Werkstatt, `submit_request` mit `crewTemplate`), eine eigene und eine zusammengestellte Crew behalten ihre Quellen.
 - **Suchanfrage scheitert geschlossen (D-079):** Mit `ExtractQuery` (bei jedem System-Profil an) sucht der `tavily`-Provider nur mit der Anfrage, die der `GroundingQueryExtractor` gebildet hat; schlägt der Aufruf fehl oder kommt keine Anfrage zurück, wird nichts gesucht, und die Quelle wird zu `grounding.provider_skipped`. Der Auftragstext ist nie die Ersatzanfrage. Nur ein Profil mit `ExtractQuery=false` sowie die Typen `news-search`, `academic-search` und `rest-api` schicken den Auftragsteil des Briefings unverändert.
-- Schlüssel- und Header-Verweise (`authHeaderEnv`, `apiKeyEnv`) werden nur für Namen auf der Allowlist angenommen und gelesen ([10-tool-system](10-tool-system_de.md#secrets-und-die-allowlist-für-umgebungsvariablen)); der Grounding-Editor ist nur für Admins.
+- Seit Stufe 8c (D-089) liest kein verbliebener Grounding-Typ einen Schlüssel oder Header aus der Umgebung (`authHeaderEnv`/`apiKeyEnv` gehörten zu `rest-api`/`academic-search`); der Grounding-Editor ist nur für Admins.
 
 ### Provider-Typen
 
@@ -417,7 +407,7 @@ Grounding-Provider reichern das Briefing vor der GEEF-Ausführungsschleife mit e
 | `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche in einer pgvector-Sammlung. Scope: `global` (nur gemeinsame Dokumente), `run-local` (Anhänge des Laufs und der Läufe, die er fortsetzt, nie die anderer Läufe) oder `both` (gemeinsame Dokumente plus diese Anhänge). Ein fehlender Scope bedeutet `global`; ein unbekannter Wert wird ebenfalls wie `global` behandelt (fail-closed, nie Anhänge anderer Läufe), und der Lauf bekommt die Warnung `grounding.scope_unknown` (D-067). `TagFilter` grenzt nur die gemeinsamen Dokumente ein; Anhänge haben keine Tags und werden davon nie ausgeblendet. | `TopK`, `Scope`, `TagFilter` |
 | `static-context` | `StaticContextGroundingProvider` | Kuratierter Fixtext, der bei jedem Run unverändert injiziert wird. Keine externe API. Ideal für Style-Guides, Glossare, Markenstimme. | `label`, `content` (max 200.000 Zeichen, Soft-Limit 50.000) |
 | `url-fetch` | `UrlFetchGroundingProvider` | Fetcht konkrete URLs, bereinigt HTML via HtmlAgilityPack, gibt Textinhalt zurück. SSRF-Guard blockiert private IPs. | `urls` (newline-separated), `maxContentPerUrl` (Default 8000), `stripBoilerplate` (bool, Default true) |
-| `news-search` | `NewsSearchGroundingProvider` | Tavily-API mit `topic=news` + `days`-Filter. Für zeitkritische Themen. Attribution via `PublishedDate`. | `recencyDays` (Default 7), `newsMaxResults` (Default 5), `newsSearchDepth` (basic/advanced) |
+| `news-search`, `academic-search`, `rest-api` | — | In Stufe 8c ausgemustert (D-089). Gespeicherte Profile und ältere Snapshots bleiben lesbar; ein Lauf überspringt sie mit einer Warnung; speichern lassen sie sich nicht mehr. | — |
 
 ### SSRF-Schutz (`url-fetch`)
 
@@ -452,8 +442,6 @@ Jeder Grounding-Provider kann optional mit einem KI-Refinement-Pass konfiguriert
 - **Synthesize**: Alle Quellen werden zu einem kohärenten Text zusammengefasst (`[n]`-Referenzen). Originalquellen bleiben als Referenz-Anhang erhalten.
 
 **Graceful Degradation:** Ist der Refinement-Anbieter inaktiv oder schlägt der LLM-Call fehl, werden die Rohergebnisse unverändert durchgereicht. Der Run wird nicht abgebrochen. Die Grounding-Visualisierung zeigt einen Hinweis.
-
-**System-Profil `tavily-news`:** Neu — Tavily-Newssuche (`topic=news`, `recencyDays=7`) mit Filter-Refinement via `google/gemini-2.0-flash-lite`. Geeignet für zeitkritische Themen.
 
 **System-Profil `tavily-refined`:** Sofort nutzbares Demo-Profil — Tavily Advanced mit Filter-Refinement via `google/gemini-2.0-flash-lite`.
 
@@ -497,7 +485,6 @@ Migration Step10 benennt historische `Findings.ReviewerName`-Werte um. `Reviewer
 | `/crew/profiles/finalizers/create` | `FinalizerProfileEditor` | Custom-Finalizer-Profil anlegen |
 | `/crew/profiles/finalizers/edit/{name}` | `FinalizerProfileEditor` | Custom-Finalizer-Profil bearbeiten |
 | `/crew/profiles/finalizers/view/{name}` | `FinalizerProfileView` | System-Finalizer-Profil ansehen (read-only) |
-| `/crew/studio` | `TemplateStudio` | KI-gestützter Template-Wizard (Analyse → Review → Edit → Materialisierung) |
 
 ### UI-Komponenten
 
@@ -515,72 +502,9 @@ Migration Step10 benennt historische `Findings.ReviewerName`-Werte um. `Reviewer
 
 Pattern `^[a-z0-9\-]+$`, max 64 Zeichen — gilt für alle Profile- und Template-Namen (Custom-Prefix exkl.). Form-Validierung via `DataAnnotations.RegularExpression`. Service-Layer ist idempotent bzgl. `custom-`-Prefix.
 
-## Template Studio (D-043)
+## Template Studio (D-043, entfernt)
 
-Das Template Studio unter `/crew/studio` ist ein KI-gestützter Wizard, der für eine beschriebene Aufgabe eine vollständige Crew-Konfiguration vorschlägt. Der Nutzer kann jeden Vorschlag im Edit-Step prüfen und bearbeiten, bevor er in die DB materialisiert wird.
-
-### Wizard-Schritte
-
-| Schritt | Komponente | Beschreibung |
-|---|---|---|
-| TaskInput | `StudioTaskInputStep` | Freitext-Aufgabenbeschreibung; löst LLM-Analyse aus |
-| Analyzing | `StudioAnalyzingStep` | Lade-Indikator während das Meta-LLM läuft |
-| Review | `StudioReviewStep` | Zeigt den KI-Vorschlag; Option, ein bestehendes Template zu verwenden |
-| Edit | `StudioEditStep` | Vollständiger Editor für das vorgeschlagene Template und alle Profile |
-| Confirmation | `StudioConfirmationStep` | Zeigt Materialisierungs-Ergebnis; startet einen Run |
-
-### Analyse-Pipeline (`AnalyzeAsync`)
-
-`TemplateStudioService.AnalyzeAsync` verwandelt die Freitext-Aufgabenbeschreibung in eine persistierte `TemplateStudioAnalysis`, die den Review- und Edit-Step speist. Die Pipeline:
-
-1. **Modell-Auflösung** — wählt das Meta-LLM in der Reihenfolge: expliziter Pro-Analyse-Override → persistierter Studio-Default (`StudioSettings`) → `appsettings`-Default (`TemplateStudioOptions`).
-2. **Kontext-Aufbau (parallel, budgetiert)** — lädt alle Crew-Listen (Templates, Executors, Reviewer, Advisors, Grounding-Provider, Finalizer) und ruft die Modell-Kataloge aller Provider **parallel** unter einem 20-Sekunden-Budget ab. Ein langsamer oder nicht erreichbarer Provider liefert keine Modelle, statt die gesamte Analyse zu blockieren; empfohlene Modelle werden zuerst gelistet, damit das LLM gültige IDs wählt.
-3. **Meta-LLM-Aufruf (Timeout-gedeckelt)** — ruft das Modell mit dem über `tool_choice` erzwungenen Tool `submit_template_proposal` auf. Ein Hard-Cap (`TemplateStudioOptions.AnalysisTimeoutSeconds`) wandelt einen hängenden Provider in eine `TimeoutException` mit Retry-Hinweis. Eine Antwort ohne Tool-Aufruf löst eine `InvalidOperationException` aus.
-4. **Vorschlags-Parsing** — `ParseProposal` liest das Tool-Call-JSON in `MatchedExistingTemplates`, eine `StudioRecommendation` (`use_existing` / `adapt_existing` / `create_new`), das `ProposedTemplate` sowie die Liste der `ProposedProfile`-Records (jeweils mit feldbezogenen LLM-Begründungen).
-5. **Defaults & Clamping** — `ApplyDefaults` füllt leere Provider/Modell/MaxTokens pro Profiltyp aus `StudioDefaults`. `ClampMaxTokens` erzwingt den `MinMaxTokens`-Floor für generierende Profile (Executor, Reviewer, Advisor) und setzt `null` für Grounding-/Finalizer-Profile (keine eigene LLM-Generierung).
-6. **Deduplizierung** — `ProfileSimilarityService.FindSimilarAsync` verwirft vorgeschlagene Profile, die einem bestehenden zu ähnlich sind (Ähnlichkeit über Name + Prompt, `TemplateStudioOptions.SimilarityThreshold`).
-7. **Kosten & Persistierung** — Input-/Output-Tokens werden über `IPricingCatalog` bepreist; die vollständige Analyse (inkl. Kosten in EUR) wird über `ITemplateStudioAnalysisRepository` gespeichert und zurückgegeben. `ListRecentAnalysesAsync` stellt die Historie bereit (siehe `StudioAnalysisHistoryList`).
-
-### StudioEditStep — Feld-Parität (D-043)
-
-Der Edit-Step exponiert das vollständige Feld-Set für das Template und jeden Profil-Slot:
-
-**Template-Felder:** DisplayName, Description, EvaluationStrategy (Dropdown), EvaluationStrategyReasoning (read-only, vom LLM)
-
-**Pro Profil-Slot (Executor / Reviewer × N / Advisor × N / GroundingProvider × N / Finalizer × N):**
-- **UseExisting / CreateNew Toggle** — bestehendes Profil per Name wählen oder neues Profil inline konfigurieren
-- **CreateNew-Felder:** Name (kebab-case), DisplayName, Description, Provider, Modell (`ModelSelector`), MaxTokens, System-Prompt
-- **Reviewer-spezifisch:** ReviewerFocus (optional)
-- **Advisor-spezifisch:** AdvisorMode (Strategic / Critical / DevilsAdvocate), AdvisorTrigger (BeforeFirstExecution / BeforeEveryExecution / OnConvergenceFailure)
-- **GroundingProvider-spezifisch:** GroundingProviderType (Tavily / VectorStore), Typ-spezifische Einstellungen (API-Key oder Collection-Name)
-- **Finalizer-spezifisch:** FinalizerType (FileExport / MetadataEnrich / ExternalSink / Transform), Typ-spezifische Einstellungen
-- **Reasoning-Anzeige:** LLM-Begründungen pro Feld, read-only (aus `analyze_template_proposal`)
-- **Field-Helps:** Englische Inline-Hinweise für jedes Feld (`StudioFieldHelps.cs`)
-
-### Schlüssel-Komponenten
-
-| Komponente | Zweck |
-|---|---|
-| `StudioProfileSlot.razor` | UseExisting/CreateNew-Toggle + vollständiges Inline-Profil-Form; bettet `ModelSelector` ein |
-| `FieldHelp.razor` | Inline-Hinweis unterhalb jedes Feldes |
-| `StudioFieldHelps.cs` | Zentrale englische Field-Help-Text-Konstanten |
-
-### Materialisierung (atomar, D-043/7)
-
-`TemplateStudioService.MaterializeAsync` kapselt alle DB-Schreibvorgänge in einer einzelnen EF-Core-Transaktion (`IAtomicTransactionFactory`) und gibt ein `MaterializationResult` zurück (finaler Template-Name, angelegte Profil-Namen, Warnungen).
-
-**Validierung vor der Transaktion:**
-- `ValidateNotSystemProfiles` — vorgeschlagene Profil-Namen dürfen nicht mit system-reservierten Namen kollidieren.
-- `ValidateReviewerCount` — das Template muss mindestens einen Reviewer tragen.
-- `ValidateAvailabilityAsync` — prüft das Modell jedes generierenden Profils gegen den Provider-Katalog; eine Abweichung erzeugt eine **nicht-blockierende Warnung** (das Modell fehlt evtl. nur im Live-Katalog), keinen Abbruch.
-
-**Transaktions-Ablauf:** Begin → Profile anlegen (Executor, Reviewer, Advisor, GroundingProvider, Finalizer) via `CreateProfileAsync` → Template anlegen via `CreateTemplateAsync` → `MarkMaterializedAsync` (markiert den Analyse-Datensatz als verbraucht) → Commit. Jeder Fehler löst ein explizites Rollback aus — kein halb-materialisierter Zustand.
-
-**Name-Mapping:** `CreateCustom*Async` präfixiert jeden neuen Profil-Namen idempotent mit `custom-`. `MaterializeAsync` merkt sich das Mapping alt→final, und `ApplyProfileNameMapping` schreibt alle Template-Referenzen (Executor, Reviewer, Advisors, Grounding-Provider, Finalizer) auf die tatsächlich gespeicherten Namen um, bevor das Template angelegt wird. Namen, die bereits auf bestehende Profile zeigen, bleiben unverändert. Die Evaluation-Strategie wird normalisiert (`NormalizeEvaluationStrategy`, Default `Sequential`).
-
-Finalizer-Vorschläge erscheinen in der LLM-Analyse-Ausgabe des Studios; `CreateProfileAsync` behandelt den Finalizer-Zweig; `StudioEditStep` stellt den Finalizer-Slot-Abschnitt neben den übrigen Profil-Slots bereit.
-
-Seit D-067 entfernt das Studio `authHeaderEnv`/`apiKeyEnv` mit einer Warnung aus vorgeschlagenen Grounding-Profilen, und sein Prompt bietet diese Schlüssel nicht mehr an; Verweise auf Geheimnisse setzen nur Administratoren im Grounding-Editor.
+Der KI-gestützte Vorlagen-Assistent unter `/crew/studio` wurde in Stufe 8c entfernt (D-089), zusammen mit seinem eigenständigen Start eines Kompositionslaufs. Auto-Crew bleibt über `/new` und `submit_auto_crew_request` erreichbar. Die MCP-Werkzeuge `analyze_template_proposal` und `materialize_template_proposal` bleiben als Stummel, die einen Fehler mit Verweis auf `submit_order` liefern. Die Tabellen `TemplateStudioAnalyses` und `StudioSettings` bleiben in der Datenbank. Die Transaktionsfabrik des Materialisierers (`IAtomicTransactionFactory`) liegt jetzt unter `Infrastructure/Persistence`.
 
 ## Kontinuierlicher Lernzyklus (D-054)
 
@@ -642,7 +566,7 @@ Ein Kompositions-Run (`RunKind.CrewComposition = 2`) ist ein vollständiger GEEF
 
 Der Single-Pass-Meta-LLM-Aufruf des Template Studios (D-038) produzierte Crews ohne Selbstkorrektur. Ein Kompositions-Run ersetzt diesen Aufruf durch eine echte GEEF-Pipeline: die Crew `crew-composer` verfeinert ein `CrewSpecArtifact`-JSON iterativ bis zur Konvergenz; danach wandelt der `CrewMaterializeFinalizerExecutor` das konvergierte Spec in echte DB-Datensätze um.
 
-Einstiegspunkt: `/crew/studio` (eigenständige Komposition, `ChainToTaskRun = false` als Standard). Der Nutzer gibt eine Aufgabenbeschreibung ein; das Studio reicht einen `RunKind.CrewComposition`-Run ein und zeigt den Fortschritt via SignalR.
+Einstiegspunkte: das erweiterte Formular `/new` mit Auto-Crew und das MCP-Werkzeug `submit_auto_crew_request` (beide hängen einen Aufgabenlauf an). Der eigenständige Start über `/crew/studio` ist mit dem Template Studio in Stufe 8c entfallen (D-089).
 
 ### Die 5 Reviewer von crew-composer
 
@@ -700,7 +624,7 @@ Läuft nach Konvergenz des Kompositions-Runs (`FinalizerType.CrewMaterialize = 6
 1. **Parse** — liest das `CrewSpecArtifact`-JSON aus dem `ArtifactText` der letzten Iteration.
 2. **Validate** — strukturelle Prüfung: Pflichtfelder vorhanden, `reviewers`-Anzahl ≥ 1, Provider-Namen im System aktiv.
 3. **Dedup** — berechnet ein Embedding des Specs, fragt `CrewTemplateEmbeddings` auf Cosine-Similarity ab; überschreitet ein bestehendes Template die 0,90-Schwelle, wird der Modus auf `existing-template` downgegradet (keine neuen DB-Datensätze).
-4. **Materialize** — für Modi `composed` / `new`: legt Profile (Executor, Reviewer × N, Advisor × N, GroundingProvider × N, Finalizer × N) und das Crew-Template in einer einzigen EF-Core-Transaktion an (analog `TemplateStudioService.MaterializeAsync`).
+4. **Materialize** — für Modi `composed` / `new`: legt Profile (Executor, Reviewer × N, Advisor × N, GroundingProvider × N, Finalizer × N) und das Crew-Template in einer einzigen EF-Core-Transaktion an (`IAtomicTransactionFactory`).
 5. **Embed** — berechnet ein Embedding des neuen Templates und schreibt es in `CrewTemplateEmbeddings` für künftige Dedup-Prüfungen.
 6. **Task-Run verketten** — wenn `ChainToTaskRun = true` und der Kompositions-Run ein Seed-Briefing enthält, wird ein neuer `RunKind.Standard`-Run mit der materialisierten Crew und dem ursprünglichen Briefing eingereicht.
 

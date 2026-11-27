@@ -78,7 +78,7 @@ A profile states its **role**; the crew states its **domain**; the system picks 
 
 - **Always current (D-066/10):** the matrix names family aliases (`claude-opus-latest`, `gpt-sol-latest`, `gpt-astra-latest`). The cli-proxy resolves the codex aliases to the newest listed model of the line, so a new release of an existing line needs no code change; run snapshots keep the concrete id. The nightly `scripts/cli-proxy-selfupdate.sh` keeps container and host CLIs current and moves the host codex default to the newest Sol.
 - **Intake slot (D-071):** `ModelSlot.Intake` (Sonnet → Sol) clarifies an order before writing; it is assigned with `AssignAsync(ModelSlot.Intake, General)` and no profile may carry it (`AllowedSlots` unchanged, not in the composer catalog).
-- **Composer settings** are whitelisted (`CrewPartSettingsPolicy`); inline `rest-api` grounding and inline `ExternalSink` finalizers are critical.
+- **Composer settings** are whitelisted (`CrewPartSettingsPolicy`); inline grounding of an unregistered type is critical. Since stage 8c (D-089) the composer no longer knows `rest-api`, `academic-search`, `news-search` or `ExternalSink`.
 
 The table and rationale are in D-066 and `reports/2026-11-22-modellrecherche.md`.
 
@@ -130,8 +130,8 @@ until its attachments are ready ([02-architecture](02-architecture.md#preparatio
 **At least one reviewer.** A crew without reviewers cannot run: `AtelierPipelineFactory` refuses to build
 the pipeline and the run ends `Failed` with a message. The former `AutoApproveReviewer` that silently
 approved every draft is removed. Creating or saving a crew template without a reviewer is refused
-(`CrewTemplateRules.EnsureHasReviewer`, used by `CrewService` and the template editor); Template Studio and
-the composer require a reviewer as well.
+(`CrewTemplateRules.EnsureHasReviewer`, used by `CrewService` and the template editor); the composer requires a
+reviewer as well.
 
 ## Advisor passes (PS-7)
 
@@ -189,17 +189,7 @@ Advisor LLM calls are not best-effort. An exception in `ProfileBasedAdvisor` bub
 
 ### Convergence-failure retry mechanism
 
-```
-Pipeline → ConvergenceFailedException
-  → RunOrchestratorService.TryConvergenceFailureRetryAsync
-      1. Checks RunEntity.AdvisorRetryAttempted — true → escalates to Failed (no second retry)
-      2. Sets AdvisorRetryAttempted = true in the DB
-      3. Enables OnConvergenceFailure advisors in the next run context
-      4. Restarts the pipeline run (once)
-      5. A second ConvergenceFailedException → Failed (no further retry)
-```
-
-**Single-retry cap:** `RunEntity.AdvisorRetryAttempted` (migration Step11) prevents infinite loops. Multi-retry with a configurable retry count is documented as future work.
+The single retry with `OnConvergenceFailure` advisors planned in D-031(e) was never wired; `RunEntity.AdvisorRetryAttempted` was never written. Since stage 8c (D-089) the property is gone from the model; the column stays in the database with its default `false`.
 
 ### DB tables (migration Step11AdvisorSystem)
 
@@ -208,7 +198,7 @@ Pipeline → ConvergenceFailedException
 | `AdvisorProfiles` | Custom advisor profiles (system advisors live as code constants in `SystemCrew`). |
 | `AdvisorConsultations` | Persisted advisor outputs per iteration and advisor (RunId, IterationNumber, AdvisorName, OutputText, CreatedAt). |
 
-Column `RunEntity.AdvisorRetryAttempted` (bool, nullable) on the `Runs` table.
+Column `AdvisorRetryAttempted` (bool, NOT NULL DEFAULT false) on the `Runs` table, never written and unmapped since D-089.
 
 ### UI components (PS-7)
 
@@ -241,12 +231,12 @@ public enum FinalizerType
 {
     FileExport    = 0,
     MetadataEnrich = 1,
-    ExternalSink  = 2,
+    [Obsolete] ExternalSink = 2,   // retired in stage 8c (D-089)
     Transform     = 3,
 }
 ```
 
-`FinalizerType` is **immutable after creation**. Typed settings records (`FileExportSettings`, `MetadataEnrichSettings`, `WebhookSinkSettings`, `EmailSinkSettings`, `TransformSettings`) wrap the `Dictionary<string,string> Settings` for type-safe access.
+`FinalizerType` is **immutable after creation**. Typed settings records (`FileExportSettings`, `MetadataEnrichSettings`, `TransformSettings`) wrap the `Dictionary<string,string> Settings` for type-safe access.
 
 ### Pipeline position
 
@@ -277,7 +267,9 @@ Each finalizer execution records its output as a `RunArtifact`:
 | `StatusMessage` | string? | Human-readable status (for `Status` artifacts) |
 | `CreatedAt` | DateTime | Creation timestamp |
 
-### System finalizer profiles (17)
+### System finalizer profiles
+
+`webhook-sink` and `email-sink` (`ExternalSink`) were removed in stage 8c (D-089); their rows stay in the database, listings leave them out and a run skips them with a warning.
 
 | Name | Type | Description |
 |---|---|---|
@@ -290,8 +282,6 @@ Each finalizer execution records its output as a `RunArtifact`:
 | `add-front-matter` | MetadataEnrich | Prepends YAML front-matter with run metadata |
 | `add-word-count-footer` | MetadataEnrich | Appends a word-count footer to the draft |
 | `add-reading-level` | MetadataEnrich | Appends a Flesch–Kincaid reading-level annotation |
-| `webhook-sink` | ExternalSink | POSTs the artifact payload to a configured webhook URL |
-| `email-sink` | ExternalSink | Sends the artifact as an e-mail attachment |
 | `anti-ai-voice` | Transform | Rewrites the draft to reduce detectable AI phrasing |
 | `tone-formalization` | Transform | Elevates the draft's register to formal/academic tone |
 | `tone-casual` | Transform | Lowers the draft's register to conversational tone |
@@ -387,11 +377,11 @@ Grounding providers enrich the briefing with external context before the GEEF ex
 
 **Actual state (D-067):**
 
-- The five system profiles `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` and `academic-default` run through their type-specific provider listed below, not through the tool path, also for older snapshots that still carry a `ToolName`. Only custom profiles with a `ToolName` use the tool-backed provider ([10-tool-system](10-tool-system.md#a-t9--grounding-rebuild-on-central-tools)).
+- The five system profiles `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` and `academic-default` (retired in stage 8c, D-089; kept in the rule for older snapshots) run through their type-specific provider listed below, not through the tool path, also for older snapshots that still carry a `ToolName`. Only custom profiles with a `ToolName` use the tool-backed provider ([10-tool-system](10-tool-system.md#a-t9--grounding-rebuild-on-central-tools)).
 - A provider that is skipped or fails (missing key, unknown type, error) becomes a run warning (`grounding.provider_skipped`) instead of silently empty context. The code `grounding.tool_failed` is reserved and currently never written; failures of tool-backed sources also use `grounding.provider_skipped`.
 - **No outside search for default orders (D-079):** a run of an order with the default crew ("Extra careful" on the web or over MCP, `submit_request` without `crewTemplate`/`customCrew`) keeps only the sources that stay inside Atelier (`vector-store`, `order-sources`, `learning-retrieval`, `static-context` and the catalogs, never through the tool path); web, news, academic, REST, URL and tool sources are dropped before the pipeline is built, also when the run resumes with a stored snapshot that still names them. A template named on purpose (workshop, `submit_request` with `crewTemplate`), an own crew and a composed crew keep their sources.
 - **Search query fails closed (D-079):** with `ExtractQuery` (on for every system profile) the `tavily` provider searches only with the query the `GroundingQueryExtractor` formed; when the call fails or returns no query, nothing is searched and the source becomes `grounding.provider_skipped`. The request text is never the fallback query. Only a profile with `ExtractQuery=false`, and the `news-search`, `academic-search` and `rest-api` types, send the request part of the briefing as it is.
-- Key and header references (`authHeaderEnv`, `apiKeyEnv`) are only accepted and read for names on the allow list ([10-tool-system](10-tool-system.md#secrets-and-the-environment-variable-allow-list)); the grounding editor is admin-only.
+- Since stage 8c (D-089) no remaining grounding type reads a key or header from the environment (`authHeaderEnv`/`apiKeyEnv` belonged to `rest-api`/`academic-search`); the grounding editor is admin-only.
 
 ### Provider Types
 
@@ -401,7 +391,7 @@ Grounding providers enrich the briefing with external context before the GEEF ex
 | `vector-store` | `VectorStoreGroundingProvider` | Semantic search in a pgvector collection. Scope: `global` (shared documents only), `run-local` (attachments of the run and of the runs it continues, never those of other runs) or `both` (shared documents plus those attachments). A missing scope means `global`; an unknown value is also treated as `global` (fail-closed, never other runs' attachments) and the run gets the warning `grounding.scope_unknown` (D-067). `TagFilter` narrows the shared documents only; attachments have no tags and are never hidden by it. | `TopK`, `Scope`, `TagFilter` |
 | `static-context` | `StaticContextGroundingProvider` | Curated fixed text injected unchanged at every run. No external API. Ideal for style guides, glossaries, brand voice. | `label`, `content` (max 200,000 chars, soft limit 50,000) |
 | `url-fetch` | `UrlFetchGroundingProvider` | Fetches specific URLs, cleans HTML via HtmlAgilityPack, returns text content. SSRF guard blocks private IPs. | `urls` (newline-separated), `maxContentPerUrl` (default 8000), `stripBoilerplate` (bool, default true) |
-| `news-search` | `NewsSearchGroundingProvider` | Tavily API with `topic=news` + `days` filter. For time-critical topics. Attribution via `PublishedDate`. | `recencyDays` (default 7), `newsMaxResults` (default 5), `newsSearchDepth` (basic/advanced) |
+| `news-search`, `academic-search`, `rest-api` | — | Retired in stage 8c (D-089). Stored profiles and older snapshots stay readable; a run skips them with a warning; they can no longer be saved. | — |
 
 ### SSRF Protection (`url-fetch`)
 
@@ -436,8 +426,6 @@ Every grounding provider can optionally be configured with an AI refinement pass
 - **Synthesize:** All sources are merged into a coherent text (`[n]` references). Original sources are preserved as a reference appendix.
 
 **Graceful degradation:** If the refinement provider is inactive or the LLM call fails, raw results are passed through unchanged. The run is not aborted. The grounding visualization shows a notice.
-
-**System profile `tavily-news`:** New — Tavily news search (`topic=news`, `recencyDays=7`) with filter refinement via `google/gemini-2.0-flash-lite`. Suitable for time-critical topics.
 
 **System profile `tavily-refined`:** Ready-to-use demo profile — Tavily Advanced with filter refinement via `google/gemini-2.0-flash-lite`.
 
@@ -481,7 +469,6 @@ Migration Step10 renames historical `Findings.ReviewerName` values. `ReviewerDis
 | `/crew/profiles/finalizers/create` | `FinalizerProfileEditor` | Create a custom finalizer profile |
 | `/crew/profiles/finalizers/edit/{name}` | `FinalizerProfileEditor` | Edit a custom finalizer profile |
 | `/crew/profiles/finalizers/view/{name}` | `FinalizerProfileView` | View a system finalizer profile (read-only) |
-| `/crew/studio` | `TemplateStudio` | AI-assisted template wizard (analyze → review → edit → materialize) |
 
 ### UI components
 
@@ -499,72 +486,9 @@ Migration Step10 renames historical `Findings.ReviewerName` values. `ReviewerDis
 
 Pattern `^[a-z0-9\-]+$`, max 64 characters — applies to all profile and template names (custom prefix excluded). Form validation via `DataAnnotations.RegularExpression`. The service layer is idempotent regarding the `custom-` prefix.
 
-## Template Studio (D-043)
+## Template Studio (D-043, removed)
 
-The Template Studio at `/crew/studio` is an AI-assisted wizard that proposes a complete crew configuration for a described task and lets the user review and edit every field before materializing to the DB.
-
-### Wizard steps
-
-| Step | Component | Description |
-|---|---|---|
-| TaskInput | `StudioTaskInputStep` | Free-text task description; triggers LLM analysis |
-| Analyzing | `StudioAnalyzingStep` | Loading indicator while the meta-LLM runs |
-| Review | `StudioReviewStep` | Shows the AI proposal; option to use an existing template instead |
-| Edit | `StudioEditStep` | Full-field editor for the proposed template and all profiles |
-| Confirmation | `StudioConfirmationStep` | Shows materialization result; launches a run |
-
-### Analysis pipeline (`AnalyzeAsync`)
-
-`TemplateStudioService.AnalyzeAsync` turns the free-text task description into a persisted `TemplateStudioAnalysis` that drives the Review and Edit steps. The pipeline:
-
-1. **Model resolution** — picks the meta-LLM in the order: explicit per-analysis override → persisted Studio default (`StudioSettings`) → `appsettings` default (`TemplateStudioOptions`).
-2. **Context assembly (parallel, budgeted)** — loads all crew lists (templates, executors, reviewers, advisors, grounding providers, finalizers) and fetches every provider's model catalogue **in parallel** under a 20-second budget. A slow or unreachable provider contributes no models instead of stalling the whole analysis; recommended models are listed first so the LLM picks valid IDs.
-3. **Meta-LLM call (timeout-capped)** — calls the model with the `submit_template_proposal` tool forced via `tool_choice`. A hard cap (`TemplateStudioOptions.AnalysisTimeoutSeconds`) turns a stalled provider into a `TimeoutException` with a retry hint. A response without a tool call raises an `InvalidOperationException`.
-4. **Proposal parsing** — `ParseProposal` reads the tool-call JSON into `MatchedExistingTemplates`, a `StudioRecommendation` (`use_existing` / `adapt_existing` / `create_new`), the `ProposedTemplate`, and the list of `ProposedProfile` records (each carrying per-field LLM reasoning).
-5. **Defaults & clamping** — `ApplyDefaults` fills empty provider/model/MaxTokens per profile type from `StudioDefaults`. `ClampMaxTokens` enforces the `MinMaxTokens` floor for generating profiles (Executor, Reviewer, Advisor) and sets `null` for grounding/finalizer profiles (no own LLM generation).
-6. **Deduplication** — `ProfileSimilarityService.FindSimilarAsync` drops proposed profiles that are too close to an existing one (similarity over name + prompt, `TemplateStudioOptions.SimilarityThreshold`).
-7. **Cost & persistence** — input/output tokens are priced via `IPricingCatalog`; the full analysis (incl. cost in EUR) is stored through `ITemplateStudioAnalysisRepository` and returned. `ListRecentAnalysesAsync` exposes the history (see `StudioAnalysisHistoryList`).
-
-### StudioEditStep field parity (D-043)
-
-The Edit step exposes the full field set for the template and every profile slot:
-
-**Template fields:** DisplayName, Description, EvaluationStrategy (dropdown), EvaluationStrategyReasoning (read-only, from LLM)
-
-**Per profile slot (Executor / Reviewer × N / Advisor × N / GroundingProvider × N / Finalizer × N):**
-- **UseExisting / CreateNew toggle** — pick an existing profile by name, or configure a new one inline
-- **CreateNew fields:** Name (kebab-case), DisplayName, Description, Provider, Model (`ModelSelector`), MaxTokens, SystemPrompt
-- **Reviewer-specific:** ReviewerFocus (optional)
-- **Advisor-specific:** AdvisorMode (Strategic / Critical / DevilsAdvocate), AdvisorTrigger (BeforeFirstExecution / BeforeEveryExecution / OnConvergenceFailure)
-- **GroundingProvider-specific:** GroundingProviderType (Tavily / VectorStore), type-specific settings (API key or collection name)
-- **Finalizer-specific:** FinalizerType (FileExport / MetadataEnrich / ExternalSink / Transform), type-specific settings
-- **Reasoning display:** LLM reasoning per field, read-only (from `analyze_template_proposal`)
-- **Field-Helps:** inline English help texts for every field (`StudioFieldHelps.cs`)
-
-### Key components
-
-| Component | Purpose |
-|---|---|
-| `StudioProfileSlot.razor` | UseExisting/CreateNew toggle + full inline profile form; embeds `ModelSelector` |
-| `FieldHelp.razor` | Inline hint rendered below every field |
-| `StudioFieldHelps.cs` | Central English help-text constants |
-
-### Materialization (atomic, D-043/7)
-
-`TemplateStudioService.MaterializeAsync` wraps all DB writes in a single EF Core transaction (`IAtomicTransactionFactory`) and returns a `MaterializationResult` (final template name, created profile names, warnings).
-
-**Pre-transaction validation:**
-- `ValidateNotSystemProfiles` — proposed profile names must not collide with system-reserved names.
-- `ValidateReviewerCount` — the template must carry at least one reviewer.
-- `ValidateAvailabilityAsync` — checks each generating profile's model against the provider catalogue; a mismatch produces a **non-blocking warning** (the model may simply be missing from the live catalogue), not an abort.
-
-**Transaction order:** begin → create profiles (Executor, Reviewer, Advisor, GroundingProvider, Finalizer) via `CreateProfileAsync` → create template via `CreateTemplateAsync` → `MarkMaterializedAsync` (marks the analysis record as consumed) → commit. Any error triggers an explicit rollback — no half-materialized state.
-
-**Name mapping:** `CreateCustom*Async` idempotently prefixes every new profile name with `custom-`. `MaterializeAsync` records the old→final mapping and `ApplyProfileNameMapping` rewrites all template references (executor, reviewers, advisors, grounding providers, finalizers) to the actually stored names before the template is created. Names already referring to existing profiles pass through unchanged. The evaluation strategy is normalized (`NormalizeEvaluationStrategy`, default `Sequential`).
-
-Finalizer proposals appear in the Studio's LLM analysis output; `CreateProfileAsync` handles the finalizer branch; `StudioEditStep` exposes the finalizer slot section alongside the other profile slots.
-
-Since D-067 the Studio removes `authHeaderEnv`/`apiKeyEnv` from proposed grounding profiles with a warning, and its prompt no longer offers these keys; secret references are set by administrators in the grounding editor only.
+The AI-assisted template wizard at `/crew/studio` was removed in stage 8c (D-089), together with its standalone start of a composition run. Auto-Crew stays reachable through `/new` and `submit_auto_crew_request`. The MCP tools `analyze_template_proposal` and `materialize_template_proposal` remain as stubs that return an error naming `submit_order`. The tables `TemplateStudioAnalyses` and `StudioSettings` stay in the database. The transaction factory the materializer uses (`IAtomicTransactionFactory`) now lives under `Infrastructure/Persistence`.
 
 ## Continuous Learning Loop (D-054)
 
@@ -626,7 +550,7 @@ A Composition-Run (`RunKind.CrewComposition = 2`) is a full GEEF-Run that uses t
 
 The Template Studio's single-pass meta-LLM call (D-038) produced crews without self-correction. A Composition-Run replaces that call with a proper GEEF pipeline: the `crew-composer` crew iteratively refines a `CrewSpecArtifact` JSON until convergence, then the `CrewMaterializeFinalizerExecutor` turns the converged spec into real DB records.
 
-Entry point: `/crew/studio` (standalone composition, `ChainToTaskRun = false` by default). The user provides a task description; the studio submits a `RunKind.CrewComposition` run and shows progress via SignalR.
+Entry points: the advanced form `/new` with Auto-Crew and the MCP tool `submit_auto_crew_request` (both chain a task run). The standalone start from `/crew/studio` went with Template Studio in stage 8c (D-089).
 
 ### The 5 reviewers of crew-composer
 
@@ -684,7 +608,7 @@ Runs after convergence of the composition-run (`FinalizerType.CrewMaterialize = 
 1. **Parse** — reads the `CrewSpecArtifact` JSON from the final iteration's `ArtifactText`.
 2. **Validate** — structural check: required fields present, `reviewers` count ≥ 1, provider names are active in the system.
 3. **Dedup** — computes an embedding of the spec, queries `CrewTemplateEmbeddings` for cosine similarity; if any existing template exceeds the 0.90 threshold, downgrades mode to `existing-template` (no new DB records).
-4. **Materialize** — for `composed` / `new` modes: creates profiles (Executor, Reviewer × N, Advisor × N, GroundingProvider × N, Finalizer × N) and the crew template in a single EF Core transaction, exactly as `TemplateStudioService.MaterializeAsync` does.
+4. **Materialize** — for `composed` / `new` modes: creates profiles (Executor, Reviewer × N, Advisor × N, GroundingProvider × N, Finalizer × N) and the crew template in a single EF Core transaction (`IAtomicTransactionFactory`).
 5. **Embed** — computes an embedding of the new template and inserts it into `CrewTemplateEmbeddings` for future dedup.
 6. **Chain task-run** — if `ChainToTaskRun = true` and the composition-run carries a seed briefing, submits a new `RunKind.Standard` run using the materialized crew and the original briefing text.
 

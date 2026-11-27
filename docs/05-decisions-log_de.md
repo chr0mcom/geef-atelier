@@ -3766,3 +3766,71 @@ für `submit_order` nach dem Formular (Antworten, „You decide“, Ablehnung oh
 mit dem SDK-Client: Formular → `submit_order` und `get_order_result` nennen die Wahl mit `form`; `answer_order` → `get_order_result`
 über einen Client 2025-11-25 mit `user`; Antwort `client` sichtbar für den Besitzer in beiden Revisionen, nicht für einen
 Administrator.
+
+## D-089 — Rückbau, Schnitt 1: ungenutzter Code entfernt (2026-11-27)
+
+**Kontext.** Stufe 8c des Rückbaus (Plan-Etappe 1b, „Rückbau Schnitt 1“). Sie nimmt Code heraus, den keine verbleibende Arbeitsweise
+braucht; der zweite Schnitt (Composer und Auto-Crew, Werkzeugpfad, Lernschleife, Vektor-Wissensbasis, ältere MCP-Werkzeuge, `/new`)
+folgt nach dem Übergang in 8b. Vor dem Entfernen eines Teils wurde geprüft, dass kein Team, das wählbar bleibt, davon abhängt.
+
+**Entscheidung — entfernt.**
+- **Template Studio** (`/crew/studio`, Dienst, Prompts, Ähnlichkeitssuche, Einstellungen, alle Studio-Bausteine). Sein eigenständiger
+  Start eines Kompositionslaufs entfällt mit; Auto-Crew bleibt über `/new` und `submit_auto_crew_request` erreichbar. Die MCP-Werkzeuge
+  `analyze_template_proposal` und `materialize_template_proposal` bleiben als **Stummel** unter den älteren Werkzeugen gelistet: Sie
+  nehmen einen optionalen Text an, und jeder Aufruf liefert einen Werkzeugfehler, der `submit_order` nennt (Clients speichern
+  Werkzeuglisten zwischen). `IAtomicTransactionFactory` ist vorher nach `Infrastructure/Persistence` umgezogen, weil der
+  Crew-Materialisierer sie nutzt; der Hilfetext zur Transform-Anweisung steht jetzt in `FinalizerFieldHelps`.
+- **MCP-Client** (`/mcp-servers`, Client-Fabrik, Werkzeugsuche, der Werkzeugtyp `mcp-tool` in `ToolExecutor`, Schema-Provider und
+  Werkzeug-Editor). Der eigene MCP-Server von Atelier ist nicht betroffen. Das Paket `ModelContextProtocol.Core` entfällt in
+  Infrastructure.
+- **Grounding-Typen `rest-api`, `academic-search`, `news-search`** mit ihren Providern, den akademischen Quellen, `JsonPathNavigator`,
+  Einstellungsschlüsseln und Editor-Abschnitten; die System-Profile `academic-default` und `tavily-news` verlassen `SystemCrew`.
+- **Abschluss `ExternalSink`** (Webhook und E-Mail) samt Einstellungen, SMTP-Optionen und MailKit; die System-Profile `webhook-sink` und
+  `email-sink` verlassen `SystemCrew`.
+- **Editor für HTTP-Provider.** HTTP-Provider kommen mit dem System und sind nur lesbar; CLI-Provider behalten Editor und Kopie.
+- **Tote Konzepte:** `GroundingProviderProfile.MaxQueriesPerRun` (nie durchgesetzt; Editorfeld, Listenspalte, Feld im MCP-DTO und
+  EF-Zuordnung), `RunEntity.AdvisorRetryAttempted` (nie geschrieben) und die nur von Tests genutzten `StubExecutionStep`/`StubReviewer`
+  (jetzt im Testprojekt).
+
+**Entscheidung — bewusst behalten (Abweichung vom Plan).** `url-fetch` (mit `UrlSafetyValidator` und `HtmlContentExtractor`) und
+`MetadataEnrich` bleiben: Teams, die wählbar bleiben, können sie weiter nennen. Über sie wird im zweiten Schnitt zusammen mit der
+Team-Wahl entschieden. Auch der agentische
+Werkzeugpfad und `/tools` bleiben bis 8d.
+
+**Eingehaltene Regeln.**
+- Reihenfolge je Teil: Navigation → Registrierung → Code → Tests → Seeds. **Kein `DROP`, keine Migration, keine gelöschte Zeile.** Die
+  Tabellen `TemplateStudioAnalyses`, `StudioSettings`, `mcp_server_configs` und die Spalten `MaxQueriesPerRun`, `AdvisorRetryAttempted`
+  bleiben (nicht mehr zugeordnet; nullable bzw. mit Standardwert). Zeilen ausgemusterter System-Profile bleiben in der Datenbank.
+- **Ausgemusterte Werte bleiben lesbar.** `FinalizerType.ExternalSink` sowie die Konstanten `GroundingProviderTypes.NewsSearch/
+  AcademicSearch/RestApi` und `ToolType.McpTool` bleiben als `[Obsolete]`. `GroundingProviderTypes.Retired` und
+  `FinalizerType.IsRetired()` benennen sie: Gespeicherte Profile und Lauf-Snapshots damit bleiben lesbar, ein Lauf überspringt sie mit
+  der bekannten Warnung („could not be read and was skipped“ / „The finishing step … failed“), speichern lassen sie sich nicht mehr
+  (`CrewService`), Finalizer-Listen lassen sie aus, und der Grounding-Editor zeigt einen Hinweis. `academic-default` bleibt in der
+  Regel, die ältere Snapshots vom Werkzeugpfad fernhält.
+- **Ausgemusterte Typen werden nicht mehr angeboten.** Grounding-Listen (Vorlagen-Editor, `list_grounding_provider_profiles`) lassen
+  Profile eines ausgemusterten Typs aus wie die Finalizer-Listen; der Composer-Prüfer weist ein `reuse` auf ein solches Profil als
+  kritisch ab. Vorlagen, die schon eines nennen, behalten den Namen (die Auswahl behält gewählte Namen), und der Lauf überspringt es mit
+  der Warnung.
+- **Ausgemusterte System-Profile bleiben geschützt.** `academic-default`, `tavily-news`, `webhook-sink` und `email-sink` gelten weiter
+  als System-Namen (`SystemCrew.RetiredGroundingProviderNames`, `RetiredFinalizerNames`): Ihre Zeilen lassen sich weder umbenennen noch
+  ändern noch löschen.
+- Der Composer nennt die entfernten Typen nicht mehr.
+
+**Nachweis.** Der Produktions-Snapshot-Test (`ATELIER_SNAPSHOT_FIXTURES`, Export außerhalb des Repositorys) prüft jetzt zusätzlich jede
+Grounding-Art gegen die echte Registrierung (`AddGroundingProviders`) oder die Ausmusterungsliste und jede Abschluss-Art gegen die
+registrierten Executoren (`AddFinalizers`) oder die Ausmusterungsliste; alle exportierten Snapshots bestehen. Ein synthetischer
+Test im Repository liest einen älteren Snapshot mit `maxQueriesPerRun`, ausgemusterten Grounding-Typen und einem
+`ExternalSink`-Abschluss. Weitere Tests: Stummel antworten mit dem Fehler, ausgemusterte Typen lassen sich nicht speichern (echtes
+Postgres), gespeicherte Sink-Zeilen bleiben, werden aber nicht gelistet, Editoren bieten die entfernten Typen nicht mehr an, die
+Provider-Seiten verweisen auf keinen entfernten Weg, die Migration des Template Studio legt ihre Tabelle weiter an.
+
+**MCP-Baselines bewusst neu genommen:** Die beiden Hashes der Werkzeugliste mit den älteren Werkzeugen ändern sich durch die
+Stummel-Beschreibungen; die Hashes ohne die älteren Werkzeuge und die Server-Hinweise sind unverändert.
+
+**Grenze: EF-Modell-Snapshot.** `AtelierDbContextModelSnapshot` kennt noch `MaxQueriesPerRun`, `AdvisorRetryAttempted`,
+`TemplateStudioAnalyses`, `StudioSettings` und `mcp_server_configs`; eine erzeugte Migration (`dotnet ef migrations add`) schlüge
+`DropColumn`/`DropTable` vor. Migrationen bleiben handgeschrieben; jetzt keine erzeugen. Erledigt wird das mit einer neuen
+Migrations-Baseline nach dem Aufräumen der Datenbank, das als eigener Schritt nach 8d kommt.
+
+**Rückweg.** Das vorige Image; die Datenbank bleibt verträglich, weil nichts gelöscht oder geändert wurde. Im Code nur über Git (Tag vor
+dem Deploy).

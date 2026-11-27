@@ -100,7 +100,7 @@ Stand Mai 2026 umfasst das Schema **28 Tabellen**, hand-geschriebene Migrationen
 | Grounding | `GroundingProviderProfiles`, `GroundingConsultations` | Step13 |
 | Vector-Store/RAG | `KnowledgeDocuments`, `KnowledgeDocumentChunks` | Step14 |
 | Cost-Tracking | `IterationActorCosts` | Step16 |
-| Template Studio | `TemplateStudioAnalyses` | Step17 |
+| Template Studio (Code in Stufe 8c entfernt, D-089; Tabellen bleiben) | `TemplateStudioAnalyses`, `StudioSettings` | Step17, Step33 |
 | Multi-User | `Users` | Step20 |
 | OAuth 2.1 | `OAuthClients`, `OAuthAuthorizationCodes`, `OAuthAccessTokens`, `OAuthRefreshTokens`, `OAuthAuditLog` | Step19 |
 | Finalizer | `FinalizerProfiles`, `RunArtifacts`, `FinalizationActorCosts` | Step22 |
@@ -109,7 +109,7 @@ Stand Mai 2026 umfasst das Schema **28 Tabellen**, hand-geschriebene Migrationen
 Die vier Run-Kern-Tabellen sind nachfolgend im Detail dokumentiert; die übrigen
 Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-decisions-log_de.md)
 (D-028 ff.) beschrieben. `Runs` trägt zusätzlich Spalten aus späteren Migrationen
-(`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted`,
+(`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted` (seit D-089 nicht mehr zugeordnet),
 `FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`, `Kind`, `ParentCompositionRunId`,
 `Outcome`, `DeliveredIteration`, `ReportJson`, `OrderId`, `OrderVersion`). Migration Step47 (D-067) ergänzt die
 Tabelle `RunWarnings` und die Spalten `Outcome`, `DeliveredIteration` und `ReportJson`; Step48 (D-069) ergänzt
@@ -133,7 +133,7 @@ Tabelle `RunWarnings` und die Spalten `Outcome`, `DeliveredIteration` und `Repor
 | CancellationRequested | bool | true wenn User den Run abbrechen möchte |
 | CrewTemplateName | varchar(100) | nullable; Name des Templates (z.B. `"klassik"`). Null = Custom-Crew-Submit. |
 | CrewSnapshot | jsonb | nullable; vollständig eingebetteter CrewSnapshot zum Zeitpunkt des Submits. |
-| AdvisorRetryAttempted | bool | nullable; true wenn OnConvergenceFailure-Retry bereits durchgeführt wurde (Single-Retry-Cap). |
+| AdvisorRetryAttempted | bool | NOT NULL DEFAULT false; nie geschrieben. Seit Stufe 8c (D-089) nicht mehr im Modell zugeordnet; die Spalte bleibt. |
 | CreatedByUser | text | nullable; Username des erstellenden Nutzers (Run-User-Isolation, D-042). Index `IX_Runs_CreatedByUser` (Step21). |
 | FinalizerCostEur | numeric(10,6) | nullable; akkumulierte Kosten aller Transform-Finalizer-LLM-Calls (Step22). |
 | FinalizerErrorMessage | text | nullable; Fehlermeldung, wenn die Finalizer-Kette teilweise oder vollständig fehlschlug (Step22). |
@@ -203,7 +203,7 @@ Probleme, die ein Lauf umgangen hat, statt anzuhalten (D-067). Werden mit dem La
 | Name | varchar(100) (PK) | |
 | DisplayName | varchar(200) | |
 | Description | text | nullable |
-| FinalizerType | int | `0 = FileExport` / `1 = MetadataEnrich` / `2 = ExternalSink` / `3 = Transform` / `4 = LearningExtract` / `5 = LearningPublish` |
+| FinalizerType | int | `0 = FileExport` / `1 = MetadataEnrich` / `2 = ExternalSink` (in Stufe 8c ausgemustert, D-089) / `3 = Transform` / `4 = LearningExtract` / `5 = LearningPublish` |
 | Settings | jsonb | typspezifische Konfiguration |
 | IsSystem | bool | true für eingebaute System-Profile |
 | CreatedAt | timestamptz | |
@@ -254,7 +254,7 @@ Siehe `Runs`-Tabelle oben (`ParentRunId`, `SeedDraftText`).
 |---|---|---|
 | `0` — `FileExport` | Schreibt den Abschlusstext in eine Datei im konfigurierten Format (md, html, pdf, docx, txt, json) | Step22 |
 | `1` — `MetadataEnrich` | Reichert Run-Metadaten an (Tags, Titelextraktion, …) | Step22 |
-| `2` — `ExternalSink` | Schiebt den Abschlusstext an einen externen Service-Endpunkt | Step22 |
+| `2` — `ExternalSink` | In Stufe 8c ausgemustert (D-089): schickte den Abschlusstext an einen Webhook oder eine E-Mail-Adresse; bleibt `[Obsolete]`, damit gespeicherte Zeilen und Snapshots lesbar bleiben, Läufe überspringen ihn mit einer Warnung | Step22 |
 | `3` — `Transform` | Wendet einen LLM-Transformations-Pass auf den Text an (Zusammenfassung, Übersetzung, …) | Step22 |
 | `4` — `LearningExtract` | Extrahiert strukturierte Learnings aus einem abgeschlossenen Run und stößt fire-and-forget einen Learning-Evaluation-Gate-Run an (opt-in; an kein Standard-Template angehängt) | Step30 |
 | `5` — `LearningPublish` | Veröffentlicht genehmigte Learning-Kandidaten im Learning-Store oder markiert abgelehnte. Läuft innerhalb der `learning-evaluation`-Crew | Step30 |
@@ -345,14 +345,7 @@ Executor-System-Prompt kann diesen Block explizit referenzieren. Mehrere Advisor
 
 ### Convergence-Failure-Retry
 
-```
-ConvergenceFailedException
-  → RunOrchestratorService.TryConvergenceFailureRetryAsync
-      ├── RunEntity.AdvisorRetryAttempted == true → Status = Failed (kein zweiter Retry)
-      └── AdvisorRetryAttempted = true → OnConvergenceFailure-Advisors aktiviert → Pipeline-Retry
-```
-
-`RunEntity.AdvisorRetryAttempted` (Migration Step11) ist der Single-Retry-Cap (D-031(e)).
+Der in D-031(e) geplante einmalige Retry mit `OnConvergenceFailure`-Advisors wurde nie verdrahtet: kein Code schrieb `Runs.AdvisorRetryAttempted`. Seit Stufe 8c (D-089) ist die Spalte nicht mehr im Modell zugeordnet; sie bleibt mit dem Standardwert `false` in der Datenbank.
 
 ### DB-Erweiterungen (Migration Step11AdvisorSystem)
 
@@ -360,7 +353,7 @@ ConvergenceFailedException
 |---|---|
 | `AdvisorProfiles` | Custom Advisor-Profile |
 | `AdvisorConsultations` | Persistierter Advisor-Output pro Iteration (RunId, IterationNumber, AdvisorName, OutputText) |
-| `Runs.AdvisorRetryAttempted` | bool nullable — Retry-Cap-Flag |
+| `Runs.AdvisorRetryAttempted` | bool, nie geschrieben; seit D-089 nicht zugeordnet |
 
 Weitere Details: [`08-crew-system.md`](08-crew-system_de.md) → Sektion "Advisor-Pässe (PS-7)".
 
@@ -373,7 +366,6 @@ Weitere Details: [`08-crew-system.md`](08-crew-system_de.md) → Sektion "Adviso
 | Execution | `ProfileBasedExecutor` | LLM-Call mit Profil-SystemPrompt + PreviousFindings + AdvisorBlock; Modell aus `ExecutorProfile` |
 | Evaluation | `ProfileBasedReviewer` × N | N Reviewer aus `CrewSnapshot.Reviewers`; Strategie konfigurierbar |
 | Finalize | `IFinalizerExecutor`-Kette | Läuft nach der Konvergenz. Iteriert `snapshot.Finalizers` der Reihe nach. Jeder `IFinalizerExecutor` erzeugt null oder ein `RunArtifact` (File, Url oder Status). Transform-Finalizer können `currentText` aktualisieren. `RunFinalizersOnMaxAttempts=true` lässt Finalizer auch bei Convergence-Failure laufen. Partial-Success-Vertrag: ein fehlschlagender Finalizer schreibt ein Status-Artifact und die Kette läuft weiter; der Run-Status bleibt Completed. Learning-Finalizer (`LearningExtract`, `LearningPublish`) tragen je einen Rekursions-Guard: Der Extraktor überspringt Learning-Runs, der Publisher überspringt Standard-Runs. |
-| Convergence-Failure | `TryConvergenceFailureRetryAsync` | Aktiviert OnConvergenceFailure-Advisors, Single-Retry (AdvisorRetryAttempted-Cap) |
 
 **Grounding-Provider-Typen (ProviderType-String):**
 
@@ -383,9 +375,7 @@ Weitere Details: [`08-crew-system.md`](08-crew-system_de.md) → Sektion "Adviso
 | `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche über kuratierte `KnowledgeDocuments` (pgvector) |
 | `static-context` | `StaticContextGroundingProvider` | Verbatim-Fixtext; Style-Guides, Glossare |
 | `url-fetch` | `UrlFetchGroundingProvider` | Fetcht eine URL mit SSRF-Guard |
-| `news-search` | `TavilyNewsGroundingProvider` | Tavily-Newssuche mit Datumsfilter |
-| `academic-search` | `AcademicSearchGroundingProvider` | arXiv / Semantic Scholar / OpenAlex-Adapter |
-| `rest-api` | `RestApiGroundingProvider` | Generischer authentifizierter REST-Endpunkt mit JSONPath-Extraktion |
+| `news-search`, `academic-search`, `rest-api` | — | In Stufe 8c ausgemustert (D-089); gespeicherte Profile und ältere Snapshots bleiben lesbar, Läufe überspringen sie mit einer Warnung (`GroundingProviderTypes.Retired`) |
 | `learning-retrieval` | `LearningRetrievalGroundingProvider` | Cosine-Similarity-Suche über `Approved`-`LearningEntries`; Domänen-Boost-Ranking (`finalScore = similarity × sameDomainBoost \| crossDomainPenalty`); Citations nutzen `learning://{id}`-Schema; in Templates nach kuratierten Wissens-Providern platzieren |
 
 **Convergence-Policy:** `DefaultConvergencePolicy` aus `ConvergenceOptions`, überschreibbar per `ConvergencePolicyOverride` im CrewTemplate.

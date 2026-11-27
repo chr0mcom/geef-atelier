@@ -3630,3 +3630,66 @@ all so far, not even those through `answer_order`.
 `submit_order` after the form (answers, "You decide", decline without entries); field order of the result DTOs; end to end with the SDK
 client: form → `submit_order` and `get_order_result` name the choice with `form`; `answer_order` → `get_order_result` through a
 2025-11-25 client with `user`; answer `client` visible to the owner in both revisions, not to an administrator.
+
+## D-089 — Cleanup, cut 1: code nobody used is removed (2026-11-27)
+
+**Context.** Stage 8c of the cleanup (plan step 1b, "removal cut 1"). It takes out code that no remaining way of working needs; the
+second cut (composer and Auto-Crew, tool path, learning loop, vector knowledge base, older MCP tools, `/new`) follows after the
+transition in 8b. Before removing a part it was checked that no team that stays selectable depends on it.
+
+**Decision — removed.**
+- **Template Studio** (`/crew/studio`, service, prompts, similarity search, settings, all studio components). Its standalone start of
+  a composition run goes with it; Auto-Crew stays reachable through `/new` and `submit_auto_crew_request`. The MCP tools
+  `analyze_template_proposal` and `materialize_template_proposal` stay listed among the older tools as **stubs**: they take an optional
+  string and every call returns a tool error that names `submit_order` (clients keep tool lists cached). `IAtomicTransactionFactory`
+  moved to `Infrastructure/Persistence` beforehand, because the crew materializer uses it; the help text of the Transform instruction
+  moved to `FinalizerFieldHelps`.
+- **MCP client** (`/mcp-servers`, client factory, tool discovery, the tool type `mcp-tool` in `ToolExecutor`, schema provider and tool
+  editor). Atelier's own MCP server is not affected. The package `ModelContextProtocol.Core` leaves Infrastructure.
+- **Grounding types `rest-api`, `academic-search`, `news-search`** with their providers, the academic sources, `JsonPathNavigator`,
+  settings keys and editor sections; the system profiles `academic-default` and `tavily-news` leave `SystemCrew`.
+- **Finishing step `ExternalSink`** (webhook and e-mail) with its settings, the SMTP options and MailKit; the system profiles
+  `webhook-sink` and `email-sink` leave `SystemCrew`.
+- **Editor for HTTP providers.** HTTP providers come with the system and are read-only; CLI providers keep editor and copy.
+- **Dead concepts:** `GroundingProviderProfile.MaxQueriesPerRun` (never enforced; editor field, list column, MCP DTO field and EF
+  mapping), `RunEntity.AdvisorRetryAttempted` (never written), and the test-only `StubExecutionStep`/`StubReviewer` (now in the test
+  project).
+
+**Decision — kept on purpose (deviation from the plan).** `url-fetch` (with `UrlSafetyValidator` and `HtmlContentExtractor`) and
+`MetadataEnrich` stay: teams that stay selectable can still name them. They are decided in the second cut together with the team
+choice. The agentic tool path and `/tools`
+also stay until 8d.
+
+**Rules kept.**
+- Order per part: navigation → registration → code → tests → seeds. **No `DROP`, no migration, no deleted row.** The tables
+  `TemplateStudioAnalyses`, `StudioSettings`, `mcp_server_configs` and the columns `MaxQueriesPerRun`, `AdvisorRetryAttempted` stay
+  (unmapped; nullable or with a default). Rows of retired system profiles stay in the database.
+- **Retired values stay readable.** `FinalizerType.ExternalSink` and the constants `GroundingProviderTypes.NewsSearch/AcademicSearch/
+  RestApi` and `ToolType.McpTool` stay as `[Obsolete]`. `GroundingProviderTypes.Retired` and `FinalizerType.IsRetired()` name them:
+  stored profiles and run snapshots with them stay readable, a run skips them with the known warning ("could not be read and was
+  skipped" / "The finishing step … failed"), they can no longer be saved (`CrewService`), finalizer listings leave them out, and the
+  grounding editor shows a notice. `academic-default` stays in the rule that keeps older snapshots off the tool path.
+- **Retired types are no longer offered.** Grounding listings (template editor, `list_grounding_provider_profiles`) leave out
+  profiles of a retired type like finalizer listings do; the composer validator rejects a `reuse` of such a profile as critical. Templates
+  that already name one keep the name (the picker keeps selected names) and the run skips it with the warning.
+- **Retired system profiles stay protected.** `academic-default`, `tavily-news`, `webhook-sink` and `email-sink` still count as system
+  names (`SystemCrew.RetiredGroundingProviderNames`, `RetiredFinalizerNames`): their rows cannot be renamed, changed or deleted.
+- The composer no longer names the removed types.
+
+**Proof.** The production-snapshot test (`ATELIER_SNAPSHOT_FIXTURES`, export outside the repository) now also checks every grounding
+type against the real registration (`AddGroundingProviders`) or the retired list, and every finalizer type against the registered
+executors (`AddFinalizers`) or the retired list; all exported snapshots pass. A synthetic test in the repository reads an
+older snapshot with `maxQueriesPerRun`, retired grounding types and an `ExternalSink` finishing step. Further tests: stubs answer with
+the error, retired types cannot be saved (real Postgres), stored sink rows stay but are not listed, editors no longer offer the
+removed types, the provider pages link to no removed route, the migration of Template Studio still creates its table.
+
+**MCP baselines taken again on purpose:** the two tool list hashes with the older tools change through the stub descriptions; the
+hashes without the older tools and the server instructions are unchanged.
+
+**Limit: the EF model snapshot.** `AtelierDbContextModelSnapshot` still knows `MaxQueriesPerRun`, `AdvisorRetryAttempted`,
+`TemplateStudioAnalyses`, `StudioSettings` and `mcp_server_configs`; a generated migration (`dotnet ef migrations add`) would propose
+`DropColumn`/`DropTable`. Migrations stay hand-written; do not generate one now. This is settled with a new migration baseline after
+the database cleanup, which comes as its own step after 8d.
+
+**Rollback.** The previous image; the database stays compatible because nothing was dropped or changed. In code only through Git
+(tag before the deploy).
