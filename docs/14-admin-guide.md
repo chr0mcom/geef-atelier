@@ -74,6 +74,14 @@ What the values mean:
   answered in every round); the run then gives the reason “Two more rounds did not reduce the open points, so the work was
   stopped.” Approval, the round limit and the time limit come first. All three stay
   off until the measurement of the new “Extra careful” has decided on them (D-085).
+  Measuring accounts can get each switch per user name (`Convergence__BestDraftOverrides__<name>=On`,
+  `…WriterBlockingOnlyOverrides…`, `…StopWithoutProgressOverrides…`; shipped empty, D-087).
+- **“Extra careful” with an outline** (`Orders:CarefulOutline`, `Off`/`On`, shipped `Off`; exceptions per user name
+  `Orders__CarefulOutlineOverrides__<name>=On`): with `On`, an “Extra careful” order without a chosen team runs on the standard way with
+  one call first that splits the text into sections with word budgets (taken from the requested length when it can be read without a
+  model); the writer then writes along it, with the same automatic checks, the same fact check and the same “What was checked” as the
+  standard way. If no usable outline comes back, the text is written in one go and the order says so. A chosen team, changes and resumed
+  runs never plan. Stays off until the measurement of package 7 has decided (D-087).
 
 **How to set a switch.** The settings are read at start. Set them as environment variables of the web service, with `__` in place
 of `:` (for example `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` passes variables one by one,
