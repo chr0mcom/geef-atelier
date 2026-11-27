@@ -26,9 +26,6 @@ public sealed class OrderOptions
     /// <summary>Configuration section name.</summary>
     public const string SectionName = "Orders";
 
-    /// <summary>Mode of <c>submit_request</c> calls without a crew template or custom crew.</summary>
-    public OrderMode LegacySubmitDefaultMode { get; set; } = OrderMode.Direct;
-
     /// <summary>Whether orders from the start page and submit_order are clarified first (stage 2). Replaces the unused IntakeEnabled.</summary>
     public IntakeMode IntakeMode { get; set; } = IntakeMode.Shadow;
 

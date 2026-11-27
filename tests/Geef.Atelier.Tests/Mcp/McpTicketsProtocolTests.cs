@@ -32,18 +32,16 @@ public sealed class McpTicketsProtocolTests
     private readonly FakeSourceIntake _intake = new();
     private readonly FakeRefusalLog _refusals = new();
 
-    [Theory]
-    [InlineData("true")]
-    [InlineData("false")]
-    public async Task Without_tickets_the_client_sees_the_tool_list_and_instructions_of_before(string legacy)
+    [Fact]
+    public async Task Without_tickets_the_client_sees_the_tool_list_and_instructions_of_before()
     {
-        await using var session = await Session.StartAsync(Services(tickets: false, legacy));
+        await using var session = await Session.StartAsync(Services(tickets: false));
 
         var tools = await session.Client.ListToolsAsync();
 
         Assert.DoesNotContain(tools, t => t.Name == "prepare_attachment");
         Assert.DoesNotContain(SubmitOrderTool.UploadIdsParameter, Properties(tools.Single(t => t.Name == "submit_order").ProtocolTool));
-        using var reference = McpTestServer.Provider(legacy, tickets: null);
+        using var reference = McpTestServer.Provider(tickets: null);
         Assert.Equal(McpTestServer.ToolListJson(reference), ToolListJson(tools));
         Assert.Equal(McpTestServer.Instructions(reference), session.Client.ServerInstructions);
         Assert.Contains("ask the person to start the order in the Atelier web app", session.Client.ServerInstructions, StringComparison.Ordinal);
@@ -53,11 +51,11 @@ public sealed class McpTicketsProtocolTests
     [Fact]
     public async Task With_tickets_the_client_sees_prepare_attachment_upload_ids_and_the_ticket_step()
     {
-        await using var session = await Session.StartAsync(Services(tickets: true, legacy: "false"));
+        await using var session = await Session.StartAsync(Services(tickets: true));
 
         var tools = await session.Client.ListToolsAsync();
 
-        Assert.Equal(10, tools.Count);
+        Assert.Equal(15, tools.Count);
         var prepare = tools.Single(t => t.Name == "prepare_attachment").ProtocolTool;
         Assert.Equal(PrepareAttachmentTool.ToolDescription, prepare.Description);
         Assert.Equal(["fileName", "sizeBytes"], Properties(prepare));
@@ -69,7 +67,7 @@ public sealed class McpTicketsProtocolTests
         Assert.Equal(SubmitOrderTool.UploadIdsDescription, uploadIds.GetProperty("description").GetString());
         Assert.Contains("string", Types(uploadIds.GetProperty("items")));
         Assert.Contains("array", Types(uploadIds));
-        Assert.Equal(McpServerInstructions.For(new OrderOptions().MaxWaitSeconds, false, tickets: true, aboutMeSaving: true), session.Client.ServerInstructions);
+        Assert.Equal(McpServerInstructions.For(new OrderOptions().MaxWaitSeconds, tickets: true, aboutMeSaving: true), session.Client.ServerInstructions);
         Assert.Contains(McpServerInstructions.TicketFilesStep, session.Client.ServerInstructions, StringComparison.Ordinal);
         Assert.DoesNotContain(McpServerInstructions.AttachmentFilesStep, session.Client.ServerInstructions, StringComparison.Ordinal);
     }
@@ -77,7 +75,7 @@ public sealed class McpTicketsProtocolTests
     [Fact]
     public async Task With_tickets_no_text_tells_the_client_to_start_without_uploading_or_to_send_files_as_base64()
     {
-        await using var session = await Session.StartAsync(Services(tickets: true, legacy: "false"));
+        await using var session = await Session.StartAsync(Services(tickets: true));
 
         var tools = await session.Client.ListToolsAsync();
         var submit = tools.Single(t => t.Name == "submit_order").ProtocolTool;
@@ -97,7 +95,7 @@ public sealed class McpTicketsProtocolTests
     [Fact]
     public async Task Without_tickets_submit_order_keeps_its_description_and_the_base64_attachments()
     {
-        await using var session = await Session.StartAsync(Services(tickets: false, legacy: "false"));
+        await using var session = await Session.StartAsync(Services(tickets: false));
 
         var submit = (await session.Client.ListToolsAsync()).Single(t => t.Name == "submit_order").ProtocolTool;
 
@@ -109,20 +107,9 @@ public sealed class McpTicketsProtocolTests
     }
 
     [Fact]
-    public async Task With_tickets_and_older_tools_the_server_offers_all_twenty_nine()
-    {
-        await using var session = await Session.StartAsync(Services(tickets: true, legacy: "true"));
-
-        var tools = await session.Client.ListToolsAsync();
-
-        Assert.Equal(29, tools.Count);
-        Assert.EndsWith(McpServerInstructions.LegacyLine, session.Client.ServerInstructions, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public async Task Without_tickets_an_upload_ids_argument_still_reaches_the_tool_and_gets_the_fixed_sentence()
     {
-        await using var session = await Session.StartAsync(Services(tickets: false, legacy: "false"));
+        await using var session = await Session.StartAsync(Services(tickets: false));
 
         var result = await session.Client.CallToolAsync("submit_order", new Dictionary<string, object?>
         {
@@ -138,7 +125,7 @@ public sealed class McpTicketsProtocolTests
     [Fact]
     public async Task Without_tickets_the_base64_way_works_as_before()
     {
-        await using var session = await Session.StartAsync(Services(tickets: false, legacy: "false"));
+        await using var session = await Session.StartAsync(Services(tickets: false));
 
         var result = await session.Client.CallToolAsync("submit_order", new Dictionary<string, object?>
         {
@@ -155,7 +142,7 @@ public sealed class McpTicketsProtocolTests
     [Fact]
     public async Task Without_tickets_a_rejected_attachment_reaches_the_client_word_for_word_and_is_counted()
     {
-        await using var session = await Session.StartAsync(Services(tickets: false, legacy: "false"));
+        await using var session = await Session.StartAsync(Services(tickets: false));
         var c = RefusalCase.Named("placeholder");
 
         var result = await session.Client.CallToolAsync("submit_order", new Dictionary<string, object?>
@@ -172,7 +159,7 @@ public sealed class McpTicketsProtocolTests
     [Fact]
     public async Task With_tickets_prepare_attachment_answers_with_the_command_and_the_link()
     {
-        await using var session = await Session.StartAsync(Services(tickets: true, legacy: "false"));
+        await using var session = await Session.StartAsync(Services(tickets: true));
 
         var result = await session.Client.CallToolAsync("prepare_attachment", new Dictionary<string, object?> { ["fileName"] = "Angebot.pdf", ["sizeBytes"] = 210_000 });
 
@@ -190,15 +177,15 @@ public sealed class McpTicketsProtocolTests
     [Fact]
     public async Task The_host_starts_with_every_service_of_the_tools_registered()
     {
-        await using var provider = Services(tickets: true, legacy: "true").BuildServiceProvider();
+        await using var provider = Services(tickets: true).BuildServiceProvider();
 
-        Assert.Contains(Services(tickets: true, legacy: "true"), d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(McpToolBindingCheck));
+        Assert.Contains(Services(tickets: true), d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(McpToolBindingCheck));
         await ActivatorUtilities.CreateInstance<McpToolBindingCheck>(provider).StartAsync(CancellationToken.None);
     }
 
-    private ServiceCollection Services(bool tickets, string legacy)
+    private ServiceCollection Services(bool tickets)
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Mcp:LegacyTools"] = legacy }).Build();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);

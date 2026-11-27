@@ -13,12 +13,12 @@ namespace Geef.Atelier.Tests.Mcp.Forms;
 public sealed class McpElicitationSwitchTests
 {
     [Theory]
-    [InlineData("true", null)]
-    [InlineData("false", "On")]
-    public void Off_changes_neither_tools_nor_instructions_nor_capabilities(string legacy, string? tickets)
+    [InlineData(null)]
+    [InlineData("On")]
+    public void Off_changes_neither_tools_nor_instructions_nor_capabilities(string? tickets)
     {
-        using var unset = McpTestServer.Provider(legacy, tickets);
-        using var off = McpTestServer.Provider(legacy, tickets, configure: s => s.Configure<McpOptions>(o => o.Elicitation = McpElicitationMode.Off));
+        using var unset = McpTestServer.Provider(tickets);
+        using var off = McpTestServer.Provider(tickets, configure: s => s.Configure<McpOptions>(o => o.Elicitation = McpElicitationMode.Off));
 
         Assert.Equal(McpTestServer.ToolListJson(unset), McpTestServer.ToolListJson(off));
         Assert.Equal(McpTestServer.Instructions(unset), McpTestServer.Instructions(off));
@@ -26,12 +26,12 @@ public sealed class McpElicitationSwitchTests
     }
 
     [Theory]
-    [InlineData("true", null)]
-    [InlineData("false", "On")]
-    public void On_adds_one_sentence_to_submit_order_and_nothing_else(string legacy, string? tickets)
+    [InlineData(null)]
+    [InlineData("On")]
+    public void On_adds_one_sentence_to_submit_order_and_nothing_else(string? tickets)
     {
-        using var off = McpTestServer.Provider(legacy, tickets);
-        using var on = McpTestServer.Provider(legacy, tickets, configure: s => s.Configure<McpOptions>(o => o.Elicitation = McpElicitationMode.On));
+        using var off = McpTestServer.Provider(tickets);
+        using var on = McpTestServer.Provider(tickets, configure: s => s.Configure<McpOptions>(o => o.Elicitation = McpElicitationMode.On));
 
         Assert.Equal(McpTestServer.Instructions(off), McpTestServer.Instructions(on));
         Assert.Null(on.GetRequiredService<IOptions<McpServerOptions>>().Value.Capabilities);

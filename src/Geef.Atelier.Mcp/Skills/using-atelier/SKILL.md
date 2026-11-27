@@ -80,5 +80,5 @@ own words with profile.
 
 ## Other tools
 
-cancel_order stops an order. list_orders lists the person's orders, for example to find an orderId again. Older tools such as
-submit_request may still be listed; use the tools above.
+cancel_order stops an order. list_orders lists the person's orders, for example to find an orderId again. The removed tools
+submit_request, submit_auto_crew_request and get_run_* may still be listed; they only return an error that names the tool to use.

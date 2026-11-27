@@ -21,7 +21,7 @@ public sealed class GuideDriftTests
     [Theory]
     [InlineData("13-ai-assistant-guide.md")]
     [InlineData("13-ai-assistant-guide_de.md")]
-    public void The_tool_table_names_exactly_the_tools_of_the_server(string file)
+    public void The_tool_table_names_exactly_the_tools_of_the_server_without_the_stubs(string file)
     {
         var documented = ToolTable(File.ReadAllText(Path.Combine(RepoRoot(), "docs", file)));
 
@@ -134,7 +134,7 @@ public sealed class GuideDriftTests
 
     private static IReadOnlyList<string> OfferedTools()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Mcp:LegacyTools"] = "false" }).Build();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);
@@ -144,7 +144,10 @@ public sealed class GuideDriftTests
             services.AddScoped(type, _ => throw new NotSupportedException());
         services.AddAtelierMcp();
         using var provider = services.BuildServiceProvider();
-        return provider.GetRequiredService<IOptions<McpServerOptions>>().Value.ToolCollection!.Select(t => t.ProtocolTool.Name).ToList();
+        return provider.GetRequiredService<IOptions<McpServerOptions>>().Value.ToolCollection!
+            .Where(t => t.ProtocolTool.Description?.StartsWith(Geef.Atelier.Mcp.Tools.RetiredTools.DescriptionStart, StringComparison.Ordinal) != true)
+            .Select(t => t.ProtocolTool.Name)
+            .ToList();
     }
 
     private static string RepoRoot()

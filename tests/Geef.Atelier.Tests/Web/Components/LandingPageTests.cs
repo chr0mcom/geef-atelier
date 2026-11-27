@@ -65,7 +65,7 @@ public sealed class LandingPageTests : TestContext
 
     private static HowItWorksFeatures Everyone(bool signedIn = false) => new(
         ForSignedInPerson: signedIn, Questions: true, MaxQuestions: 3, ChangeText: true, MaxVersions: 10, WebResearch: false,
-        FactCheck: FactCheckOffer.ReportsOnly, SumsInFiles: true, UploadThroughAssistant: true, OlderAssistantTools: true,
+        FactCheck: FactCheckOffer.ReportsOnly, SumsInFiles: true, UploadThroughAssistant: true,
         LearnsFromEarlierTexts: false, MaxFiles: 10, MaxFileBytes: 26_214_400, FullTextChars: 150_000, MapChars: 600_000);
 
     [Fact]

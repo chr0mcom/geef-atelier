@@ -28,12 +28,12 @@ public sealed class McpSkillTests
     }
 
     [Theory]
-    [InlineData("true", null)]
-    [InlineData("false", "On")]
-    public void Off_adds_no_extension_no_resources_and_changes_neither_tools_nor_instructions(string legacy, string? tickets)
+    [InlineData(null)]
+    [InlineData("On")]
+    public void Off_adds_no_extension_no_resources_and_changes_neither_tools_nor_instructions(string? tickets)
     {
-        using var unset = McpTestServer.Provider(legacy, tickets);
-        using var off = McpTestServer.Provider(legacy, tickets, configure: s => s.Configure<McpOptions>(o => o.Skills = McpSkillsMode.Off));
+        using var unset = McpTestServer.Provider(tickets);
+        using var off = McpTestServer.Provider(tickets, configure: s => s.Configure<McpOptions>(o => o.Skills = McpSkillsMode.Off));
         var options = off.GetRequiredService<IOptions<McpServerOptions>>().Value;
 
         Assert.Null(options.Capabilities?.Extensions);
@@ -44,12 +44,12 @@ public sealed class McpSkillTests
     }
 
     [Theory]
-    [InlineData("true", null)]
-    [InlineData("false", "On")]
-    public void On_adds_the_extension_and_the_files_and_only_one_sentence_to_submit_order(string legacy, string? tickets)
+    [InlineData(null)]
+    [InlineData("On")]
+    public void On_adds_the_extension_and_the_files_and_only_one_sentence_to_submit_order(string? tickets)
     {
-        using var off = McpTestServer.Provider(legacy, tickets);
-        using var on = McpTestServer.Provider(legacy, tickets, configure: s => s.Configure<McpOptions>(o => o.Skills = McpSkillsMode.On));
+        using var off = McpTestServer.Provider(tickets);
+        using var on = McpTestServer.Provider(tickets, configure: s => s.Configure<McpOptions>(o => o.Skills = McpSkillsMode.On));
         var options = on.GetRequiredService<IOptions<McpServerOptions>>().Value;
 
         Assert.True(options.Capabilities!.Extensions!.ContainsKey("io.modelcontextprotocol/skills"));
@@ -98,7 +98,7 @@ public sealed class McpSkillTests
     [Fact]
     public void The_skill_names_only_tools_the_server_has_and_links_only_its_own_files()
     {
-        using var provider = McpTestServer.Provider("true", "On", TellOnceMode.WithoutPromise);
+        using var provider = McpTestServer.Provider("On", TellOnceMode.WithoutPromise);
         var tools = McpTestServer.Tools(provider).Keys.ToHashSet(StringComparer.Ordinal);
         var all = AllSkillText();
 
@@ -168,7 +168,7 @@ public sealed class McpSkillTests
     [MemberData(nameof(ToolRules))]
     public void Rules_that_moved_into_tool_descriptions_stand_in_the_skill_in_the_same_words(string tool, string rule)
     {
-        using var provider = McpTestServer.Provider("false", "On", TellOnceMode.WithoutPromise);
+        using var provider = McpTestServer.Provider("On", TellOnceMode.WithoutPromise);
         Assert.Contains(rule, McpTestServer.Tools(provider)[tool].ProtocolTool.Description!, StringComparison.Ordinal);
         Assert.Contains(rule, OneLine(AllSkillText()), StringComparison.Ordinal);
     }
@@ -221,10 +221,9 @@ public sealed class McpSkillTests
 
     private static IEnumerable<string> AllInstructions()
     {
-        foreach (var legacy in new[] { false, true })
         foreach (var tickets in new[] { false, true })
         foreach (var saving in new[] { false, true })
-            yield return OneLine(McpServerInstructions.For(new OrderOptions().MaxWaitSeconds, legacy, tickets, saving));
+            yield return OneLine(McpServerInstructions.For(new OrderOptions().MaxWaitSeconds, tickets, saving));
     }
 
     private static string AllSkillText() =>

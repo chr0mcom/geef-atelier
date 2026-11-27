@@ -6,9 +6,6 @@ public sealed class McpOptions
     /// <summary>Configuration section name.</summary>
     public const string SectionName = "Mcp";
 
-    /// <summary>Whether the older tools are offered beside the order tools.</summary>
-    public bool LegacyTools { get; set; } = true;
-
     /// <summary>Whether the server offers the skill about using Atelier (extension <c>io.modelcontextprotocol/skills</c>).</summary>
     public McpSkillsMode Skills { get; set; } = McpSkillsMode.Off;
 

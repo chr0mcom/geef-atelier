@@ -123,21 +123,6 @@ public sealed class McpAttachmentRefusalTests
         Assert.Empty(orders.Submitted);
     }
 
-    [Fact]
-    public async Task Submit_request_counts_a_rejected_attachment_once_with_the_unchanged_message()
-    {
-        var orders = new FakeOrderService();
-        var c = RefusalCase.Named("base64");
-
-        var ex = await Assert.ThrowsAnyAsync<McpException>(() => SubmitRequestTool.SubmitRequest(
-            orders, new FakeSourceIntake(), _refusals, new FakeUser("admin", isAdmin: true), OrderToolTestData.Options(), Request, attachments: c.Json));
-
-        Assert.Equal(c.MessageStart + OffWay, ex.Message);
-        var record = Assert.Single(_refusals.Records);
-        Assert.Equal(("admin", RefusalPath.McpInline, SourceRefusalCodes.McpBase64Invalid), (record.OwnerUsername, record.Path, record.Code));
-        Assert.Empty(orders.Submitted);
-    }
-
     [Theory]
     [InlineData("application/pdf", "application/pdf")]
     [InlineData(" Application/PDF ; charset=binary", "application/pdf")]

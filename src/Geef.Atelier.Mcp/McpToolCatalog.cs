@@ -10,9 +10,9 @@ using ModelContextProtocol.Server;
 namespace Geef.Atelier.Mcp;
 
 /// <summary>
-/// The tools the server offers, registered one by one: the order tools always, the ticket tools only while
-/// <see cref="UploadOptions.Tickets"/> is <c>On</c>, the older tools only while <see cref="McpOptions.LegacyTools"/> is true.
-/// Every tool type of this assembly is in exactly one of the three lists.
+/// The tools the server offers, registered one by one: the order tools and the stubs of the removed older tools always, the
+/// ticket tools only while <see cref="UploadOptions.Tickets"/> is <c>On</c>. Every tool type of this assembly is in exactly one
+/// of the three lists.
 /// </summary>
 public static class McpToolCatalog
 {
@@ -30,21 +30,8 @@ public static class McpToolCatalog
     public static IReadOnlyList<Type> OrderToolsFor(bool tickets) =>
         tickets ? [.. OrderTools, .. TicketTools] : OrderTools;
 
-    /// <summary>The older tools, kept beside the order tools while <see cref="McpOptions.LegacyTools"/> is true.</summary>
-    public static IReadOnlyList<Type> LegacyTools { get; } =
-    [
-        typeof(AnalyzeTemplateProposalTool), typeof(CancelRunTool), typeof(DownloadRunArtifactTool), typeof(GetProviderModelsTool),
-        typeof(GetRunDetailsTool), typeof(GetRunResultTool), typeof(GetRunStatusTool), typeof(ListAdvisorProfilesTool),
-        typeof(ListCrewTemplatesTool), typeof(ListGroundingProviderProfilesTool), typeof(ListKnowledgeDocumentsTool),
-        typeof(ListLearningsTool), typeof(ListProvidersTool), typeof(ListReviewerProfilesTool), typeof(ListRunArtifactsTool),
-        typeof(ListRunsTool), typeof(MaterializeTemplateProposalTool), typeof(SubmitAutoCrewRequestTool), typeof(SubmitRequestTool),
-    ];
-
-    /// <summary>Start of the description of an older tool that has a successor, followed by the successor and <see cref="LegacyLeadEnd"/>.</summary>
-    public const string LegacyLeadStart = "Older tool, kept for now: use ";
-
-    /// <summary>End of the first sentence of the description of an older tool that has a successor.</summary>
-    public const string LegacyLeadEnd = " instead. ";
+    /// <summary>The stubs of the removed older tools, offered for one version beside the order tools (D-091).</summary>
+    public static IReadOnlyList<Type> RetiredTools { get; } = [typeof(Tools.RetiredTools)];
 
     /// <summary>The tool methods of <paramref name="toolTypes"/>, as <c>WithTools</c> would find them.</summary>
     public static IReadOnlyList<MethodInfo> ToolMethods(this IEnumerable<Type> toolTypes) =>

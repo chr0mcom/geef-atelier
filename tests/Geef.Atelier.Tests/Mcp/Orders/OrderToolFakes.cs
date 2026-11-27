@@ -21,8 +21,8 @@ internal sealed class FakeUser(string? username, bool isAdmin = false) : ICurren
 
 internal static class OrderToolTestData
 {
-    public static IOptions<OrderOptions> Options(int maxWaitSeconds = 50, OrderMode legacyMode = OrderMode.Direct) =>
-        Microsoft.Extensions.Options.Options.Create(new OrderOptions { MaxWaitSeconds = maxWaitSeconds, LegacySubmitDefaultMode = legacyMode });
+    public static IOptions<OrderOptions> Options(int maxWaitSeconds = 50) =>
+        Microsoft.Extensions.Options.Options.Create(new OrderOptions { MaxWaitSeconds = maxWaitSeconds });
 
     public static IOptions<IntakeOptions> Intake(int submitWaitSeconds = 30) =>
         Microsoft.Extensions.Options.Options.Create(new IntakeOptions { SubmitWaitSeconds = submitWaitSeconds });

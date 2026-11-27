@@ -27,7 +27,6 @@ public sealed class HowItWorksFeaturesTests
         Assert.Equal(FactCheckOffer.ReportsOnly, features.FactCheck);
         Assert.False(features.UploadThroughAssistant);
         Assert.False(features.LearnsFromEarlierTexts);
-        Assert.True(features.OlderAssistantTools);
     }
 
     [Fact]

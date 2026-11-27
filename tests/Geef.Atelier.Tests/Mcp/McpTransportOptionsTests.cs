@@ -16,7 +16,7 @@ public sealed class McpTransportOptionsTests
     [Fact]
     public void The_transport_is_stateless_by_an_explicit_setting()
     {
-        using var provider = McpTestServer.Provider("true", "On", TellOnceMode.WithoutPromise);
+        using var provider = McpTestServer.Provider("On", TellOnceMode.WithoutPromise);
 
         var transport = provider.GetRequiredService<IOptions<HttpServerTransportOptions>>().Value;
 
@@ -24,13 +24,11 @@ public sealed class McpTransportOptionsTests
     }
 
     [Theory]
-    [InlineData("true", "On")]
-    [InlineData("true", "Off")]
-    [InlineData("false", "On")]
-    [InlineData("false", "Off")]
-    public void No_tool_announces_task_support(string legacy, string tickets)
+    [InlineData("On")]
+    [InlineData("Off")]
+    public void No_tool_announces_task_support(string tickets)
     {
-        using var provider = McpTestServer.Provider(legacy, tickets, TellOnceMode.WithoutPromise);
+        using var provider = McpTestServer.Provider(tickets, TellOnceMode.WithoutPromise);
 
         foreach (var line in McpTestServer.ToolListJson(provider).Split('\n'))
         {
@@ -42,7 +40,7 @@ public sealed class McpTransportOptionsTests
     [Fact]
     public void The_server_announces_no_extensions()
     {
-        using var provider = McpTestServer.Provider("true", "On", TellOnceMode.WithoutPromise);
+        using var provider = McpTestServer.Provider("On", TellOnceMode.WithoutPromise);
 
         var options = provider.GetRequiredService<IOptions<McpServerOptions>>().Value;
 

@@ -41,7 +41,7 @@ public sealed class McpToolBindingEndToEndTests(PostgresFixture postgres)
         }
 
         Assert.Contains("currentUser", methods.Values.SelectMany(m => m.GetParameters()).Select(p => p.Name));
-        Assert.Contains("crewService", methods.Values.SelectMany(m => m.GetParameters()).Select(p => p.Name));
+        Assert.Contains("exports", methods.Values.SelectMany(m => m.GetParameters()).Select(p => p.Name));
     }
 
     [Fact]

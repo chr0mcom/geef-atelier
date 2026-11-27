@@ -52,7 +52,7 @@ public sealed class McpOrderEndpointTests(PostgresFixture pg) : IAsyncLifetime
         Assert.Contains("submit_request", tools.Keys);
         Assert.Contains("in their own words", tools["submit_order"]);
         Assert.Contains("max 50", tools["get_order_status"]);
-        Assert.Contains("Administrators only", tools["list_learnings"]);
+        Assert.DoesNotContain("list_learnings", tools.Keys);
     }
 
     [Fact]

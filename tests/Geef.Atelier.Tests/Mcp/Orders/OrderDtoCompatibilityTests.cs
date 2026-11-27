@@ -18,11 +18,8 @@ public sealed class OrderDtoCompatibilityTests
     public void Old_constructors_keep_working_and_new_fields_default_to_null()
     {
         var status = new OrderStatusDto("o", "working", false, "Writing", 3, 1, "r", [], 10);
-        var run = new RunStatusDto("r", "Pending", null);
 
         Assert.Null(status.Outcome);
-        Assert.Null(run.OrderId);
-        Assert.Null(run.Warnings);
     }
 
     [Fact]
@@ -191,8 +188,7 @@ public sealed class OrderDtoCompatibilityTests
             "5. Give the person the text from get_order_result as it is, together with what was checked (checks), the open points (the placeholders to fill in, open checks, passages that may not be backed, problems in their files, points the writer left open and the questions the person did not answer) and the assumptions. Do not say more was checked than checks says, and do not fill in placeholders or open points yourself. If no text was written, say so and do not write one yourself. lookedUp shows what web pages say, not checked facts. Follow the description of get_order_result for changed versions.\n" +
             "6. If the person wants a finished text changed, call revise_order with their words in change, as they said them. Do not rephrase them or add changes of your own; follow its description before you say the change is made.\n" +
             "7. For the text as a file, call export_order and still give the person the open points from get_order_result.\n" +
-            "profile shows what the person saved under About me in the Atelier web app. If get_order_result has aboutMeMissing, ask whether they want to tell it once and save only their own words with profile; never fill it in yourself.\n" +
-            "The older tools (such as submit_request and get_run_result) remain for now; use the tools above. submit_request never asks questions.";
+            "profile shows what the person saved under About me in the Atelier web app. If get_order_result has aboutMeMissing, ask whether they want to tell it once and save only their own words with profile; never fill it in yourself.";
 
         Assert.Equal(expected, McpServerInstructions.Text);
     }
@@ -205,7 +201,6 @@ public sealed class OrderDtoCompatibilityTests
     [InlineData("Never guess an answer")]
     [InlineData("answer_order with skip=true")]
     [InlineData("the assumptions")]
-    [InlineData("submit_request never asks questions")]
     [InlineData("word for word")]
     [InlineData("Do not write your own version")]
     [InlineData("only into the attachments parameter")]

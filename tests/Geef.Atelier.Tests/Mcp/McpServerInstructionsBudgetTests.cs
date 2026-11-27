@@ -19,19 +19,17 @@ public sealed class McpServerInstructionsBudgetTests
     private const string WithoutTickets = "instructions:no-tickets";
     private const string WhileSaving = "instructions:saving";
     private const string ReadOnly = "instructions:read-only";
-    private const string WithLegacy = "instructions:legacy";
     private const string TicketAttachments = "tool:submit_order/attachments";
     private const string AboutMeNote = "note:aboutMeMissing";
 
-    private static readonly Lazy<IReadOnlyList<(string Legacy, string Tickets, TellOnceMode TellOnce, string Text)>> AllInstructions = new(() =>
-        [.. from legacy in new[] { "true", "false" }
-            from tickets in new[] { "Off", "On" }
+    private static readonly Lazy<IReadOnlyList<(string Tickets, TellOnceMode TellOnce, string Text)>> AllInstructions = new(() =>
+        [.. from tickets in new[] { "Off", "On" }
             from tellOnce in Enum.GetValues<TellOnceMode>()
-            select (legacy, tickets, tellOnce, Render(legacy, tickets, tellOnce))]);
+            select (tickets, tellOnce, Render(tickets, tellOnce))]);
 
     private static readonly Lazy<IReadOnlyDictionary<string, string>> ServedTools = new(() =>
     {
-        using var provider = McpTestServer.Provider("false", "On", TellOnceMode.WithoutPromise);
+        using var provider = McpTestServer.Provider("On", TellOnceMode.WithoutPromise);
         var tools = McpTestServer.Tools(provider);
         var served = tools.ToDictionary(t => "tool:" + t.Key, t => t.Value.ProtocolTool.Description ?? string.Empty, StringComparer.Ordinal);
         served[TicketAttachments] = tools["submit_order"].ProtocolTool.InputSchema.GetProperty("properties")
@@ -40,25 +38,24 @@ public sealed class McpServerInstructionsBudgetTests
         return served;
     });
 
-    public static TheoryData<string, string, TellOnceMode, ResearchMode, ReviseMode, int> Combinations()
+    public static TheoryData<string, TellOnceMode, ResearchMode, ReviseMode, int> Combinations()
     {
-        var data = new TheoryData<string, string, TellOnceMode, ResearchMode, ReviseMode, int>();
-        foreach (var legacy in new[] { "true", "false" })
+        var data = new TheoryData<string, TellOnceMode, ResearchMode, ReviseMode, int>();
         foreach (var tickets in new[] { "Off", "On" })
         foreach (var tellOnce in Enum.GetValues<TellOnceMode>())
         foreach (var research in Enum.GetValues<ResearchMode>())
         foreach (var revise in Enum.GetValues<ReviseMode>())
         foreach (var maxWait in new[] { 50, 120 })
-            data.Add(legacy, tickets, tellOnce, research, revise, maxWait);
+            data.Add(tickets, tellOnce, research, revise, maxWait);
         return data;
     }
 
     [Theory]
     [MemberData(nameof(Combinations))]
     public void Every_combination_of_switches_keeps_the_instructions_and_tool_descriptions_within_the_limits(
-        string legacy, string tickets, TellOnceMode tellOnce, ResearchMode research, ReviseMode revise, int maxWait)
+        string tickets, TellOnceMode tellOnce, ResearchMode research, ReviseMode revise, int maxWait)
     {
-        using var provider = McpTestServer.Provider(legacy, tickets, tellOnce, services =>
+        using var provider = McpTestServer.Provider(tickets, tellOnce, services =>
         {
             services.Configure<ResearchOptions>(o => o.Mode = research);
             services.Configure<OrderOptions>(o =>
@@ -88,7 +85,7 @@ public sealed class McpServerInstructionsBudgetTests
     {
         var longest = AllInstructions.Value.MaxBy(i => i.Text.Length);
 
-        Assert.Equal(("true", "On"), (longest.Legacy, longest.Tickets));
+        Assert.Equal("On", longest.Tickets);
         Assert.NotEqual(TellOnceMode.Off, longest.TellOnce);
         Assert.True(longest.Text.Length <= McpServerInstructions.TargetLength, $"{longest.Text.Length} characters");
     }
@@ -96,9 +93,9 @@ public sealed class McpServerInstructionsBudgetTests
     [Fact]
     public void The_most_important_rules_come_first_in_every_combination()
     {
-        foreach (var (legacy, tickets, tellOnce, text) in AllInstructions.Value)
+        foreach (var (tickets, tellOnce, text) in AllInstructions.Value)
         {
-            var label = $"legacy={legacy} tickets={tickets} tellOnce={tellOnce}";
+            var label = $"tickets={tickets} tellOnce={tellOnce}";
             var step2 = At(text, "\n2. ", label);
             var step3 = At(text, "\n3. ", label);
             var step4 = At(text, "\n4. ", label);
@@ -183,7 +180,6 @@ public sealed class McpServerInstructionsBudgetTests
         { "profile (saving)", "aboutMeMissing names details Atelier had to assume or leave open because the person has not saved them under About me.", AboutMeNote },
         { "profile (saving)", "the person changes or deletes it under About me in the web app", "tool:profile" },
         { "8", "Do not invent anything: if the person did not ask for something or did not give a file or a fact, do not add it.", Everywhere },
-        { "legacy", "use the tools above. submit_request never asks questions.", WithLegacy },
     };
 
     [Theory]
@@ -200,7 +196,7 @@ public sealed class McpServerInstructionsBudgetTests
     [Fact]
     public void The_details_that_moved_are_no_longer_in_the_instructions()
     {
-        foreach (var (_, _, _, text) in AllInstructions.Value)
+        foreach (var (_, _, text) in AllInstructions.Value)
         {
             Assert.DoesNotContain("assumptionsVersion", text, StringComparison.Ordinal);
             Assert.DoesNotContain("lengthNotice", text, StringComparison.Ordinal);
@@ -221,15 +217,14 @@ public sealed class McpServerInstructionsBudgetTests
                 WithoutTickets => i.Tickets == "Off",
                 WhileSaving => i.TellOnce != TellOnceMode.Off,
                 ReadOnly => i.TellOnce == TellOnceMode.Off,
-                WithLegacy => i.Legacy == "true",
                 _ => true,
             })
-            .Select(i => ($"instructions (legacy={i.Legacy}, tickets={i.Tickets}, tellOnce={i.TellOnce})", i.Text))];
+            .Select(i => ($"instructions (tickets={i.Tickets}, tellOnce={i.TellOnce})", i.Text))];
     }
 
-    private static string Render(string legacy, string tickets, TellOnceMode tellOnce)
+    private static string Render(string tickets, TellOnceMode tellOnce)
     {
-        using var provider = McpTestServer.Provider(legacy, tickets, tellOnce);
+        using var provider = McpTestServer.Provider(tickets, tellOnce);
         return McpTestServer.Instructions(provider);
     }
 

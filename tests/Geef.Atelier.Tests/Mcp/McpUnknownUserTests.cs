@@ -35,15 +35,6 @@ public sealed class McpUnknownUserTests
     {
         ["get_order_status"] = user => GetOrderStatusTool.GetOrderStatus(NeverCalled<IOrderService>.Create(), user, OrderToolTestData.Options(), Id, 0),
         ["get_order_result"] = user => GetOrderResultTool.GetOrderResult(NeverCalled<IOrderService>.Create(), user, Id),
-        ["get_run_status"] = user => GetRunStatusTool.GetRunStatus(NeverCalled<IRunService>.Create(), user, Id),
-        ["get_run_details"] = user => GetRunDetailsTool.GetRunDetails(NeverCalled<IRunService>.Create(), user, Id),
-        ["get_run_result"] = user => GetRunResultTool.GetRunResult(NeverCalled<IRunService>.Create(), user, Id),
-        ["cancel_run"] = user => CancelRunTool.CancelRun(NeverCalled<IRunService>.Create(), user, Id),
-        ["list_run_artifacts"] = user => ListRunArtifactsTool.ListRunArtifacts(NeverCalled<IRunService>.Create(), user, NeverCalled<IRunArtifactRepository>.Create(), Id),
-        ["download_run_artifact"] = user => DownloadRunArtifactTool.DownloadRunArtifact(
-            NeverCalled<IRunService>.Create(), user, NeverCalled<IRunArtifactRepository>.Create(), Options.Create(new FinalizerOptions()), Id, Id),
-        ["list_runs"] = user => ListRunsTool.ListRuns(NeverCalled<IRunService>.Create(), user, NeverCalled<IRunArtifactRepository>.Create()),
-        ["list_runs_all_users"] = user => ListRunsTool.ListRuns(NeverCalled<IRunService>.Create(), user, NeverCalled<IRunArtifactRepository>.Create(), includeAllUsers: true),
     };
 
     [Theory]

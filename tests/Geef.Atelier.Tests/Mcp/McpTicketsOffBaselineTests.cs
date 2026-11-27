@@ -28,58 +28,52 @@ namespace Geef.Atelier.Tests.Mcp;
 /// The two tool list hashes with the older tools were taken again once more for stage 8c (D-089): the template studio is gone, and
 /// <c>analyze_template_proposal</c> and <c>materialize_template_proposal</c> stay as stubs that only return an error naming
 /// <c>submit_order</c>. The hashes without the older tools and the instructions did not change.
+/// Stage 8d (D-091) removed the older tools and <c>Mcp:LegacyTools</c>: the list always holds the order tools and the five stubs
+/// <c>submit_request</c>, <c>submit_auto_crew_request</c> and <c>get_run_*</c>, and the line about the older tools left the instructions,
+/// so one tool list hash and one instructions hash remain for each of the two states, taken again once; the instructions hashes are those
+/// that were taken without the older tools before.
 /// </summary>
 public sealed class McpTicketsOffBaselineTests
 {
-    private const string ToolsWithLegacyHash = "005b52ae7f7e1c10dc8543b8090a169c7268f79134f5b9e446209429a0804120";
-    private const string ToolsWithoutLegacyHash = "e49a4bd52d165ce64eb944902eeda78e3974454881e63cfba0d9b39c1b29afe3";
-    private const string InstructionsWithLegacyHash = "0008d51c7b9a6d3663e355f88eb9a485ec4565a787d3b1476277452eb585d81a";
+    private const string ToolsHash = "b0e3376fbb46fab7c2225ecf54a5fc19ada4bcec88ec89d060c31a1a009ef61b";
+    private const string InstructionsHash = InstructionsWithoutLegacyHash;
+    private const string ToolsBeforeAboutMeHash = "7e04c7226f550e360603331466baf7f031699756ea41b3d3134d319f6f8531d0";
+    private const string InstructionsBeforeAboutMeHash = InstructionsWithoutLegacyBeforeAboutMeHash;
     private const string InstructionsWithoutLegacyHash = "f9c6023635e5f6d73305154507755c8c36d483ba989488706b9c0920d52d04d1";
-    private const string ToolsWithLegacyBeforeAboutMeHash = "7d079b82d3999a257c48204860262b28339383b90359328409bef53d7dade1ba";
-    private const string ToolsWithoutLegacyBeforeAboutMeHash = "00083d904670898ab70b151f7c3579de45799bc4522e9d9a40d7b75c25422cb4";
-    private const string InstructionsWithLegacyBeforeAboutMeHash = "8185e3bdcfa40031c0d4f0c5eca8cd08864a7ab11eb3cf2d0288203152eff680";
     private const string InstructionsWithoutLegacyBeforeAboutMeHash = "75aab43d645c8fadd9927f53851a12f8a53df7c86ef70114d03af033ccd7e09a";
 
-    [Theory]
-    [InlineData("true", ToolsWithLegacyHash)]
-    [InlineData("false", ToolsWithoutLegacyHash)]
-    public void Without_tickets_the_tool_list_is_unchanged(string legacy, string expected)
+    [Fact]
+    public void Without_tickets_the_tool_list_is_unchanged()
     {
-        using var provider = McpTestServer.Provider(legacy, tickets: null);
+        using var provider = McpTestServer.Provider(tickets: null);
 
         var actual = Sha256(McpTestServer.ToolListJson(provider));
-        Assert.True(expected == actual, $"tool list hash {actual}");
+        Assert.True(ToolsHash == actual, $"tool list hash {actual}");
     }
 
-    [Theory]
-    [InlineData("true", InstructionsWithLegacyHash)]
-    [InlineData("false", InstructionsWithoutLegacyHash)]
-    public void Without_tickets_the_instructions_are_unchanged(string legacy, string expected)
+    [Fact]
+    public void Without_tickets_the_instructions_are_unchanged()
     {
-        using var provider = McpTestServer.Provider(legacy, tickets: null);
+        using var provider = McpTestServer.Provider(tickets: null);
 
         var actual = Sha256(McpTestServer.Instructions(provider));
-        Assert.True(expected == actual, $"instructions hash {actual}");
+        Assert.True(InstructionsHash == actual, $"instructions hash {actual}");
     }
 
-    [Theory]
-    [InlineData("true", ToolsWithLegacyBeforeAboutMeHash)]
-    [InlineData("false", ToolsWithoutLegacyBeforeAboutMeHash)]
-    public void Without_saving_about_me_details_the_tool_list_is_the_one_before_it(string legacy, string expected)
+    [Fact]
+    public void Without_saving_about_me_details_the_tool_list_is_the_one_before_it()
     {
-        using var provider = McpTestServer.Provider(legacy, tickets: null, tellOnce: TellOnceMode.Off);
+        using var provider = McpTestServer.Provider(tickets: null, tellOnce: TellOnceMode.Off);
 
         var actual = Sha256(McpTestServer.ToolListJson(provider));
-        Assert.True(expected == actual, $"tool list hash {actual}");
+        Assert.True(ToolsBeforeAboutMeHash == actual, $"tool list hash {actual}");
     }
 
-    [Theory]
-    [InlineData(true, InstructionsWithLegacyBeforeAboutMeHash)]
-    [InlineData(false, InstructionsWithoutLegacyBeforeAboutMeHash)]
-    public void Without_saving_about_me_details_the_instructions_are_those_before_it(bool legacy, string expected)
+    [Fact]
+    public void Without_saving_about_me_details_the_instructions_are_those_before_it()
     {
-        var actual = Sha256(McpServerInstructions.For(new OrderOptions().MaxWaitSeconds, legacy, tickets: false, aboutMeSaving: false));
-        Assert.True(expected == actual, $"instructions hash {actual}");
+        var actual = Sha256(McpServerInstructions.For(new OrderOptions().MaxWaitSeconds, tickets: false, aboutMeSaving: false));
+        Assert.True(InstructionsBeforeAboutMeHash == actual, $"instructions hash {actual}");
     }
 
     internal static string Sha256(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
@@ -88,10 +82,9 @@ public sealed class McpTicketsOffBaselineTests
 /// <summary>The MCP server options as the host builds them, with every service of the tools registered as a stub.</summary>
 internal static class McpTestServer
 {
-    public static ServiceProvider Provider(string legacy, string? tickets, TellOnceMode? tellOnce = null, Action<IServiceCollection>? configure = null)
+    public static ServiceProvider Provider(string? tickets, TellOnceMode? tellOnce = null, Action<IServiceCollection>? configure = null)
     {
-        var settings = new Dictionary<string, string?> { ["Mcp:LegacyTools"] = legacy };
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);

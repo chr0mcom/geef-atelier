@@ -101,24 +101,17 @@ public static class McpServerInstructions
         "attachments as Base64 instead. Never send a placeholder, a file name, a summary or shortened content instead of a file, " +
         "and never paste file content into the request.\n";
 
-    /// <summary>The line about the older tools, added while <see cref="McpOptions.LegacyTools"/> is true.</summary>
-    public const string LegacyLine =
-        "\nThe older tools (such as submit_request and get_run_result) remain for now; " +
-        "use the tools above. submit_request never asks questions.";
-
-    /// <summary>The instructions with the defaults of <see cref="OrderOptions.MaxWaitSeconds"/>, <see cref="McpOptions.LegacyTools"/> and <see cref="OrderOptions.TellOnce"/>; the server uses <see cref="For"/> with the configured values.</summary>
-    public static string Text { get; } = For(new OrderOptions().MaxWaitSeconds, new McpOptions().LegacyTools, aboutMeSaving: new OrderOptions().TellOnce != TellOnceMode.Off);
+    /// <summary>The instructions with the defaults of <see cref="OrderOptions.MaxWaitSeconds"/> and <see cref="OrderOptions.TellOnce"/>; the server uses <see cref="For"/> with the configured values.</summary>
+    public static string Text { get; } = For(new OrderOptions().MaxWaitSeconds, aboutMeSaving: new OrderOptions().TellOnce != TellOnceMode.Off);
 
     /// <summary>
-    /// The instructions for the longest wait <paramref name="maxWaitSeconds"/>, with the line about the older tools when
-    /// <paramref name="legacyTools"/> is true, with <see cref="TicketFilesStep"/> as step 2 when <paramref name="tickets"/> is true and with
-    /// <see cref="ProfileSavingLine"/> instead of <see cref="ProfileReadOnlyLine"/> when <paramref name="aboutMeSaving"/> is true.
+    /// The instructions for the longest wait <paramref name="maxWaitSeconds"/>, with <see cref="TicketFilesStep"/> as step 2 when
+    /// <paramref name="tickets"/> is true and with <see cref="ProfileSavingLine"/> instead of <see cref="ProfileReadOnlyLine"/> when
+    /// <paramref name="aboutMeSaving"/> is true.
     /// </summary>
-    public static string For(int maxWaitSeconds, bool legacyTools, bool tickets = false, bool aboutMeSaving = false)
+    public static string For(int maxWaitSeconds, bool tickets = false, bool aboutMeSaving = false)
     {
         var text = string.Format(CultureInfo.InvariantCulture, tickets ? TicketTextFormat : TextFormat, Math.Max(0, maxWaitSeconds));
-        if (aboutMeSaving)
-            text = text.Replace(ProfileReadOnlyLine, ProfileSavingLine, StringComparison.Ordinal);
-        return text + (legacyTools ? LegacyLine : string.Empty);
+        return aboutMeSaving ? text.Replace(ProfileReadOnlyLine, ProfileSavingLine, StringComparison.Ordinal) : text;
     }
 }
