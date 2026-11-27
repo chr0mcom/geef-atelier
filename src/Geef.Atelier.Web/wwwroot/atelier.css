@@ -37,7 +37,6 @@
 
 /* ============================================================
    GEEF.ATELIER — design system
-   "Atelier Noir" base. Palette swappable via .palette-* on <html>.
    ============================================================ */
 
 /* ---------- Tokens: Atelier Noir (default, dark) ---------- */
@@ -227,10 +226,8 @@ body::before {
 /* ============================================================
    Typography utilities
    ============================================================ */
-.t-display   { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.012em; }
 .t-mono      { font-family: var(--font-mono); }
 .t-eyebrow   { font-family: var(--font-ui); font-weight: 500; text-transform: uppercase; letter-spacing: 0.16em; font-size: 11px; color: var(--ink-3); }
-.t-caption   { font-size: 12px; color: var(--ink-3); }
 
 /* Blazor FocusOnNavigate moves focus to the page <h1> for screen-reader
    announcement. The heading is not keyboard-reachable (tabindex=-1), so its
@@ -356,22 +353,8 @@ h1[tabindex="-1"]:focus { outline: none; }
   border-radius: 7px;
   font-size: 13px;
 }
-.nav-dropdown-sep {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  padding: 8px 12px 3px;
-  margin-top: 4px;
-}
 
 /* Global live indicator (running runs anywhere) */
-@keyframes pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--st-running) 60%, transparent); }
-  70%  { box-shadow: 0 0 0 8px color-mix(in oklch, var(--st-running) 0%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--st-running) 0%, transparent); }
-}
 
 .user-menu {
   display: flex;
@@ -573,16 +556,6 @@ h1[tabindex="-1"]:focus { outline: none; }
 .severity.info     .mark { background: currentColor; clip-path: polygon(0 35%, 100% 35%, 100% 65%, 0 65%); }
 
 /* ============================================================
-   Generic cards / sheets
-   ============================================================ */
-.sheet {
-  background: var(--surface);
-  border: 1px solid var(--hairline-soft);
-  border-radius: 4px;
-  position: relative;
-}
-
-/* ============================================================
    LOGIN
    ============================================================ */
 .login-stage {
@@ -721,17 +694,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-/* ============================================================
-   WELCOME / LANDING
-   ============================================================ */
-.welcome {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 56px 32px 80px;
-  display: grid;
-  gap: 40px;
 }
 
 /* ============================================================
@@ -1113,35 +1075,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
   background: var(--bg);
   padding: 0 8px;
 }
-.stage {
-  position: relative;
-  padding: 4px 18px;
-  text-align: center;
-}
-.stage .role {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-.stage .name {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 400;
-  margin-top: 6px;
-  letter-spacing: -0.005em;
-  color: var(--ink-2);
-}
-.stage .desc {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 12px;
-  color: var(--ink-3);
-  margin-top: 4px;
-}
-.stage.active .name { color: var(--hero); }
-.stage.done .name { color: var(--ink); }
 
 /* ink ribbon between stages */
 
@@ -1192,7 +1125,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
   color: var(--ink-2);
   font-style: italic;
 }
-.iter-head .summary .arrow { color: var(--hero); margin: 0 8px; font-style: normal; }
 .iter-head .findings-count {
   display: flex;
   gap: 8px;
@@ -1490,16 +1422,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
   max-width: 65ch;
   color: var(--paper-ink);
 }
-.manuscript .math {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  background: var(--paper-2);
-  border-left: 2px solid var(--hero-deep);
-  padding: 10px 14px;
-  display: block;
-  margin: 10px 0 14px;
-  color: var(--paper-ink);
-}
 .manuscript em { font-style: italic; }
 .manuscript strong { font-weight: 600; }
 .manuscript ul, .manuscript ol { padding-left: 22px; margin: 8px 0 14px; max-width: 64ch; }
@@ -1575,45 +1497,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* --- Loading state — inkwell --- */
-@keyframes fill {
-  0%, 100% { transform: translateY(80%); }
-  50%      { transform: translateY(30%); }
-}
-
-/* --- Style guide page --- */
-.guide {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 56px 32px 80px;
-}
-.guide section { margin-bottom: 56px; }
-.guide h2 {
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: 28px;
-  letter-spacing: -0.012em;
-  margin: 0 0 18px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--hairline-soft);
-}
-
-/* --- Misc small bits --- */
-.kbd {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  border: 1px solid var(--hairline);
-  border-bottom-width: 2px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  color: var(--ink-2);
-  background: var(--surface);
-}
-
-.scroll-x-hide::-webkit-scrollbar { width: 8px; height: 8px; }
-.scroll-x-hide::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 999px; }
-.scroll-x-hide::-webkit-scrollbar-track { background: transparent; }
-
 /* ── z-index layers ─────────────────────────────────────── */
 :root {
     --z-modal: 1000;
@@ -1632,13 +1515,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     white-space: nowrap;
 }
 
-/* ── disabled-action (for read-only system profile buttons) */
-.disabled-action {
-    opacity: 0.45;
-    cursor: not-allowed;
-    pointer-events: none;
-}
-
 /* ── collapsible sections ───────────────────────────────── */
 .collapsible-header {
     display: flex;
@@ -1654,73 +1530,15 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     color: var(--ink);
 }
 
-.collapsible-body {
-    margin-top: 0.75rem;
-}
-
 /* ── Crew UI — shared page layout ───────────────────────── */
-.crew-index,
-.crew-templates-index,
 .crew-profiles-index,
-.studio-page,
-.user-management,
-.learnings-index {
+.user-management {
     max-width: 1180px;
     margin: 0 auto;
     padding: 40px 32px 80px;
 }
 
-/* ── Studio — analyzing step ─────────────────────────────── */
-
-@keyframes studio-spin {
-    to { transform: rotate(360deg); }
-}
-
-/* ── Studio — analysis model section ─────────────────────── */
-
-/* ══ Studio — Edit/Create step ════════════════════════════════ */
-
-/* Sections as cards */
-
-.optional-label {
-    font-size: 0.75rem;
-    font-weight: 400;
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--ink-3);
-}
-
-/* Slot row = the collapsible card + its action toolbar */
-
-/* Collapsible slot card */
-
-/* Header is a full-width clickable button */
-
-/* Segmented mode toggle */
-
-/* Two-column field grid inside a create-new slot */
-
-/* Reasoning hint boxes — subtle, not dominating */
-.field-reasoning {
-    margin-top: 0.35rem;
-    padding: 0.45rem 0.6rem;
-    background: color-mix(in oklch, var(--st-completed, var(--hero)) 8%, transparent);
-    border-left: 2px solid color-mix(in oklch, var(--st-completed, var(--hero)) 45%, transparent);
-    border-radius: 0 6px 6px 0;
-    font-size: 0.8rem;
-    color: var(--ink-2);
-    line-height: 1.45;
-}
-.field-reasoning.overall-reasoning {
-    background: color-mix(in oklch, var(--hero) 7%, transparent);
-    border-left-color: color-mix(in oklch, var(--hero) 45%, transparent);
-}
-
-/* Inputs/selects/textarea consistency inside slots, template section & all crew editors */
-.studio-edit select,
-.studio-edit textarea,
-.studio-slot select,
-.studio-slot textarea,
+/* Inputs, selects and textareas of the provider editor */
 .crew-editor select,
 .crew-editor textarea,
 .crew-editor input[type="text"],
@@ -1740,10 +1558,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     box-sizing: border-box;
     transition: border-color 0.18s, background 0.18s;
 }
-.studio-edit select:focus,
-.studio-edit textarea:focus,
-.studio-slot select:focus,
-.studio-slot textarea:focus,
 .crew-editor select:focus,
 .crew-editor textarea:focus,
 .crew-editor input:focus { border-color: var(--hero); background: var(--surface-2); }
@@ -1755,44 +1569,10 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     background: color-mix(in oklch, var(--ink-3) 6%, var(--surface));
 }
 
-.checkbox-field label {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    text-transform: none;
-    letter-spacing: 0;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--ink);
-    cursor: pointer;
-}
-.checkbox-field input[type="checkbox"] {
-    width: 1rem; height: 1rem; accent-color: var(--hero); cursor: pointer;
-}
-
 .validation-error {
     color: var(--sv-critical);
     font-size: 0.78rem;
 }
-.validation-panel {
-    margin: 1rem 0;
-    padding: 0.75rem 1rem;
-    background: color-mix(in oklch, var(--sv-critical) 10%, transparent);
-    border: 1px solid color-mix(in oklch, var(--sv-critical) 40%, transparent);
-    border-radius: 8px;
-    color: var(--sv-critical);
-    font-size: 0.875rem;
-}
-
-/* Small ghost buttons used for slot actions */
-.btn.btn-sm {
-    padding: 0.3rem 0.6rem;
-    font-size: 0.78rem;
-}
-.btn.btn-sm.danger { color: var(--sv-critical); }
-.btn.btn-sm.danger:hover { background: color-mix(in oklch, var(--sv-critical) 12%, transparent); }
-
-/* Sticky action bar always reachable */
 
 .crew-editor {
     max-width: 760px;
@@ -1811,7 +1591,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 }
 /* …unless the editor already groups its content into .edit-section cards,
    in which case the form is transparent and the sections are the cards. */
-.crew-editor form:has(.edit-section),
 .crew-editor form:has(.template-meta-section) {
     background: transparent;
     border: none;
@@ -1820,72 +1599,25 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 
 .crew-editor .field { margin-bottom: 1.1rem; }
 .crew-editor .field > small,
-.crew-editor .form-hint,
 .crew-editor .field-hint {
     font-size: 0.8rem;
     color: var(--ink-3);
     line-height: 1.45;
 }
 
-/* Opt-in two-column field grid */
-.field-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0 1rem;
-}
-.field-grid .field--full { grid-column: 1 / -1; }
-
 /* Checkboxes & inline checkbox labels */
 .crew-editor input[type="checkbox"] {
     width: 1rem; height: 1rem; accent-color: var(--hero); cursor: pointer;
 }
-.form-checkbox-label,
-.crew-editor .checkbox-field label {
+.form-checkbox-label {
     display: flex;
     align-items: center;
     gap: 0.55rem;
     cursor: pointer;
     font-size: 0.875rem;
-}
-
-/* Radio groups (evaluation strategy, advisor mode/trigger) */
-.crew-editor .radio-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-}
-.crew-editor .radio-option {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.55rem 0.75rem;
-    border: 1px solid var(--hairline-soft);
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 400;
-    font-size: 0.875rem;
-    transition: border-color 0.15s, background 0.15s;
-}
-.crew-editor .radio-option:hover { border-color: var(--hairline-strong, var(--hairline)); }
-.crew-editor .radio-option:has(input:checked) {
-    border-color: var(--hero);
-    background: color-mix(in oklch, var(--hero) 7%, transparent);
-}
-.crew-editor .radio-option input[type="radio"] { accent-color: var(--hero); }
-.crew-editor .radio-option .radio-description {
-    display: block;
-    font-size: 0.78rem;
-    color: var(--ink-3);
-    margin-top: 0.1rem;
 }
 
 /* Collapsible "Advanced" sections */
-.crew-editor .collapsible-section {
-    border: 1px solid var(--hairline);
-    border-radius: 10px;
-    margin: 1.25rem 0;
-    background: var(--surface-2, var(--surface));
-}
 .crew-editor .collapsible-header {
     padding: 0.7rem 0.95rem;
     cursor: pointer;
@@ -1903,21 +1635,8 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 .crew-editor .collapsible-header::before {
     content: "▸"; color: var(--ink-3); font-size: 0.7rem; transition: transform 0.15s;
 }
-.crew-editor .collapsible-section[open] .collapsible-header::before { transform: rotate(90deg); }
-.crew-editor .collapsible-body { padding: 0.25rem 0.95rem 0.6rem; border-top: 1px solid var(--hairline-soft); }
 
 /* Validation summary from EditForm */
-.crew-editor .validation-summary,
-.crew-editor .validation-errors {
-    margin: 0 0 1rem;
-    padding: 0.7rem 0.95rem;
-    list-style: none;
-    background: color-mix(in oklch, var(--sv-critical) 10%, transparent);
-    border: 1px solid color-mix(in oklch, var(--sv-critical) 40%, transparent);
-    border-radius: 8px;
-    color: var(--sv-critical);
-    font-size: 0.85rem;
-}
 .crew-editor .validation-message { color: var(--sv-critical); font-size: 0.78rem; }
 
 /* Sticky action footer — always reachable */
@@ -1987,12 +1706,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     line-height: 1.4;
 }
 
-/* ── Unified Profile Picker ───────────────────────────────── */
-
-/* Pool (available) column */
-
-/* Active (selected) column */
-
 /* Fields inside pipeline stage sections have no bottom margin (card padding is enough) */
 .pipeline-stage-section > .field:last-child { margin-bottom: 0; }
 
@@ -2047,19 +1760,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     color: color-mix(in oklch, var(--hero) 65%, var(--ink-3));
 }
 
-.provider-type-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.3rem 0.75rem;
-    border-radius: 999px;
-    background: var(--hero-soft);
-    border: 1px solid color-mix(in oklch, var(--hero) 28%, transparent);
-    color: var(--hero);
-    font-size: 0.82rem;
-    font-weight: 700;
-    margin-top: 0.25rem;
-}
-
 .provider-type-hidden-select {
     position: absolute;
     clip: rect(0 0 0 0);
@@ -2082,10 +1782,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     margin: 0;
     font-size: 1.75rem;
 }
-
-/* ── Knowledge doc list ─────────────────────────────────── */
-
-/* Indexing status badge colours */
 
 /* ── Crew UI — tables ────────────────────────────────────── */
 .crew-table {
@@ -2130,35 +1826,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     color: var(--ink-2);
 }
 
-.form-input {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--hairline-strong);
-    border-radius: 6px;
-    background: var(--surface);
-    color: var(--ink);
-    font-size: 0.875rem;
-    font-family: inherit;
-    box-sizing: border-box;
-}
-
-.form-input:focus {
-    outline: none;
-    border-color: var(--hero);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--hero) 20%, transparent);
-}
-
-textarea.form-input {
-    resize: vertical;
-    min-height: 4rem;
-}
-
-.form-hint {
-    font-size: 0.8125rem;
-    color: var(--ink-2);
-    margin-top: 0.125rem;
-}
-
 .form-actions,
 .editor-actions {
     display: flex;
@@ -2177,39 +1844,11 @@ textarea.form-input {
     margin-bottom: 1.5rem;
 }
 
-/* ── Crew UI — radio groups (template editor) ───────────── */
-.radio-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-}
-
-.radio-option {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    font-weight: normal;
-}
-
 /* ── Crew UI — misc utilities ────────────────────────────── */
 .text-muted {
     color: var(--ink-2);
     font-size: 0.875rem;
     font-style: italic;
-}
-
-/* ── Attachment section on New.razor ─────────────────────── */
-.attachment-section {
-    margin-bottom: 1.25rem;
-}
-
-.attachment-section > label {
-    display: block;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--ink-2);
-    margin-bottom: 0.5rem;
 }
 
 /* ── Citation badges (GroundingSection) ──────────────────── */
@@ -2240,11 +1879,6 @@ textarea.form-input {
     background: color-mix(in oklch, #22c55e 10%, var(--surface));
     border-color: color-mix(in oklch, #22c55e 35%, transparent);
     color: color-mix(in oklch, #22c55e 60%, var(--ink-1));
-}
-.alert-info {
-    background: color-mix(in oklch, var(--ink-2, #64748b) 8%, var(--surface));
-    border-color: color-mix(in oklch, var(--ink-2, #64748b) 30%, transparent);
-    color: var(--ink-1);
 }
 
 /* ── Admin UI — user/client list rows ───────────────────── */
@@ -2730,34 +2364,6 @@ textarea.form-control {
     margin: 0;
 }
 
-/* ── Learnings Index ─────────────────────────────────────── */
-
-.status-badge {
-    display: inline-block;
-    padding: 0.2rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    flex-shrink: 0;
-}
-
-.status-badge.status-proposed {
-    background: color-mix(in oklch, var(--hero) 15%, var(--surface));
-    color: var(--hero);
-}
-
-.status-badge.status-approved {
-    background: color-mix(in oklch, oklch(0.7 0.15 145) 15%, var(--surface));
-    color: oklch(0.55 0.15 145);
-}
-
-.status-badge.status-rejected {
-    background: color-mix(in oklch, var(--sv-fail) 15%, var(--surface));
-    color: var(--sv-fail);
-}
-
 /* ── Access denied notice ───────────────────────────────── */
 .access-denied {
     max-width: 36rem;
@@ -2920,8 +2526,6 @@ textarea.form-control {
 .start-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
 .start-submit { padding: 11px 28px; font-size: 15px; }
 .start-blocked { font-size: 13px; color: var(--ink-3); }
-.start-more { margin: 0; font-size: 12px; }
-.start-more a { color: var(--ink-3); text-decoration: underline; text-underline-offset: 2px; }
 
 .order-banner {
   display: flex;
@@ -3975,10 +3579,6 @@ textarea.form-control {
 }
 
 /* ── Shared helpers (formerly in the dashboard stylesheet, kept in the same cascade position) ── */
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: .5; transform: scale(1.3); }
-}
 
 .reviewer {
   display: flex;
@@ -3988,7 +3588,6 @@ textarea.form-control {
 
 .reviewer .name    { flex: 1; font-size: 13px; color: var(--ink-1); }
 .reviewer .pass    { font-size: 11px; color: color-mix(in oklch, var(--hero) 80%, var(--ink-2)); }
-.reviewer .fail    { font-size: 11px; color: var(--sv-critical, oklch(0.65 0.18 20)); }
 .reviewer .fill    { flex: 1; height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
 .reviewer .fill span { display: block; height: 100%; background: var(--hero); border-radius: 3px; }
 

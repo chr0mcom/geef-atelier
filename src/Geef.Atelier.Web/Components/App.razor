@@ -71,14 +71,4 @@
 
     string HtmlRootClass => $"palette-{Theme}{(UsesLandingChrome ? " landing-root" : "")}";
     string BodyClass => UsesLandingChrome ? "landing-body" : "";
-
-    /// <summary>Dashboard scope read from cookie; defaults to "my".</summary>
-    internal string DashboardScope
-    {
-        get
-        {
-            var v = Http.HttpContext?.Request.Cookies["Atelier.DashboardScope"];
-            return v == "all" ? "all" : "my";
-        }
-    }
 }

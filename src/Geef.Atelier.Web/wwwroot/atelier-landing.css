@@ -128,8 +128,6 @@ html.palette-vellum body.landing-body {
   box-shadow: 0 10px 30px -16px color-mix(in oklch, var(--hero) 60%, transparent);
 }
 .lp-cta:active { transform: translateY(1px); }
-.lp-cta .arrow { font-family: var(--font-mono); font-size: 14px; line-height: 1; transition: transform .25s; }
-.lp-cta:hover .arrow { transform: translateX(3px); }
 .lp-cta.ghost {
   opacity: 1;
   background: transparent;
@@ -164,7 +162,6 @@ html.palette-vellum body.landing-body {
   padding: 120px 0;
   position: relative;
 }
-.lp-section.tight { padding: 80px 0; }
 .lp-section.intro { padding: 60px 0 110px; }
 @media (max-width: 760px) {
   .lp-section { padding: 72px 0; }
@@ -348,16 +345,6 @@ html.palette-vellum body.landing-body {
   display: flex; gap: 14px;
 }
 .hero-visual .colophon b { color: var(--hero); font-weight: 500; }
-.hero-visual .colophon-r {
-  position: absolute;
-  top: 18px; right: 18px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  z-index: 4;
-}
 .hero-visual .stage-floor {
   position: absolute;
   bottom: 0; left: 0; right: 0;
@@ -586,7 +573,6 @@ body[data-static="1"] .press-anim * { animation: none !important; }
   width: 10px; height: 1px;
   background: var(--hero);
 }
-.landing .lp-text-link,
 .ex-more a,
 .lp-flow-foot a,
 .lp-limits-more a,
@@ -1182,13 +1168,6 @@ body[data-static="1"] .lp-flow .retry-path { animation: none !important; }
 }
 
 /* tiny mono caption helper */
-.lp-mono-caption {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
 
 /* ============================================================
    Legal Pages & Docs — shared public sub-page layout
@@ -1381,9 +1360,3 @@ body[data-static="1"] .lp-flow .retry-path { animation: none !important; }
 }
 
 /* dotted hr */
-.lp-hr {
-  height: 1px;
-  border: none;
-  background: var(--hairline-soft);
-  margin: 0;
-}
