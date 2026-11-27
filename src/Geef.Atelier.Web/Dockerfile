@@ -31,7 +31,7 @@ RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 COPY --from=build /app/publish .
 # Pre-create volume mount points so fresh named volumes inherit appuser ownership
 # (DataProtection keys must be writable by the non-root app user).
-RUN mkdir -p /app/dataprotection-keys /app/exports /app/sources \
+RUN mkdir -p /app/dataprotection-keys /app/sources \
     && chown -R appuser:appgroup /app
 
 USER appuser
