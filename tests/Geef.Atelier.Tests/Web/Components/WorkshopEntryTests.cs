@@ -33,7 +33,6 @@ public sealed class WorkshopEntryTests : TestContext
         typeof(RunDetail),
         typeof(New),
         typeof(CrewTemplatesIndex),
-        typeof(TemplateStudio),
         typeof(KnowledgeIndex),
         typeof(ReviewerProfilesIndex),
         typeof(ExecutorProfilesIndex),
@@ -101,7 +100,7 @@ public sealed class WorkshopEntryTests : TestContext
 
         var hrefs = cut.FindAll(".nav-dropdown a.nav-link").Select(a => a.GetAttribute("href")).ToList();
         Assert.Equal(
-            new[] { "/workshop", "/runs", "/new", "/crew/templates", "/crew/studio", "/crew/knowledge", "/crew/learnings",
+            new[] { "/workshop", "/runs", "/new", "/crew/templates", "/crew/knowledge", "/crew/learnings",
                 "/crew/profiles/reviewers", "/crew/profiles/executors", "/crew/profiles/advisors", "/crew/profiles/grounding-providers",
                 "/crew/profiles/finalizers", "/tools", "/packs", "/mcp-servers", "/crew/providers" },
             hrefs);
@@ -118,7 +117,7 @@ public sealed class WorkshopEntryTests : TestContext
 
         var hrefs = cut.FindAll(".nav-dropdown a.nav-link").Select(a => a.GetAttribute("href")).ToList();
         Assert.Equal(
-            new[] { "/workshop", "/runs", "/new", "/crew/templates", "/crew/studio", "/crew/knowledge",
+            new[] { "/workshop", "/runs", "/new", "/crew/templates", "/crew/knowledge",
                 "/crew/profiles/reviewers", "/crew/profiles/executors", "/crew/profiles/advisors", "/crew/profiles/grounding-providers",
                 "/crew/profiles/finalizers", "/packs" },
             hrefs);

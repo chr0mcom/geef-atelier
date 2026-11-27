@@ -5,7 +5,6 @@ namespace Geef.Atelier.Infrastructure.Composition;
 
 /// <summary>
 /// Defines the structured tool schema the composition meta-LLM must use to submit its crew specification.
-/// Mirrors the pattern established by <c>TemplateProposalTool</c>.
 /// </summary>
 internal static class CrewSpecTool
 {

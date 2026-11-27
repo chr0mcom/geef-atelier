@@ -249,7 +249,7 @@ public sealed class LearningPublishFinalizerTests
             => Task.FromResult(false);
 
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken ct = default)
-            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m, 0, 0m));
+            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m));
 
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;

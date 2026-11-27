@@ -36,7 +36,7 @@ internal sealed class OpenAiResponsesClient(
             // The HttpClient already carries a Polly retry handler; disable the SDK's duplicate retries.
             RetryPolicy = new ClientRetryPolicy(maxRetries: 0),
             // The SDK's per-attempt default is 100 s. Reasoning models stream well past that, so defer the
-            // real cap to the caller's CancellationToken (Studio: 600 s) and the HttpClient timeout (30 min).
+            // real cap to the caller's CancellationToken and the HttpClient timeout (30 min).
             NetworkTimeout = TimeSpan.FromMinutes(30),
         };
 

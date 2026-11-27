@@ -38,13 +38,14 @@ public sealed class Step17TemplateStudioMigrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Step17Migration_CreatesTemplateStudioAnalysesTable_WithZeroRows()
+    public async Task Step17Migration_StillCreatesTheTable_AfterTheStudioCodeIsGone()
     {
         await using var context = NewContext();
         await context.Database.MigrateAsync();
 
-        // Querying the DbSet proves the table was created and EF mapping is correct
-        var count = await context.TemplateStudioAnalyses.CountAsync();
+        var count = await context.Database
+            .SqlQueryRaw<int>("SELECT count(*)::int AS \"Value\" FROM \"TemplateStudioAnalyses\"")
+            .SingleAsync();
         Assert.Equal(0, count);
     }
 }

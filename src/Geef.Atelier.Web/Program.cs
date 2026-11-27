@@ -24,7 +24,6 @@ using Geef.Atelier.Infrastructure.Research;
 using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Infrastructure.Sources.Extraction;
 using Geef.Atelier.Infrastructure.Finalizers;
-using Geef.Atelier.Infrastructure.TemplateStudio;
 using Geef.Atelier.Infrastructure.Mcp;
 using Geef.Atelier.Infrastructure.Orders;
 using Geef.Atelier.Infrastructure.Tools;
@@ -97,7 +96,6 @@ builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection("Pri
 builder.Services.Configure<CostTrackingOptions>(builder.Configuration.GetSection("CostTracking"));
 builder.Services.AddSingleton<IPricingCatalog, PricingCatalog>();
 builder.Services.AddSingleton<DocsService>();
-builder.Services.AddTemplateStudio(builder.Configuration);
 builder.Services.AddFinalizers(builder.Configuration);
 builder.Services.AddCrewComposition();
 

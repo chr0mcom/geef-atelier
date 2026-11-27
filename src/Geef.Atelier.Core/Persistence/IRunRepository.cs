@@ -27,7 +27,6 @@ public interface IRunRepository
     /// Returns aggregated statistics for the current calendar month.
     /// Pass <c>null</c> for <paramref name="username"/> for system-wide stats (Admin-mode);
     /// pass a username to scope run-level statistics to that user only.
-    /// Studio-analysis stats are never user-scoped.
     /// </summary>
     Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default);
 

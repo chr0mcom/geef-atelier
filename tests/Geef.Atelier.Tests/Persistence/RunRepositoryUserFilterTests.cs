@@ -72,9 +72,5 @@ public sealed class RunRepositoryUserFilterTests(PostgresFixture fixture)
         // System-wide total is the sum of all users
         Assert.True(statsForAll.RunsThisMonth >= statsForTarget.RunsThisMonth + statsForOther.RunsThisMonth,
             "System-wide stats should include all users' runs");
-
-        // Studio stats are never user-scoped — same value for both queries
-        Assert.Equal(statsForAll.StudioAnalysesThisMonth, statsForTarget.StudioAnalysesThisMonth);
-        Assert.Equal(statsForAll.StudioAnalysesThisMonth, statsForOther.StudioAnalysesThisMonth);
     }
 }

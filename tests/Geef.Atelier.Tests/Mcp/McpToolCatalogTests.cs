@@ -27,6 +27,8 @@ public sealed class McpToolCatalogTests
         ["get_run_result"] = "get_order_result",
         ["cancel_run"] = "cancel_order",
         ["list_runs"] = "list_orders",
+        ["analyze_template_proposal"] = "submit_order",
+        ["materialize_template_proposal"] = "submit_order",
     };
 
     [Fact]
@@ -76,7 +78,7 @@ public sealed class McpToolCatalogTests
     }
 
     [Fact]
-    public void The_five_older_tools_with_a_successor_name_it_first_and_the_others_do_not()
+    public void The_older_tools_with_a_successor_name_it_first_and_the_others_do_not()
     {
         var tools = Tools(legacy: "true");
 

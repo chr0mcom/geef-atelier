@@ -89,17 +89,7 @@ internal sealed class RunRepository(AtelierDbContext db) : IRunRepository
             .Where(r => r.TotalCostEur != null)
             .SumAsync(r => r.TotalCostEur!.Value, cancellationToken);
 
-        // Studio-analysis stats are shared and never scoped by user.
-        var studioAnalysesThisMonth = await db.TemplateStudioAnalyses
-            .Where(a => a.CreatedAt >= startOfMonth)
-            .CountAsync(cancellationToken);
-
-        var studioCostThisMonth = await db.TemplateStudioAnalyses
-            .Where(a => a.CreatedAt >= startOfMonth)
-            .SumAsync(a => a.CostEur ?? 0m, cancellationToken);
-
-        return new WelcomeStats(runsThisMonth, convergenceRate, avgIterations, totalCostThisMonth,
-            studioAnalysesThisMonth, studioCostThisMonth);
+        return new WelcomeStats(runsThisMonth, convergenceRate, avgIterations, totalCostThisMonth);
     }
 
     /// <inheritdoc/>

@@ -9,7 +9,6 @@ using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Core.Persistence.Profiles;
 using Geef.Atelier.Core.Persistence.Sources;
 using Geef.Atelier.Core.Persistence.Providers;
-using Geef.Atelier.Core.Persistence.TemplateStudio;
 using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.SiteSettings;
@@ -26,8 +25,6 @@ using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Infrastructure.Persistence.Providers;
 using Geef.Atelier.Infrastructure.Persistence.Repositories;
 using Geef.Atelier.Infrastructure.Persistence.SiteSettings;
-using Geef.Atelier.Infrastructure.Persistence.StudioSettings;
-using Geef.Atelier.Infrastructure.Persistence.TemplateStudio;
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -52,7 +49,6 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IFinalizerProfileRepository, FinalizerProfileRepository>();
         services.AddScoped<IProviderRepository, ProviderRepository>();
         services.AddScoped<IRunArtifactRepository, RunArtifactRepository>();
-        services.AddScoped<ITemplateStudioAnalysisRepository, TemplateStudioAnalysisRepository>();
         services.AddScoped<IOAuthClientRepository, OAuthClientRepository>();
         services.AddScoped<IOAuthAuthorizationCodeRepository, OAuthAuthorizationCodeRepository>();
         services.AddScoped<IOAuthAccessTokenRepository, OAuthAccessTokenRepository>();
@@ -62,7 +58,6 @@ public static class PersistenceServiceExtensions
         services.AddScoped<ILearningRepository, LearningRepository>();
         services.AddScoped<ISiteSettingsRepository, SiteSettingsRepository>();
         services.AddScoped<ISiteSettingsService, SiteSettingsService>();
-        services.AddScoped<IStudioSettingsRepository, StudioSettingsRepository>();
         services.AddScoped<IToolDefinitionRepository, ToolDefinitionRepository>();
         services.AddScoped<IToolInvocationRepository, ToolInvocationRepository>();
         services.AddScoped<IMcpServerConfigRepository, McpServerConfigRepository>();

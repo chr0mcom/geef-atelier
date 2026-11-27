@@ -25,14 +25,17 @@ namespace Geef.Atelier.Tests.Mcp;
 /// The four tool list hashes were taken again once more for <c>givenAnswers</c> (D-088): the description of <c>get_order_result</c> gained
 /// <see cref="Geef.Atelier.Mcp.Tools.GetOrderResultTool.GivenAnswersRule"/>; without that sentence the tool list gives the hashes before it.
 /// The instructions did not change.
+/// The two tool list hashes with the older tools were taken again once more for stage 8c (D-089): the template studio is gone, and
+/// <c>analyze_template_proposal</c> and <c>materialize_template_proposal</c> stay as stubs that only return an error naming
+/// <c>submit_order</c>. The hashes without the older tools and the instructions did not change.
 /// </summary>
 public sealed class McpTicketsOffBaselineTests
 {
-    private const string ToolsWithLegacyHash = "c60bc0b4f2d8e6e64bbbcb004522771d2b66dcd91c39304964d2906c97879e95";
+    private const string ToolsWithLegacyHash = "005b52ae7f7e1c10dc8543b8090a169c7268f79134f5b9e446209429a0804120";
     private const string ToolsWithoutLegacyHash = "e49a4bd52d165ce64eb944902eeda78e3974454881e63cfba0d9b39c1b29afe3";
     private const string InstructionsWithLegacyHash = "0008d51c7b9a6d3663e355f88eb9a485ec4565a787d3b1476277452eb585d81a";
     private const string InstructionsWithoutLegacyHash = "f9c6023635e5f6d73305154507755c8c36d483ba989488706b9c0920d52d04d1";
-    private const string ToolsWithLegacyBeforeAboutMeHash = "3d233cd5c6606f0dca6e1c12cd71fa4fc2ca53641be252a0316863fdb07e5cd2";
+    private const string ToolsWithLegacyBeforeAboutMeHash = "7d079b82d3999a257c48204860262b28339383b90359328409bef53d7dade1ba";
     private const string ToolsWithoutLegacyBeforeAboutMeHash = "00083d904670898ab70b151f7c3579de45799bc4522e9d9a40d7b75c25422cb4";
     private const string InstructionsWithLegacyBeforeAboutMeHash = "8185e3bdcfa40031c0d4f0c5eca8cd08864a7ab11eb3cf2d0288203152eff680";
     private const string InstructionsWithoutLegacyBeforeAboutMeHash = "75aab43d645c8fadd9927f53851a12f8a53df7c86ef70114d03af033ccd7e09a";
