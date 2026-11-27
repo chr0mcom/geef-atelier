@@ -6,10 +6,11 @@
 #   2. Anmeldung mit dem Smoke-Konto: Login-Formular (Cookie), dann OAuth-Freigabe mit PKCE für den registrierten
 #      Smoke-Client und Tausch gegen ein Zugriffstoken. Zugangsdaten nur aus der Datei $ATELIER_SMOKE_ENV
 #      (Standard /srv/docker/websites/geef_atelier/.smoke.env, Modus 0600, gitignored). Werte werden nie ausgegeben.
-#   3. Auftrag über den MCP-Endpunkt (/mcp, Werkzeug submit_request): Ein-Satz-Briefing mit dem Klassik-Template.
-#   4. Warten, bis get_run_status ein outcome meldet (nicht nur einen terminalen Status: der Text ist erst mit
-#      gesetztem outcome endgültig, also nach den Abschlussschritten), höchstens ATELIER_SMOKE_TIMEOUT Sekunden.
-#   5. Erst dann get_run_result lesen und prüfen: outcome Converged oder DeliveredWithOpenPoints und Text vorhanden
+#   3. Auftrag über den MCP-Endpunkt (/mcp, Werkzeug submit_order, Standardweg): ein Ein-Satz-Auftrag. Stellt Atelier
+#      Rückfragen (state needs_input), überspringt das Skript sie mit answer_order(skip=true).
+#   4. Warten mit get_order_status (waitSeconds), bis done gesetzt ist und ein outcome vorliegt (der Text ist erst mit
+#      gesetztem outcome endgültig), höchstens ATELIER_SMOKE_TIMEOUT Sekunden.
+#   5. Erst dann get_order_result lesen und prüfen: outcome Converged oder DeliveredWithOpenPoints und Text vorhanden
 #      ist bestanden; outcome Failed oder Aborted, fehlender Text oder Zeitlimit ohne outcome ist gescheitert.
 #   6. Eine Ergebniszeile auf stdout und Exit-Code.
 #
@@ -19,8 +20,9 @@
 #            Ein Traceback erscheint nie; auch ein unerwarteter interner Fehler endet mit einer Ergebniszeile und Exit 4.
 # Passwortschutz: Unverschlüsseltes http:// ist nur für die Hosts in ALLOWED_HTTP_HOSTS erlaubt (localhost, 127.0.0.1, ::1,
 #            geef-atelier-web); jeder andere http-Host bricht vor dem Login mit Exit 2 ab. Weiterleitungen folgt das Skript nie.
-# Variablen (Umgebung schlägt Datei): ATELIER_SMOKE_ENV, ATELIER_SMOKE_BASE_URL, ATELIER_SMOKE_TEMPLATE,
-#            ATELIER_SMOKE_TIMEOUT, ATELIER_SMOKE_POLL, ATELIER_SMOKE_REDIRECT_URI, ATELIER_SMOKE_SKIP_HEALTH=1 (nur Tests),
+# Variablen (Umgebung schlägt Datei): ATELIER_SMOKE_ENV, ATELIER_SMOKE_BASE_URL, ATELIER_SMOKE_TIMEOUT,
+#            ATELIER_SMOKE_WAIT (waitSeconds je Statusabfrage, Standard 25), ATELIER_SMOKE_POLL (Pause zwischen zwei
+#            Statusabfragen, Standard 2), ATELIER_SMOKE_REDIRECT_URI, ATELIER_SMOKE_SKIP_HEALTH=1 (nur Tests),
 #            ATELIER_SMOKE_VERBOSE=1 (Zwischenschritte auf stderr), WEB_CONTAINER.
 # Tests: cli-proxy/tests/test_atelier_smoke_script.py (Attrappe für docker, eigener HTTP-Testserver statt Atelier).
 
@@ -68,7 +70,7 @@ import urllib.request
 
 ENV_FILE = sys.argv[1]
 REQUIRED = ("ATELIER_SMOKE_USER", "ATELIER_SMOKE_PASSWORD", "ATELIER_SMOKE_CLIENT_ID")
-BRIEFING = "Schreibe genau einen kurzen deutschen Satz, der bestätigt, dass der Atelier-Smoke-Test läuft."
+REQUEST = "Schreibe genau einen kurzen deutschen Satz, der bestätigt, dass der Atelier-Smoke-Test läuft."
 VERBOSE = os.environ.get("ATELIER_SMOKE_VERBOSE") == "1"
 
 
@@ -107,7 +109,6 @@ if missing:
     result(f"NICHT EINGERICHTET: in {ENV_FILE} fehlen {', '.join(missing)} (siehe docs/ops/atelier-smoke.md).", 2)
 
 BASE = cfg.get("ATELIER_SMOKE_BASE_URL", "https://geef.stefan-bechtel.de").rstrip("/")
-TEMPLATE = cfg.get("ATELIER_SMOKE_TEMPLATE", "klassik")
 REDIRECT_URI = cfg.get("ATELIER_SMOKE_REDIRECT_URI", "http://127.0.0.1/atelier-smoke/callback")
 ALLOWED_HTTP_HOSTS = ("localhost", "127.0.0.1", "::1", "geef-atelier-web")
 
@@ -124,9 +125,10 @@ if _base.scheme == "http" and _host not in ALLOWED_HTTP_HOSTS:
            "sonst https:// verwenden.", 2)
 try:
     TIMEOUT = int(cfg.get("ATELIER_SMOKE_TIMEOUT", "1500"))
-    POLL = max(1, int(cfg.get("ATELIER_SMOKE_POLL", "10")))
+    WAIT = min(50, max(0, int(cfg.get("ATELIER_SMOKE_WAIT", "25"))))
+    POLL = max(0, int(cfg.get("ATELIER_SMOKE_POLL", "2")))
 except ValueError:
-    result("NICHT EINGERICHTET: ATELIER_SMOKE_TIMEOUT und ATELIER_SMOKE_POLL müssen ganze Zahlen sein.", 2)
+    result("NICHT EINGERICHTET: ATELIER_SMOKE_TIMEOUT, ATELIER_SMOKE_WAIT und ATELIER_SMOKE_POLL müssen ganze Zahlen sein.", 2)
 
 
 class UnexpectedResponse(Exception):
@@ -147,7 +149,6 @@ def as_text(value, what):
     return value.strip()
 
 
-TERMINAL_STATUSES = ("Completed", "Failed", "Aborted")
 SUCCESS_OUTCOMES = ("Converged", "DeliveredWithOpenPoints")
 KNOWN_OUTCOMES = (*SUCCESS_OUTCOMES, "Failed", "Aborted")
 
@@ -329,45 +330,51 @@ def main():
     mcp.notify("notifications/initialized")
 
     started = time.monotonic()
-    submitted = mcp.tool("submit_request", {"briefingText": BRIEFING, "crewTemplate": TEMPLATE})
-    run_id = submitted.get("runid")
-    if not run_id:
-        result("FEHLER (mcp): submit_request ohne Lauf-ID", 3)
-    step(f"Lauf {run_id} eingereicht")
+    submitted = mcp.tool("submit_order", {"request": REQUEST})
+    order_id = as_text(submitted.get("orderid"), "orderId von submit_order")
+    if not order_id:
+        result("FEHLER (mcp): submit_order ohne Auftrags-ID", 3)
+    step(f"Auftrag {order_id} eingereicht ({as_text(submitted.get('state'), 'state von submit_order') or '?'})")
 
-    status = ""
+    state = ""
+    outcome = ""
+    skipped = False
     while True:
-        current = mcp.tool("get_run_status", {"runId": run_id})
-        status = str(current.get("status") or "")
-        outcome = as_outcome(current.get("outcome"), "outcome von get_run_status")
-        if outcome:
+        current = mcp.tool("get_order_status", {"orderId": order_id, "waitSeconds": WAIT})
+        state = as_text(current.get("state"), "state von get_order_status")
+        outcome = as_outcome(current.get("outcome"), "outcome von get_order_status")
+        if state == "needs_input" and not skipped:
+            mcp.tool("answer_order", {"orderId": order_id, "skip": True})
+            skipped = True
+            step("Rückfragen übersprungen")
+            continue
+        if current.get("done") is True and outcome:
             break
         if time.monotonic() - started > TIMEOUT:
-            if status in TERMINAL_STATUSES:
-                result(f"FEHLER (zeitlimit): Lauf {run_id} nach {TIMEOUT} s im Status {status}, aber ohne outcome; "
-                       "der Text ist erst mit gesetztem outcome endgültig (Abschlussschritte noch offen oder abgebrochen)", 1)
-            result(f"FEHLER (zeitlimit): Lauf {run_id} nach {TIMEOUT} s noch im Status {status or '?'}, ohne outcome", 1)
-        step(f"Status {status or '?'}, outcome noch offen")
+            if current.get("done") is True:
+                result(f"FEHLER (zeitlimit): Auftrag {order_id} nach {TIMEOUT} s fertig im Zustand {state}, aber ohne outcome; "
+                       "der Text ist erst mit gesetztem outcome endgültig", 1)
+            result(f"FEHLER (zeitlimit): Auftrag {order_id} nach {TIMEOUT} s noch im Zustand {state or '?'}, ohne outcome", 1)
+        step(f"Zustand {state or '?'}, outcome noch offen")
         time.sleep(POLL)
 
-    final = mcp.tool("get_run_result", {"runId": run_id})
+    final = mcp.tool("get_order_result", {"orderId": order_id})
     elapsed = int(time.monotonic() - started)
-    outcome = as_outcome(final.get("outcome"), "outcome von get_run_result") or outcome
-    final_status = str(final.get("status") or status)
-    text = as_text(final.get("finaltext"), "finalText von get_run_result")
-    error = as_text(final.get("errormessage"), "errorMessage von get_run_result")
+    final_state = as_text(final.get("state"), "state von get_order_result") or state
+    text = as_text(final.get("text"), "text von get_order_result")
+    note = as_text(final.get("note"), "note von get_order_result")
     problems = []
     if outcome not in SUCCESS_OUTCOMES:
-        problems.append(f"outcome {outcome} (Status {final_status})")
+        problems.append(f"outcome {outcome} (Zustand {final_state})")
     if not text:
         problems.append("kein Text")
     if problems:
-        if error:
-            problems.append(f"Fehlermeldung: {error[:160]}")
-        result(f"FEHLER (lauf): Lauf {run_id} nach {elapsed} s: {'; '.join(problems)}", 1)
-    open_points = "" if outcome == "Converged" else f", Status {final_status}, offene Punkte"
-    result(f"OK: Lauf {run_id} {outcome} in {elapsed} s, {len(text)} Zeichen Text ({TEMPLATE}){open_points}", 0)
-
+        if note:
+            problems.append(f"Hinweis: {note[:160]}")
+        result(f"FEHLER (lauf): Auftrag {order_id} nach {elapsed} s: {'; '.join(problems)}", 1)
+    open_points = "" if outcome == "Converged" else f", Zustand {final_state}, offene Punkte"
+    asked = ", Rückfragen übersprungen" if skipped else ""
+    result(f"OK: Auftrag {order_id} {outcome} in {elapsed} s, {len(text)} Zeichen Text (submit_order){asked}{open_points}", 0)
 
 try:
     main()

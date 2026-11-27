@@ -122,21 +122,33 @@ class FakeAtelier(BaseHTTPRequestHandler):
                 res = {"protocolVersion": "2025-06-18", "capabilities": {}, "serverInfo": {"name": "fake"}}
             else:
                 name, args = msg["params"]["name"], msg["params"]["arguments"]
-                if name == "submit_request":
+                s.setdefault("tools", []).append(name)
+                asking = s.get("ask") and "answered" not in s
+                if name == "submit_order":
                     s["submitted"] = args
-                    payload = {"runId": "run-1", "status": "Pending", "errorMessage": None}
-                elif name == "get_run_status":
-                    s["polls"] = s.get("polls", 0) + 1
-                    done = s["polls"] >= 2 and not s.get("hang")
-                    payload = {"runId": "run-1", "status": s.get("final_status", "Completed") if done else "Running",
-                               "errorMessage": None, "outcome": _outcome(s)}
+                    payload = {"orderId": "order-1", "state": "needs_input" if asking else "queued",
+                               "runId": None if asking else "run-1", "message": "", "sources": []}
+                elif name == "answer_order":
+                    s["answered"] = args
+                    payload = {"orderId": "order-1", "state": "queued", "runId": "run-1", "message": ""}
+                elif name == "get_order_status":
+                    s.setdefault("waits", []).append(args.get("waitSeconds"))
+                    if asking:
+                        payload = {"orderId": "order-1", "state": "needs_input", "done": False, "step": "Waiting for answers",
+                                   "elapsedSeconds": 1, "warnings": [], "nextCheckSeconds": 0, "outcome": None}
+                    else:
+                        s["polls"] = s.get("polls", 0) + 1
+                        done = s["polls"] >= 2 and not s.get("hang")
+                        payload = {"orderId": "order-1", "state": s.get("final_state", "delivered") if done else "working",
+                                   "done": done, "step": "Done" if done else "Writing", "elapsedSeconds": 1, "runId": "run-1",
+                                   "warnings": [], "nextCheckSeconds": 0 if done else 5, "outcome": _outcome(s) if done else None}
                 else:
                     s["result_reads"] = s.get("result_reads", 0) + 1
                     s["result_read_at_poll"] = s.get("polls", 0)
                     final = _outcome(s) is not None
-                    payload = {"runId": "run-1", "status": s.get("final_status", "Completed"),
-                               "finalText": s.get("final_text", "Der Smoke-Test läuft.") if final else "VORLÄUFIG vor dem Abschlussschritt",
-                               "errorMessage": s.get("error"), "outcome": _outcome(s)}
+                    payload = {"orderId": "order-1", "state": s.get("final_state", "delivered"),
+                               "text": s.get("final_text", "Der Smoke-Test läuft.") if final else "VORLÄUFIG vor dem Abschlussschritt",
+                               "note": s.get("note")}
                     if "result_payload" in s:
                         payload = s["result_payload"]
                 res = {"content": [{"type": "text", "text": json.dumps(payload)}], "isError": False}
@@ -226,13 +238,33 @@ def test_happy_path_one_line_and_no_secrets(sandbox, server):
     r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
     assert r.returncode == 0, r.stdout + r.stderr
     lines = r.stdout.strip().splitlines()
-    assert len(lines) == 1 and lines[0].startswith("SMOKE OK: Lauf run-1 Converged")
-    assert "offene Punkte" not in lines[0]
-    assert scenario["submitted"]["crewTemplate"] == "klassik"
-    assert len(scenario["submitted"]["briefingText"]) < 200
+    assert len(lines) == 1 and lines[0].startswith("SMOKE OK: Auftrag order-1 Converged")
+    assert "offene Punkte" not in lines[0] and "Rückfragen" not in lines[0]
+    assert set(scenario["submitted"]) == {"request"}
+    assert len(scenario["submitted"]["request"]) < 200
     assert [c["method"] for c in scenario["calls"]][:2] == ["initialize", "notifications/initialized"]
+    assert set(scenario["tools"]) == {"submit_order", "get_order_status", "get_order_result"}
+    assert set(scenario["waits"]) == {25}
     for secret in (PASSWORD, "tok-SECRET", "cookie-1"):
         assert secret not in r.stdout + r.stderr
+
+
+def test_questions_are_skipped_once_and_the_order_still_passes(sandbox, server):
+    httpd, scenario = server
+    scenario["ask"] = True
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.stdout.startswith("SMOKE OK: Auftrag order-1 Converged") and "Rückfragen übersprungen" in r.stdout
+    assert scenario["answered"] == {"orderId": "order-1", "skip": True}
+    assert scenario["tools"].count("answer_order") == 1
+
+
+def test_no_removed_tool_is_called(sandbox, server):
+    httpd, scenario = server
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not {"submit_request", "get_run_status", "get_run_result"} & set(scenario["tools"])
+    assert "klassik" not in SCRIPT.read_text(encoding="utf-8") and "submit_request" not in SCRIPT.read_text(encoding="utf-8")
 
 
 def test_wrong_password_exits_3(sandbox, server):
@@ -260,12 +292,12 @@ def test_state_mismatch_exits_3(sandbox, server):
 @pytest.mark.parametrize(
     ("scenario_update", "expected"),
     [
-        ({"final_status": "Failed", "final_outcome": "Failed", "error": "Did not converge"},
-         "outcome Failed (Status Failed); Fehlermeldung: Did not converge"),
-        ({"final_status": "Aborted", "final_outcome": "Aborted"}, "outcome Aborted (Status Aborted)"),
-        ({"final_status": "Completed", "final_outcome": "Failed"}, "outcome Failed (Status Completed)"),
+        ({"final_state": "failed", "final_outcome": "Failed", "note": "No text was written."},
+         "outcome Failed (Zustand failed); Hinweis: No text was written."),
+        ({"final_state": "stopped", "final_outcome": "Aborted"}, "outcome Aborted (Zustand stopped)"),
+        ({"final_state": "delivered", "final_outcome": "Failed"}, "outcome Failed (Zustand delivered)"),
         ({"final_text": ""}, "kein Text"),
-        ({"final_outcome": "DeliveredWithOpenPoints", "final_status": "Failed", "final_text": ""}, "kein Text"),
+        ({"final_outcome": "DeliveredWithOpenPoints", "final_state": "delivered_with_open_points", "final_text": ""}, "kein Text"),
     ],
 )
 def test_bad_run_exits_1(sandbox, server, scenario_update, expected):
@@ -276,14 +308,13 @@ def test_bad_run_exits_1(sandbox, server, scenario_update, expected):
     assert "FEHLER (lauf)" in r.stdout and expected in r.stdout
 
 
-@pytest.mark.parametrize("final_status", ["Failed", "Aborted"])
-def test_delivered_with_open_points_passes_and_says_so(sandbox, server, final_status):
+def test_delivered_with_open_points_passes_and_says_so(sandbox, server):
     httpd, scenario = server
-    scenario.update(final_outcome="DeliveredWithOpenPoints", final_status=final_status, error="Did not converge")
+    scenario.update(final_outcome="DeliveredWithOpenPoints", final_state="delivered_with_open_points")
     r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
     assert r.returncode == 0, r.stdout + r.stderr
-    assert r.stdout.startswith("SMOKE OK: Lauf run-1 DeliveredWithOpenPoints")
-    assert f"Status {final_status}, offene Punkte" in r.stdout
+    assert r.stdout.startswith("SMOKE OK: Auftrag order-1 DeliveredWithOpenPoints")
+    assert "Zustand delivered_with_open_points, offene Punkte" in r.stdout
 
 
 def test_waits_for_outcome_not_for_terminal_status_and_reads_text_once_afterwards(sandbox, server):
@@ -301,7 +332,7 @@ def test_timeout_exits_1(sandbox, server):
     scenario["hang"] = True
     r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}", ATELIER_SMOKE_TIMEOUT="2"))
     assert r.returncode == 1
-    assert "FEHLER (zeitlimit)" in r.stdout and "Status Running, ohne outcome" in r.stdout
+    assert "FEHLER (zeitlimit)" in r.stdout and "Zustand working, ohne outcome" in r.stdout
 
 
 def test_terminal_status_without_outcome_times_out_with_clear_error(sandbox, server):
@@ -310,7 +341,7 @@ def test_terminal_status_without_outcome_times_out_with_clear_error(sandbox, ser
     r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}", ATELIER_SMOKE_TIMEOUT="2"))
     assert r.returncode == 1, r.stdout
     assert r.stdout.startswith("SMOKE FEHLER (zeitlimit)")
-    assert "im Status Completed, aber ohne outcome" in r.stdout
+    assert "fertig im Zustand delivered, aber ohne outcome" in r.stdout
     assert scenario.get("result_reads", 0) == 0
 
 
@@ -383,10 +414,10 @@ def test_unexpected_token_response_exits_4(sandbox, server, body, expected):
         ({"plain_body": "<html>"}, "initialize ohne lesbare Antwort"),
         ({"rpc_result": [1]}, "Feld result der Antwort auf initialize ist kein JSON-Objekt"),
         ({"raw_for": "tools/call", "sse_data": "[]"}, "SSE-Datenzeile der Antwort auf tools/call"),
-        ({"result_payload": {"runId": "run-1", "status": "Completed", "finalText": 42, "outcome": "Converged"}},
-         "finalText von get_run_result ist kein Text"),
-        ({"final_outcome": "Weird"}, "outcome von get_run_status hat den unbekannten Wert 'Weird'"),
-        ({"final_outcome": 3}, "outcome von get_run_status ist kein Text"),
+        ({"result_payload": {"orderId": "order-1", "state": "delivered", "text": 42}},
+         "text von get_order_result ist kein Text"),
+        ({"final_outcome": "Weird"}, "outcome von get_order_status hat den unbekannten Wert 'Weird'"),
+        ({"final_outcome": 3}, "outcome von get_order_status ist kein Text"),
     ],
 )
 def test_unexpected_mcp_response_exits_4(sandbox, server, update, expected):
