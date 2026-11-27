@@ -109,8 +109,9 @@ descriptions; those editors were removed in stage 8d (D-091).
 ## Database
 
 One baseline migration builds the schema (D-092). The application does not start on a database that does not start from it and
-changes nothing there; the log says why. An installation from before D-092 has to be converted once, with a backup taken first.
-To go back to an image from before D-092, restore that backup; such an image cannot read the converted database.
+changes nothing there; the log says why. There is no automatic upgrade for an installation from before D-092: take a backup and set it up again with an empty
+database (accounts, providers and settings have to be entered again), or convert its schema by hand to match the baseline.
+To go back to an image from before D-092, restore that backup.
 
 ## Things to watch
 

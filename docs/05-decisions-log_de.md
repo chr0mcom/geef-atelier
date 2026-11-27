@@ -4029,8 +4029,8 @@ Migrationsgeschichte Einträge hat, aber nicht die Baseline, oder eine mit Tabel
 Meldung an; nichts wird angelegt oder geändert. Eine Datenbank mit der Baseline und späteren Migrationen, die diese Version nicht
 kennt, startet weiterhin; der Rückweg auf das vorige Image nach einer additiven Migration funktioniert also wie bisher.
 
-**Umstellung einer bestehenden Installation.** Eine bestehende Datenbank wird einmal außerhalb der Anwendung umgestellt, mit einem
-SQL-Skript in einer Transaktion. Es bricht bei allem Unerwarteten ab (andere Migrationsgeschichte oder anderes Schema, offene
+**Umstellung einer bestehenden Installation.** Die laufende Installation wurde einmal außerhalb der Anwendung umgestellt, mit
+einem SQL-Skript in einer Transaktion. Das Skript ist an diese Installation gebunden und nicht Teil des Repositorys. Es bricht bei allem Unerwarteten ab (andere Migrationsgeschichte oder anderes Schema, offene
 Verbindungen, laufende Arbeit, Dateien in der Bibliothek) und prüft am Ende, dass das Schema genau der Baseline entspricht und die
 behaltenen Zeilen unverändert sind; ein zweiter Lauf ändert nichts. Behalten werden: alle Konten außer deaktivierten Testkonten,
 die Passwort-Hashes, OAuth-Clients mit noch gültigem Token oder Code (oder jünger als ein Tag), gültige Zugriffstokens, alle nicht

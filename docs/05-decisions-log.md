@@ -3880,8 +3880,8 @@ entries but not the baseline, or one with tables and no history, stops the start
 changed. A database that has the baseline plus later migrations this version does not know still starts, so going back to the
 previous image after an additive migration keeps working as before.
 
-**Conversion of an existing installation.** An existing database is converted once, outside the application, by one SQL script in
-one transaction. It stops on anything unexpected (other migration history or schema, open connections, running work, files kept in
+**Conversion of an existing installation.** The running installation was converted once, outside the application, by one SQL
+script in one transaction. The script is tied to that installation and not part of the repository. It stops on anything unexpected (other migration history or schema, open connections, running work, files kept in
 the library) and checks at the end that the schema equals the baseline exactly and that the kept rows are unchanged; a second run
 changes nothing. Kept: all accounts except disabled test accounts, password hashes, OAuth clients that still have a valid token or
 code (or are newer than a day), valid access tokens, all unexpired refresh tokens (used and revoked ones too, because reuse

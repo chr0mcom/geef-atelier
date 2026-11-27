@@ -113,9 +113,9 @@ Rollenbeschreibungen bearbeitest du nicht; diese Editoren wurden in Stufe 8d ent
 ## Datenbank
 
 Eine Baseline-Migration baut das Schema auf (D-092). Auf einer Datenbank, die nicht von ihr ausgeht, startet die Anwendung nicht
-und ändert dort nichts; das Log nennt den Grund. Eine Installation von vor D-092 muss einmal umgestellt werden, vorher wird
-gesichert. Für den Rückweg auf ein Image von vor D-092 diese Sicherung zurückspielen; ein solches Image kann die umgestellte
-Datenbank nicht lesen.
+und ändert dort nichts; das Log nennt den Grund. Für eine Installation von vor D-092 gibt es keine automatische Umstellung: sichern und mit
+einer leeren Datenbank neu aufsetzen (Konten, Anbieter und Einstellungen neu eintragen) oder das Schema von Hand an die
+Baseline angleichen. Für den Rückweg auf ein Image von vor D-092 diese Sicherung zurückspielen.
 
 ## Worauf achten
 
