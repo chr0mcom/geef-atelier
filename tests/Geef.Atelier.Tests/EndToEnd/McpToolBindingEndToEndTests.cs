@@ -21,7 +21,11 @@ public sealed class McpToolBindingEndToEndTests(PostgresFixture postgres)
     [Fact]
     public async Task Tools_list_shows_exactly_the_client_values_of_every_tool_and_no_service()
     {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres, s => s.Configure<UploadOptions>(o => o.Tickets = UploadTicketsMode.On));
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, s =>
+        {
+            s.Configure<UploadOptions>(o => o.Tickets = UploadTicketsMode.On);
+            s.Configure<OrderOptions>(o => o.CarefulOutline = CarefulOutlineMode.On);
+        });
 
         var response = await host.PostMcpAsync("tools/list");
         var listed = response.GetProperty("result").GetProperty("tools").EnumerateArray()

@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Checks;
@@ -28,7 +29,9 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
     private static async Task<(AtelierEndToEndHost Host, Guid OrderId)> SubmitAsync(
         PostgresFixture postgres, string request, Action<ScriptedLlmEndpoint> script, bool withPdf = false, OrderMode mode = OrderMode.Direct)
     {
-        var host = await AtelierEndToEndHost.StartAsync(postgres);
+        var host = await AtelierEndToEndHost.StartAsync(postgres, mode == OrderMode.Careful
+            ? s => s.Configure<OrderOptions>(o => o.CarefulOutlineOverrides["e2e-direct"] = CarefulOutlineMode.On)
+            : null);
         script(host.Script);
         var sources = new List<OrderSourceSelection>();
         if (withPdf)
