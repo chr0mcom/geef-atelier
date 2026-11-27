@@ -64,11 +64,16 @@ public sealed class CarefulOutlineEndToEndTests(PostgresFixture postgres)
         Assert.Contains(WritingPlanPrompts.OutlineLead, executor[1].PromptText, StringComparison.Ordinal);
         Assert.Contains("1. What changes – about 60 words: The new hours", executor[1].PromptText, StringComparison.Ordinal);
 
+        var check = Assert.Single(host.Llm.Calls, ScriptedLlmEndpoint.IsRequirementsCall);
+        Assert.Contains("sonnet", check.Model, StringComparison.Ordinal);
+        Assert.Contains(ScriptedLlmEndpoint.DefaultExecutorText, check.PromptText, StringComparison.Ordinal);
+
         var actors = await host.QueryAsync(db => db.IterationActorCosts.AsNoTracking()
             .Where(c => db.Iterations.Any(i => i.Id == c.IterationId && i.RunId == run.Id))
             .Select(c => c.ActorName).ToListAsync());
         Assert.Contains(WritingPlanner.ActorName, actors);
         Assert.Contains(SystemCrew.DirectWriterProfile.Name, actors);
+        Assert.Contains(SystemCrew.RequirementsCheckProfile.Name, actors);
 
         var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId));
         Assert.Equal(OrderMode.Careful, order.Mode);
@@ -93,5 +98,6 @@ public sealed class CarefulOutlineEndToEndTests(PostgresFixture postgres)
         Assert.Equal(SystemCrew.KlassikTemplateName, webRun.CrewTemplateName);
         Assert.Equal(SystemCrew.DirectTemplateName, standardRun.CrewTemplateName);
         Assert.DoesNotContain(host.Llm.CallsFor(LlmRole.Executor), c => c.SystemPrompt == WritingPlanPrompts.SystemPrompt);
+        Assert.DoesNotContain(host.Llm.Calls, ScriptedLlmEndpoint.IsRequirementsCall);
     }
 }

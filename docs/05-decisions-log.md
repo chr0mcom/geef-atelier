@@ -3522,6 +3522,23 @@ with and without the clarifier.
 
 **Way back:** switch `Off` (default), remove the exceptions.
 
+**Addendum to D-087 – repair of K (2026-11-27).** The measurement showed that neither K nor L won against the direct path. Under the rule
+fixed in advance, exactly one repair of K follows. According to the reasons of the blind juror, K lost mainly on explicit requirements
+of the request it did not meet. The repair is general, not cut to particular tasks, and sits in the same switch `Orders:CarefulOutline`
+(unchanged with `Off`):
+- The template `direct-outline` gets a third check `requirements-check`. After the **first** version, one call of a model other than the
+  writer (the intake's standard model, without falling back to another model, 120 s) lists every explicit requirement of the request word
+  for word and says whether the text meets it. The code still checks the length.
+- Only “not met” with a quote that stands in the request (compared without case and white space) blocks, at most ten. The one correction
+  of the direct path gets for each point the fixed sentence “The request asks: "…". The text does not meet this yet.” with the reason.
+- Later versions are not checked again (cost cap), so whether the correction meets every point stays unchecked.
+- A failure is not repeated and never blocks; the order gets the note “Whether the text meets every point of the request could not be
+  checked.”. The prompt names no kind of text.
+- Evidence: unit tests (reading, the quote must stand in the request, the sentence, the prompt), pipeline tests over the real assembly
+  (met, not met with correction, quote not in the request, failure, direct path never checks) and end-to-end over MCP. The repair is
+  measured with the same criteria against the stored texts of the direct path. Without a win the checkbox goes and long texts run on the
+  direct path.
+
 ## D-088 — MCP: skill and questions as a form, both behind switches and shipped off (2026-11-27)
 
 **Status:** built and tested (steps 2 and 3 of the review of new MCP capabilities); both switches shipped `Off`; acceptance on the

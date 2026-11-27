@@ -75,6 +75,8 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
             {
                 DeterministicChecksReviewer.ReviewerName => checks,
                 SourceFactCheckReviewer.ReviewerName => FactReviewer(context, profile, ledger),
+                RequirementsCheckReviewer.ReviewerName => new RequirementsCheckReviewer(profile, context.LlmClientResolver, context.PricingCatalog,
+                    context.CostAccumulator, context.WarningSink, context.Run.Id, context.LoggerFactory.CreateLogger<RequirementsCheckReviewer>()),
                 _ => null,
             },
             warningSink: context.WarningSink,

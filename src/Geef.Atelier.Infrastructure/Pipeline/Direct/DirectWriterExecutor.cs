@@ -156,8 +156,9 @@ internal sealed class DirectWriterExecutor(
     }
 
     /// <summary>
-    /// The problems of the previous pass the correction must fix: messages of the blocking findings of the automatic checks, and
-    /// for blocking findings of the fact check a fixed sentence built from their metadata (<see cref="DirectWriterPrompts.FactProblem"/>).
+    /// The problems of the previous pass the correction must fix: messages of the blocking findings of the automatic checks, for
+    /// blocking findings of the fact check a fixed sentence built from their metadata (<see cref="DirectWriterPrompts.FactProblem"/>), and
+    /// for requirements of the request that are not met (outline template only) <see cref="RequirementsCheckReviewer.Problem"/>.
     /// Findings of other reviewers, findings that do not block (hints, shadow mode, source conflicts) and reports about checks that
     /// could not run are never passed on.
     /// </summary>
@@ -175,6 +176,7 @@ internal sealed class DirectWriterExecutor(
             {
                 DeterministicChecksReviewer.FindingCategory => f.Message,
                 SourceFactCheckReviewer.FindingCategory => DirectWriterPrompts.FactProblem(f.Metadata, f.Message, forbidPlaceholders),
+                RequirementsCheckReviewer.FindingCategory => RequirementsCheckReviewer.Problem(f.Metadata, f.Message),
                 _ => null,
             })
             .OfType<string>()

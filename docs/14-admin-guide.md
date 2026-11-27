@@ -90,7 +90,8 @@ What the values mean:
   `Orders__CarefulOutlineOverrides__<name>=On`): with `On`, an “Extra careful” order without a chosen team runs on the standard way with
   one call first that splits the text into sections with word budgets (taken from the requested length when it can be read without a
   model); the writer then writes along it, with the same automatic checks, the same fact check and the same “What was checked” as the
-  standard way. If no usable outline comes back, the text is written in one go and the order says so. A chosen team, changes and resumed
+  standard way, plus a check after the first version whether every explicit requirement of the request is met (otherwise one
+  correction). If no usable outline comes back, the text is written in one go and the order says so. A chosen team, changes and resumed
   runs never plan. Stays off until the measurement of package 7 has decided (D-087).
 
 **How to set a switch.** The settings are read at start. Set them as environment variables of the web service, with `__` in place
