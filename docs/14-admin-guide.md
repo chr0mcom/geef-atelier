@@ -54,8 +54,9 @@ What the values mean:
   that looking things up did not work, so switch it off (`Research__Mode=Off`, see “How to set a switch” below) if you set no key. The way back for everyone is
   `Research__Mode=Off`, for one person `Research__ModeOverrides__<user>=Off`. The switch counts twice: only a request that was read
   while research was on for the person can search, and only while it is still on; requests read before the switch was turned on
-  never search. Search words with an email address, a phone or account number, a date of birth or a street address are held back;
-  names and other details in plain words are not recognized, and the person sees the words that went out on the result. This switch
+  never search. Atelier tries to hold back search words with an email address, a phone or account number, a date of birth or a
+  street address that it recognizes; it does not recognize every form, names and other details in plain words not at all, and the
+  person sees the words that went out on the result. This switch
   covers the standard way only. "Extra careful" never searches the web. A workshop
   template or an own team that someone chooses explicitly – on the older form `/new` or through the older tools (`submit_request`
   with `crewTemplate` or `customCrew`, `submit_auto_crew_request`) – uses the sources of that team, and these can include a web

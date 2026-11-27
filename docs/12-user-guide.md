@@ -116,10 +116,10 @@ example your sign-off word for word, depends on the text: check the result as al
 - Your request, your answers, your About me details and your files go to the AI services this Atelier uses to write and check the
   text.
 - Atelier may look things up on the web, but only on the standard way and only when you add no files. Then a web search service
-  gets a few short search words. The search words come from your request. Atelier leaves out email addresses, phone numbers,
-  account numbers and street addresses, but names or other personal details in your request can end up in them. Your answers and
-  your files are never sent, and a word from your About me details only when you also wrote it in your request (this compares
-  words, so it can miss a word in another language). The result lists the search words that were sent. A change of a finished
+  gets a few short search words taken from your request. Atelier tries to leave out email addresses, phone numbers, account numbers and street addresses that it recognizes. It does
+  not recognize every form, and names or other personal details in your request can end up in the search words. Your answers and
+  files are never sent. Words from your About me details are held back unless you also wrote them in your request, but a
+  translated or reworded detail can slip through. The result shows which search words were sent. A change of a finished
   text uses what was looked up the first time and does not search again. There is a daily limit; once it is reached, the text is
   written without looking things up, and the result says so. "Extra careful" never searches the web. Teams that administrators
   set up in the workshop can have their own web search.

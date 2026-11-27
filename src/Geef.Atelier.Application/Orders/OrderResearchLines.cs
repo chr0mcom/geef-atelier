@@ -16,6 +16,12 @@ public static class OrderResearchLines
     public const string RetrievedFormat = "retrieved {0}";
     public const string RetrievedDateFormat = "d MMM yyyy";
 
+    /// <summary>
+    /// What goes to the web search service, in the same words on every page that describes it (explanation page, start page, hosting
+    /// page). It promises nothing the code does not hold: the filter tries, the About me comparison can miss a reworded detail.
+    /// </summary>
+    public const string SearchPrivacy = "Atelier tries to leave out email addresses, phone numbers, account numbers and street addresses that it recognizes. It does not recognize every form, and names or other personal details in your request can end up in the search words. Your answers and files are never sent. Words from your About me details are held back unless you also wrote them in your request, but a translated or reworded detail can slip through. The result shows which search words were sent.";
+
     /// <summary>Lead of the search words that went to the search service, shown only to the person who placed the order.</summary>
     public const string SearchWordsLead = "These search words went to a web search service. They come from your request:";
 
@@ -48,14 +54,26 @@ public static class OrderResearchLines
     /// of an entry is <see cref="ResearchAddress.SafeTitle"/>, also for research stored before that rule. Found
     /// research without an entry shows the sentence of <see cref="ResearchStatus.NothingFound"/>, so that it never stays silent; topics
     /// that were withheld add <see cref="SomeWithheld"/> to entries and to that sentence. With <paramref name="showSearchWords"/> (only
-    /// for the person who placed the order) the view also lists the topics that went to the search service.
+    /// for the person who placed the order) the view also lists the topics that went to the search service, always when there are any:
+    /// also without a text (<paramref name="hasText"/> false; then without the sentence, which speaks of the text) and when the delivered
+    /// run did not use the found passages (then with <see cref="NotUsedForThisText"/> instead of the passages). Without a text and
+    /// without search words to show there is no view.
     /// </summary>
-    public static OrderLookedUpView? Build(OrderResearch? research, bool deliveredRunLookedUp, bool showSearchWords = false)
+    public static OrderLookedUpView? Build(OrderResearch? research, bool deliveredRunLookedUp, bool showSearchWords = false, bool hasText = true)
     {
-        var view = BuildView(research, deliveredRunLookedUp);
         var words = showSearchWords ? (research?.TopicsSent ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).ToList() : [];
-        return view is null || words.Count == 0 ? view : view with { SearchWords = words };
+        if (research is null || research.Status == ResearchStatus.NotNeeded)
+            return null;
+        if (!hasText)
+            return words.Count == 0 ? null : new OrderLookedUpView(research.Status, null, Math.Max(0, research.Withheld), [], words);
+        var view = BuildView(research, deliveredRunLookedUp);
+        if (view is null)
+            return words.Count == 0 ? null : new OrderLookedUpView(research.Status, NotUsedForThisText, Math.Max(0, research.Withheld), [], words);
+        return words.Count == 0 ? view : view with { SearchWords = words };
     }
+
+    /// <summary>Said beside the search words when passages were found but the shown text was written without them.</summary>
+    public const string NotUsedForThisText = "Pages were looked up, but this version of the text was written without them.";
 
     private static OrderLookedUpView? BuildView(OrderResearch? research, bool deliveredRunLookedUp)
     {

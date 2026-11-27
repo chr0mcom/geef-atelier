@@ -160,9 +160,9 @@ internal sealed class OrderService(
         var hasText = !string.IsNullOrWhiteSpace(run.FinalText);
         var viewer = viewerUsername ?? requestingUsername;
         var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
-        var lookedUp = !hasText || string.IsNullOrWhiteSpace(order.ResearchJson)
+        var lookedUp = string.IsNullOrWhiteSpace(order.ResearchJson)
             ? null
-            : OrderResearchLines.Build(ResearchJson.TryParse(order.ResearchJson), report?.LookedUp == true, showSearchWords: showProfile);
+            : OrderResearchLines.Build(ResearchJson.TryParse(order.ResearchJson), report?.LookedUp == true, showSearchWords: showProfile, hasText: hasText);
         var warnings = (await warningRepository.ListByRunAsync(run.Id, ct)).WithoutShownResearchWarning(lookedUp);
 
         var result = new OrderResult(

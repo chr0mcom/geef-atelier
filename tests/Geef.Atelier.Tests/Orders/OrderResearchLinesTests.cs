@@ -103,6 +103,47 @@ public sealed class OrderResearchLinesTests
     }
 
     [Fact]
+    public void The_shared_privacy_sentence_makes_no_unlimited_promise_about_what_it_recognizes()
+    {
+        var sentence = OrderResearchLines.SearchPrivacy;
+
+        Assert.Contains("tries to leave out", sentence, StringComparison.Ordinal);
+        Assert.Contains("that it recognizes", sentence, StringComparison.Ordinal);
+        Assert.Contains("It does not recognize every form", sentence, StringComparison.Ordinal);
+        Assert.Contains("names or other personal details in your request can end up in the search words", sentence, StringComparison.Ordinal);
+        Assert.Contains("a translated or reworded detail can slip through", sentence, StringComparison.Ordinal);
+        Assert.Contains("The result shows which search words were sent.", sentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("private", sentence, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Without_a_text_the_owner_still_sees_the_search_words_but_no_sentence_about_the_text()
+    {
+        var research = Research(ResearchStatus.Failed, error: "search_failed");
+
+        var owner = OrderResearchLines.Build(research, false, showSearchWords: true, hasText: false)!;
+
+        Assert.Equal(["minimum wage 2027"], owner.SearchWords);
+        Assert.Null(owner.Note);
+        Assert.Empty(owner.Entries);
+        Assert.Null(OrderResearchLines.Build(research, false, showSearchWords: false, hasText: false));
+        Assert.Null(OrderResearchLines.Build(research with { TopicsSent = [] }, false, showSearchWords: true, hasText: false));
+    }
+
+    [Fact]
+    public void Passages_the_shown_text_did_not_use_stay_hidden_but_the_owner_sees_the_search_words_with_a_sentence()
+    {
+        var research = Research(ResearchStatus.Found, [Entry()]);
+
+        var owner = OrderResearchLines.Build(research, deliveredRunLookedUp: false, showSearchWords: true)!;
+
+        Assert.Empty(owner.Entries);
+        Assert.Equal(["minimum wage 2027"], owner.SearchWords);
+        Assert.Equal(OrderResearchLines.NotUsedForThisText, owner.Note);
+        Assert.Null(OrderResearchLines.Build(research, deliveredRunLookedUp: false));
+    }
+
+    [Fact]
     public void Without_search_words_that_went_out_none_are_listed()
     {
         var view = OrderResearchLines.Build(Research(ResearchStatus.DailyLimit) with { TopicsSent = [] }, true, showSearchWords: true)!;

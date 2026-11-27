@@ -89,9 +89,7 @@ public sealed class LandingSwitchesTests : TestContext
         Assert.Contains("A page it finds can be wrong", cut.Find("[data-testid='landing-limit-web']").TextContent, StringComparison.Ordinal);
         var privacy = cut.Find("[data-testid='landing-privacy-research']").TextContent;
         Assert.Contains("only when you add no files", privacy, StringComparison.Ordinal);
-        Assert.Contains("names or other personal details in your request can end up in them", privacy, StringComparison.Ordinal);
-        Assert.Contains("Your answers and your files are never sent", privacy, StringComparison.Ordinal);
-        Assert.Contains("only when you also wrote it in your request", privacy, StringComparison.Ordinal);
+        Assert.Contains(OrderResearchLines.SearchPrivacy, privacy, StringComparison.Ordinal);
         Assert.DoesNotContain("private details", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 

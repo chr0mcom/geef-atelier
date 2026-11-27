@@ -4,8 +4,8 @@ namespace Geef.Atelier.Tests.Domain.Research;
 
 /// <summary>
 /// <see cref="ResearchTopicPrivacy"/>: topics with an email address, a phone or account number, a date of birth or a street address
-/// are recognized, also when the request itself names them; years, year ranges, paragraphs, amounts, norms and dates of this century
-/// still go out. All data invented.
+/// are recognized, also when the request itself names them; years, lists of years, paragraphs, amounts, norms, rankings, durations and
+/// historical dates still go out. All data invented.
 /// </summary>
 public sealed class ResearchTopicPrivacyTests
 {
@@ -24,7 +24,18 @@ public sealed class ResearchTopicPrivacyTests
     [InlineData("3704 0044 0532 0130 Überweisung")]
     [InlineData("Erika Mustermann geboren 03.04.1951 Pflegegrad")]
     [InlineData("Rente Jahrgang 1958 Abschläge")]
-    [InlineData("Max Beispiel 12.07.1985 Versicherung")]
+    [InlineData("Max Beispiel geb. 12.07.1985 Versicherung")]
+    [InlineData("(030) 123456 Hausverwaltung")]
+    [InlineData("(089) 12 34 56 Rückruf")]
+    [InlineData("030–123456 Praxis")]
+    [InlineData("0171.123.45.67 Nachbar")]
+    [InlineData("Hauptstr 7 Mieterhöhung")]
+    [InlineData("Hauptstraße Nr. 7 Kündigung")]
+    [InlineData("Lindenring 12 Hausverwaltung")]
+    [InlineData("Am Markt 3 Musterstadt Gewerbeanmeldung")]
+    [InlineData("Am Graben 12, 1010 Wien Meldezettel")]
+    [InlineData("Konto 532 013 000 Rücklastschrift")]
+    [InlineData("Kontonummer: 1234 5678 Bank")]
     [InlineData("date of birth 1990-05-17 passport renewal")]
     [InlineData("max.mustermann@example.org Verzugszinsen")]
     [InlineData("erika (at) example.org Antwort")]
@@ -50,6 +61,16 @@ public sealed class ResearchTopicPrivacyTests
     [InlineData("Paragraph 5 Arbeitszeitgesetz")]
     [InlineData("Deutschlandticket Preis 58 Euro")]
     [InlineData("Stadt mit 12000 Einwohnern Förderprogramm")]
+    [InlineData("Platz 1 im Ranking Hochschulen")]
+    [InlineData("Kitaplatz 3 Jahre Rechtsanspruch")]
+    [InlineData("Arbeitsplatz 4 Tage Woche Studie")]
+    [InlineData("Mauerfall 9.11.1989 Zeitzeugen")]
+    [InlineData("2022 Supreme Court ruling abortion")]
+    [InlineData("Inflationsrate 2022 2023 2024")]
+    [InlineData("50000 Zuschauer Stadion Auflagen")]
+    [InlineData("Rechtsweg 2 Instanzen Sozialgericht")]
+    [InlineData("Girokonto 2026 Gebühren Vergleich")]
+    [InlineData("Zinssatz 0,5 Prozent Tagesgeld")]
     [InlineData("")]
     public void Years_paragraphs_amounts_norms_and_current_dates_still_go_out(string topic) =>
         Assert.False(topic.HoldsContactDetails(), topic);

@@ -123,10 +123,11 @@ Upload-Ticket gehen Dateien als Base64 in `attachments`, was nur für kleine Dat
 
 - `submit_order` kann im Web nachschlagen (seit dem Zusatz zu D-074 für alle eingeschaltet; die Administration kann es abschalten,
   auch je Person), nur für die erste Version, nur wenn die Rückfragen-Stufe lief und nur, wenn der Auftrag keine Dateien hat. Der
-  Suchdienst bekommt kurze Suchwörter aus dem Auftrag, nie die Antworten oder die Dateien. Mailadressen, Telefon- und
-  Kontonummern, Geburtsdaten und Straßenanschriften werden zurückgehalten; Namen oder andere Angaben aus dem Auftrag können trotzdem
-  darin stehen. Ein Wort aus den About-me-Angaben geht nur hinaus, wenn es auch im Auftrag steht (ein Wortvergleich, der ein Wort in
-  einer anderen Sprache übersehen kann). `lookedUp.searchWords` nennt die gesendeten Wörter (nur beim eigenen Auftrag).
+  Suchdienst bekommt kurze Suchwörter aus dem Auftrag. Atelier versucht, Mailadressen, Telefonnummern, Kontonummern und Straßenanschriften wegzulassen, die es erkennt. Es erkennt
+  nicht jede Schreibweise, und Namen oder andere persönliche Angaben aus dem Auftrag können in den Suchwörtern landen. Antworten
+  und Dateien werden nie gesendet. Wörter aus den About-me-Angaben werden zurückgehalten, außer sie stehen auch im Auftrag; eine
+  übersetzte oder umformulierte Angabe kann aber durchrutschen. `lookedUp.searchWords` nennt die gesendeten Wörter (nur beim
+  eigenen Auftrag, auch ohne Text).
   `revise_order` sucht nicht neu. Ist die Tagesgrenze erreicht, wird der Text ohne Nachschlagen geschrieben, und `lookedUp` sagt
   es; der Auftrag scheitert nicht.
 - `submit_order` mit `extraCareful` sucht nie im Web.

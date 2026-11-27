@@ -2492,12 +2492,18 @@ zählen weiter als zurückgehalten. Damit gilt der Satz „es gilt das Profil de
 **Nachbesserung nach der Datenschutz-Prüfung (vor dem Einschalten):** Eine unabhängige Prüfung zeigte, dass Namen, Anschriften,
 Telefon- und Kontonummern, Geburtsdaten und Gesundheitsangaben aus dem Auftrag ungefiltert in ein Suchthema gelangen konnten und ein
 Ergebnissatz das Gegenteil behauptete („… so that no private details could reach a search engine.“). Folgen: (1) Ein Code-Filter
-ohne Modell hält Suchthemen mit Mailadresse, Telefonnummer, IBAN oder langer Ziffernfolge, Geburtsdatum, Straße mit Hausnummer oder
-Postleitzahl mit Ort zurück, auch wenn der Auftrag sie nennt; Jahreszahlen, Zeiträume, Paragraphen, Beträge und Normnummern gehen
-weiter durch. Klärer-Prompt und -Schema unverändert. (2) Die Texte sagen jetzt, dass die Suchwörter aus dem Auftrag stammen und
+ohne Modell versucht, Suchthemen mit Mailadresse, Telefonnummer (auch mit Klammern, Punkten oder Gedankenstrich), IBAN, langer oder
+als Konto-, Kunden- oder Vertragsnummer bezeichneter Ziffernfolge, Geburtsdatum (nur mit einem Wort für Geburt), Straße mit
+Hausnummer (auch „Hauptstr 7“, „Nr. 7“, „Am Markt 3“) oder Postleitzahl mit Ort zurückzuhalten, auch wenn der Auftrag sie nennt; er
+erkennt nicht jede Schreibweise; Jahreszahlen, Zeiträume, Paragraphen, Beträge und Normnummern gehen
+weiter durch, ebenso Rangplätze, Dauern („Kitaplatz 3 Jahre“), Listen von Jahren und historische Daten. Klärer-Prompt und
+-Schema unverändert. (2) Die Texte sagen jetzt, dass die Suchwörter aus dem Auftrag stammen und
 Namen oder andere persönliche Angaben darin landen können; die Sätze zu zurückgehaltenen Wörtern nennen Ursachen nur als Beispiele.
 (3) Das Ergebnis zeigt der Person, der der Auftrag gehört, welche Suchwörter gesendet wurden (Web und MCP `lookedUp.searchWords`),
-nie anderen, auch nicht der Administration. (4) Gesucht wird nur, wenn beim Lesen des Auftrags die Recherche für die Person an war
+auch ohne Text und wenn die gezeigte Fassung die Stellen nicht nutzte, nie anderen, auch nicht der Administration. Alle Seiten
+nutzen denselben Satz: Atelier versucht wegzulassen, was es erkennt, erkennt nicht jede Schreibweise, Namen und andere Angaben aus
+dem Auftrag können in den Suchwörtern landen, Antworten und Dateien nie, About-me-Wörter nur, wenn sie auch im Auftrag stehen (eine
+übersetzte oder umformulierte Angabe kann durchrutschen). (4) Gesucht wird nur, wenn beim Lesen des Auftrags die Recherche für die Person an war
 und das im Datensatz steht (`IntakeRecord.ResearchAllowed`): Aufträge, die vor dem Einschalten gelesen wurden und noch warten,
 suchen nie, auch nicht beim Fortsetzen. (5) Fremde Seiten: Stellen mit Steuer- oder Richtungszeichen werden verworfen, Seitentitel
 gekürzt, Antworten des Suchdienstes über 4 MiB nicht gelesen. **Grenzen, bewusst:** Namen, Gesundheitsangaben und andere Angaben in

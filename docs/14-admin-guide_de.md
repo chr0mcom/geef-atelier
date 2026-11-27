@@ -56,8 +56,9 @@ Was die Werte bedeuten:
   meldet, dass das Nachschlagen nicht geklappt hat – ohne Schlüssel also ausschalten (`Research__Mode=Off`, siehe „Einen Schalter setzen“ unten). Rückweg für alle:
   `Research__Mode=Off`, für eine Person `Research__ModeOverrides__<user>=Off`. Der Schalter zählt doppelt: Suchen kann nur ein
   Auftrag, der gelesen wurde, während die Recherche für die Person an war, und nur, solange sie noch an ist; vor dem Einschalten
-  gelesene Aufträge suchen nie. Suchwörter mit Mailadresse, Telefon- oder Kontonummer, Geburtsdatum oder Straßenanschrift werden
-  zurückgehalten; Namen und andere Angaben in Worten erkennt das nicht, und die Person sieht am Ergebnis, welche Wörter hinausgingen.
+  gelesene Aufträge suchen nie. Atelier versucht, Suchwörter mit Mailadresse, Telefon- oder Kontonummer, Geburtsdatum oder
+  Straßenanschrift zurückzuhalten, die es erkennt; es erkennt nicht jede Schreibweise, Namen und andere Angaben in Worten gar nicht,
+  und die Person sieht am Ergebnis, welche Wörter hinausgingen.
   Dieser Schalter gilt nur für den Standardweg. „Extra careful“ sucht nie im Web. Eine
   Werkstatt-Vorlage oder ein eigenes Team, das jemand ausdrücklich wählt – im älteren Formular `/new` oder über die älteren
   Werkzeuge (`submit_request` mit `crewTemplate` oder `customCrew`, `submit_auto_crew_request`) –, nutzt die Quellen dieses Teams,

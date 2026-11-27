@@ -2395,12 +2395,16 @@ still count as held back. The sentence "the profile of the briefing counts" abov
 
 **Follow-up after the privacy review (before switching on):** an independent review showed that names, addresses, phone and account
 numbers, dates of birth and health details from the request could reach a topic unfiltered, and that a result sentence claimed the
-opposite ("… so that no private details could reach a search engine."). Consequences: (1) a code filter without a model holds back
-topics with an email address, a phone number, an IBAN or a long number, a date of birth, a street with a house number or a postcode
-with a town, also when the request names them; years, periods, paragraphs, amounts and norm numbers still go out. Prompt and schema
-of the clarifier unchanged. (2) The texts now say that the search words come from the request and that names or other personal
+opposite ("… so that no private details could reach a search engine."). Consequences: (1) a code filter without a model tries to hold
+back topics with an email address, a phone number (also with brackets, dots or dashes), an IBAN, a long number or one labelled as an
+account, customer or contract number, a date of birth (only with a word for birth), a street with a house number (also "Hauptstr 7",
+"Nr. 7", "Am Markt 3") or a postcode with a town, also when the request names them; it does not recognize every form; years, periods, paragraphs, amounts and norm numbers still go out, as do rankings, durations ("Kitaplatz 3 Jahre"),
+lists of years and historical dates. Prompt and schema of the clarifier unchanged. (2) The texts now say that the search words come from the request and that names or other personal
 details can end up in them; the sentences about held-back words name causes only as examples. (3) The result shows the person who
-placed the order which search words were sent (web and MCP `lookedUp.searchWords`), never anyone else, administrators included.
+placed the order which search words were sent (web and MCP `lookedUp.searchWords`), also without a text and when the shown version
+did not use the passages, never anyone else, administrators included. Every page uses the same sentence: Atelier tries to leave out
+what it recognizes, does not recognize every form, names and other details from the request can end up in the search words,
+answers and files never, About me words only when the request has them too (a translated or reworded detail can slip through).
 (4) Research runs only when it was on for the person when the request was read and the record says so (`IntakeRecord.ResearchAllowed`):
 orders read before the switch that are still waiting never search, also when resumed. (5) Other pages: passages with control or
 direction characters are dropped, page titles are cut, answers of the search service above 4 MiB are not read. **Limits, on

@@ -281,7 +281,7 @@
             <li>Your request, your answers, your About me details and your files go to the AI services that write and check the text.</li>
             @if (_f.WebResearch)
             {
-                <li data-testid="hiw-privacy-research">To look things up, Atelier sends a web search service a few short search words, and only when you add no files. The search words come from your request. Atelier leaves out email addresses, phone numbers, account numbers and street addresses, but names or other personal details in your request can end up in them. Your answers and your files are never sent, and a word from your About me details only when you also wrote it in your request. The comparison with About me looks at words, so it can miss a word in another language. “Extra careful” never searches the web.</li>
+                <li data-testid="hiw-privacy-research">To look things up, Atelier sends a web search service a few short search words taken from your request, and only when you add no files. @OrderResearchLines.SearchPrivacy “Extra careful” never searches the web.</li>
             }
             <li>Only you and the administrators of this Atelier can see your requests. More in the <a href="/privacy">privacy notice</a>.</li>
         </ul>
@@ -383,7 +383,7 @@
         : "Atelier uses it for your next requests: the writer gets it with every new request.";
 
     string FlowDescription => _f.WebResearch
-        ? "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. A web search service gets only a few short search words taken from your request, never your answers or your files; names or other details you wrote can be among them."
+        ? "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. A web search service gets only a few short search words taken from your request, never your answers or your files; names or other details you wrote can end up in them."
         : "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. Nothing goes to a web search when you use this standard way.";
 
     string FactCheckSentence => _f.FactCheck switch

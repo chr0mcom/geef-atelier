@@ -311,14 +311,11 @@ public sealed class HowItWorksPageTests : TestContext
         var privacy = on.Find("[data-testid='hiw-privacy-research']").TextContent;
         Assert.Contains("sends a web search service a few short search words", privacy, StringComparison.Ordinal);
         Assert.Contains("when you add no files", privacy, StringComparison.Ordinal);
-        Assert.Contains("leaves out email addresses, phone numbers, account numbers and street addresses", privacy, StringComparison.Ordinal);
-        Assert.Contains("names or other personal details in your request can end up in them", privacy, StringComparison.Ordinal);
-        Assert.Contains("Your answers and your files are never sent", privacy, StringComparison.Ordinal);
-        Assert.Contains("a word from your About me details only when you also wrote it in your request", privacy, StringComparison.Ordinal);
+        Assert.Contains(OrderResearchLines.SearchPrivacy, privacy, StringComparison.Ordinal);
         Assert.DoesNotContain("private details", on.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("which search words were sent", step, StringComparison.Ordinal);
         Assert.Contains("“Extra careful” never searches the web", privacy, StringComparison.Ordinal);
-        Assert.Contains("never your answers or your files; names or other details you wrote can be among them", on.Find("[data-testid='hiw-flow']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("never your answers or your files; names or other details you wrote can end up in them", on.Find("[data-testid='hiw-flow']").TextContent, StringComparison.Ordinal);
         Assert.Contains("does not look things up on the web", on.Find("[data-testid='hiw-limit-careful']").TextContent, StringComparison.Ordinal);
     }
 

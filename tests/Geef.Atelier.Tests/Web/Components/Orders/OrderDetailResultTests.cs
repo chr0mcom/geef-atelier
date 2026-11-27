@@ -120,6 +120,22 @@ public sealed class OrderDetailResultTests : TestContext
     }
 
     [Fact]
+    public void AFailedOrderWithoutTextStillShowsTheSearchWordsThatWentOut()
+    {
+        var view = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Failed));
+        _orders.SetResult(HonestResultData.Full(view) with
+        {
+            Text = null,
+            LookedUp = new OrderLookedUpView(ResearchStatus.Failed, null, 0, [], ["Mindestlohn 2027 Höhe"]),
+        });
+
+        var cut = RenderComponent<OrderDetail>(p => p.Add(c => c.OrderId, view.OrderId));
+
+        Assert.Equal("Mindestlohn 2027 Höhe", cut.Find("[data-testid='order-looked-up-word']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='order-result']"));
+    }
+
+    [Fact]
     public void WithoutTheLookedUpSentenceTheWarningAboutResearchStays()
     {
         var cut = RenderFull(r => r with { LookedUp = null, Warnings = [Warning(RunWarningCodes.ResearchFailed, OrderResearchLines.Failed)] });

@@ -122,10 +122,11 @@ nächsten Aufträge. Ob der Schreiber es wirklich verwendet, etwa deinen Gruß w
 - Dein Auftrag, deine Antworten, deine About-me-Angaben und deine Dateien gehen an die KI-Dienste, die dieses Atelier zum
   Schreiben und Prüfen nutzt.
 - Atelier kann im Web nachschlagen, aber nur auf dem Standardweg und nur, wenn du keine Dateien anhängst. Dann bekommt ein
-  Suchdienst einige kurze Suchwörter. Sie stammen aus deinem Auftrag. Atelier lässt Mailadressen, Telefonnummern, Kontonummern und
-  Straßenanschriften weg, aber Namen oder andere persönliche Angaben aus deinem Auftrag können darin landen. Deine Antworten und
-  deine Dateien werden nie gesendet, ein Wort aus deinen About-me-Angaben nur, wenn du es auch in den Auftrag geschrieben hast (das
-  vergleicht Wörter und kann deshalb ein Wort in einer anderen Sprache übersehen). Das Ergebnis nennt die gesendeten Suchwörter. Eine Änderung eines fertigen Textes nutzt, was beim ersten Mal nachgeschlagen wurde, und sucht nicht neu. Es
+  Suchdienst einige kurze Suchwörter aus deinem Auftrag. Atelier versucht, Mailadressen, Telefonnummern, Kontonummern und Straßenanschriften wegzulassen, die es erkennt. Es erkennt
+  nicht jede Schreibweise, und Namen oder andere persönliche Angaben aus deinem Auftrag können in den Suchwörtern landen. Deine
+  Antworten und Dateien werden nie gesendet. Wörter aus deinen About-me-Angaben werden zurückgehalten, außer du hast sie auch in
+  den Auftrag geschrieben; eine übersetzte oder umformulierte Angabe kann aber durchrutschen. Das Ergebnis zeigt, welche
+  Suchwörter gesendet wurden. Eine Änderung eines fertigen Textes nutzt, was beim ersten Mal nachgeschlagen wurde, und sucht nicht neu. Es
   gibt eine Tagesgrenze; ist sie erreicht, wird der Text ohne Nachschlagen geschrieben, und das Ergebnis sagt es. „Extra careful“
   sucht nie im Web. Teams, die die Administration in der Werkstatt einrichtet, können eine eigene Websuche haben.
 - Nur du und die Administration dieses Ateliers sehen deine Aufträge.
