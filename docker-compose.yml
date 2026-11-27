@@ -20,6 +20,8 @@ services:
       - AtelierUser__Username=${ATELIER_USER}
       - AtelierUser__PasswordHash=${ATELIER_PASSWORD_HASH}
       - AtelierMcp__Token=${ATELIER_MCP_TOKEN}
+      # Public address of this installation: OAuth metadata and the links of the upload ticket are built from it.
+      - OAuth__Issuer=https://${ATELIER_DOMAIN}
       - Llm__Providers__openrouter__ApiKey=${LLM_OPENROUTER_API_KEY}
       - Tavily__ApiKey=${TAVILY_API_KEY}
       - CliProxy__InternalApiToken=${ATELIER_INTERNAL_API_TOKEN:-}
