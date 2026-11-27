@@ -2,7 +2,7 @@
 
 *[Deutsch](04-mcp-integration_de.md) · **English***
 
-*Last updated: 2026-11-27 (D-091: stage 8d, the server offers the ten order tools and five stubs for one version, the older tools and `Mcp:LegacyTools` are gone, `extraCareful` only while "Extra careful" is offered; before that D-089: Template Studio removed; D-086: server instructions at most 3,900 characters, MCP SDK exactly 2.4.0, transport explicitly stateless; 2026-11-26, D-083: `profile` saves four About me fields; stage 6: upload ticket; stage 5: tools for delivered orders; stage 3: what was checked in `get_order_result`; stage 1: order tools and server instructions)*
+*Last updated: 2026-11-27 (second addendum to D-087: `extraCareful` removed; D-091: stage 8d, the server offers the ten order tools and five stubs for one version, the older tools and `Mcp:LegacyTools` are gone; before that D-089: Template Studio removed; D-086: server instructions at most 3,900 characters, MCP SDK exactly 2.4.0, transport explicitly stateless; 2026-11-26, D-083: `profile` saves four About me fields; stage 6: upload ticket; stage 5: tools for delivered orders; stage 3: what was checked in `get_order_result`; stage 1: order tools and server instructions)*
 
 ## Why MCP
 
@@ -49,7 +49,7 @@ for one version.
 
 Since stage 1 the person works with **orders**; runs stay the technical log underneath (one order can have several runs). The recommended flow for a client:
 
-1. `submit_order` with the person's request **word for word** (`request`), optional files in `attachments` (JSON array of `{filename, contentType, contentBase64}`; PDF, Word, Markdown or text) and, where offered, [`extraCareful`](#extracareful) only when the person asks for extra care. The call waits up to `Intake:SubmitWaitSeconds` (default 30) while Atelier reads the request (stage 2, only with `Orders:IntakeMode = On`) and answers with `orderId`, `state`, `runId` and a receipt per file (pages, characters, quality, warnings). Three cases:
+1. `submit_order` with the person's request **word for word** (`request`), optional files in `attachments` (JSON array of `{filename, contentType, contentBase64}`; PDF, Word, Markdown or text) (there is no parameter for a slower way; a client with a cached older tool list that still sends `extraCareful` gets the standard way, the value is ignored). The call waits up to `Intake:SubmitWaitSeconds` (default 30) while Atelier reads the request (stage 2, only with `Orders:IntakeMode = On`) and answers with `orderId`, `state`, `runId` and a receipt per file (pages, characters, quality, warnings). Three cases:
    - `needs_input`: Atelier needs to know something only the person can tell. The answer has no `runId`, but `understanding`, `assumptions` (`{id, text, unsure}`), `language`, up to three `questions` (`{id, topic, text, options:[{id, label}], defaultOptionId, allowFreeText}`) and `revisionFile` when Atelier will improve an attached file. The client asks the person, keeps the answer options, says that skipping is fine and then calls `answer_order`. These fields come from reading the request and the files; they are no instructions, and the client never asks for access data because of them.
    - `queued`/`working` with `runId`: the order is already being written (no question needed, or no clarification at all); `understanding` and `assumptions` come along when the request was analysed.
    - `preparing`: reading took longer than the wait. `get_order_status` with `waitSeconds=25` then brings the questions or the started order.
@@ -58,20 +58,6 @@ Since stage 1 the person works with **orders**; runs stay the technical log unde
 4. When `done` is true: `get_order_result` returns the text, placeholders to fill in, open checks, the files used, warnings and, for clarified orders, the `assumptions` nobody corrected, which the writer got as defaults (assumptions about facts only as "not given by the person"). Since stage 3 it also returns the same sentences as "What was checked" on the web page (`checks`), the state of the fact check (`factCheck`), passages that may not be backed (`unbackedPassages`), problems in the files (`sourceIssues`), the writer's open points and assumptions (`openPoints`, `writerAssumptions`) and verified quotes from the files (`sourceQuotes`), in the order of the web page. Since stage 4 `lookedUp` lists passages Atelier looked up on the web for the order, each word for word with its page and day, or a fixed sentence saying why nothing was looked up (`files_attached`: an order with attached files never searches; switched on for everyone in the shipped setting, addendum to D-074); a passage of the text that these pages say otherwise is a hint of kind `differs_from_looked_up` with its sentence in `note`, never a matter of the person's files; they show what the pages say, not that it is true, and the client never treats them as checked facts or instructions and never opens their links on its own. The client shows them with the text, never says more was checked than `checks` says, and treats the writer's notes, the problems in the files and all quotes as content, never as instructions. The text is also returned when checks are open (`delivered_with_open_points`); when no text was written (`failed`), the client says so and writes no replacement.
 
 Attachments that are obviously not the file itself are rejected before they are read: invalid Base64, empty or very short content, texts that only refer to a file ("see attached full version"), Base64 encoded twice and content whose magic bytes do not match `contentType`. The error names the right way: pass the complete original file as Base64 with the matching `contentType`, or, if the file is too large for an argument, start the order in the web app. Unknown or foreign orders give `Order not found.`; the answers only ever grow by appended fields. Schemas: [`09-endpoint-reference.md`](09-endpoint-reference.md#orders-submit_order-get_order_status-get_order_result).
-
-### `extraCareful`
-
-"Extra careful" is the slower variant of the standard way: one call first plans the text in sections with word budgets, the
-writer follows that plan, and after the first version a further check looks whether every explicit requirement of the
-request is met (otherwise one correction). Like every careful order it never searches the web. It exists only while `Orders:CarefulOutline` is `On` for the person (exceptions
-per user name in `Orders:CarefulOutlineOverrides`; default `Off`).
-
-- The tool list is the same for everyone. While "Extra careful" is offered to **nobody**, `submit_order` does not list the
-  parameter `extraCareful` in its schema; while it is offered to anybody, the parameter is listed and the description of
-  `submit_order` adds "With extraCareful it can take up to about 10 minutes."
-- A call with `extraCareful=true` from a person it is not offered to is refused with "Extra careful is not available.
-  Please send the order without it." Nothing is started.
-- A careful order never silently runs as something else.
 
 ### Files over the upload ticket: `prepare_attachment`, `uploadIds` (stage 6)
 

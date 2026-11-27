@@ -62,7 +62,7 @@ durchgesetzt vom System-Prompt und von einer Wiederholung im Code.
 
 Die Policy wird via `ConvergenceOptions` (`src/Geef.Atelier.Infrastructure/Configuration/`) konfiguriert und aus dem Abschnitt `Convergence` der `appsettings.json` gelesen. Eine Aufstellung im Code darf die Werte überschreiben:
 
-| Wert | `appsettings.json` | Override von `direct` und `direct-outline` |
+| Wert | `appsettings.json` | Override von `direct` |
 |---|---|---|
 | `MaxIterations` | 6 | 2 |
 | `AbortOnCritical` | false | false |

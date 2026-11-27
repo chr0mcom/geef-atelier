@@ -9,9 +9,8 @@
 **Geef.Atelier** is a text manufactory: it turns a person's request and files into a finished text and says honestly what was
 checked and what is still open. A request becomes an **order**; at most three short questions come before the start; one
 writing call gets the files in full text; automatic checks and a fact check by another model follow, with at most one
-correction. "Extra careful", offered only where it is switched on, adds a plan before the writing and a check of every
-explicit requirement of the request. The guides [12](12-user-guide.md) to [15](15-developer-guide.md) describe the product
-for each audience.
+correction. There is no second, slower way. The guides [12](12-user-guide.md) to [15](15-developer-guide.md) describe the
+product for each audience.
 
 The original vision was a machine that composes a crew of AI roles for each piece of work. That way of working, together with
 the learning loop and the knowledge base, was removed in stage 8d (D-091); the git history and the

@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-27 (D-091: Etappe 8d, entfernte Endpunkte, Seiten und Werkzeuge herausgenommen: zehn MCP-Werkzeuge und für eine Version fünf Stummel, kein Artefakt-Download, kein SignalR-Hub, keine Werkstatt-Editoren; `extraCareful` nur, solange angeboten; zuvor `Research:Mode` ausgeliefert `On`; D-083: `profile` und About-me-Felder; Etappe 6: Upload-Ticket; Etappe 5: Werkzeuge für gelieferte Aufträge; Etappen 1 bis 4: Auftrags-Werkzeuge, Rückfragen, Prüfstand, nachgeschlagene Stellen)*
+*Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: `extraCareful` entfernt; D-091: Etappe 8d, entfernte Endpunkte, Seiten und Werkzeuge herausgenommen: zehn MCP-Werkzeuge und für eine Version fünf Stummel, kein Artefakt-Download, kein SignalR-Hub, keine Werkstatt-Editoren; zuvor `Research:Mode` ausgeliefert `On`; D-083: `profile` und About-me-Felder; Etappe 6: Upload-Ticket; Etappe 5: Werkzeuge für gelieferte Aufträge; Etappen 1 bis 4: Auftrags-Werkzeuge, Rückfragen, Prüfstand, nachgeschlagene Stellen)*
 
 Alle von außen erreichbaren HTTP-Endpunkte von Geef.Atelier: MCP, OAuth 2.1
 sowie Web-UI- und Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -44,12 +44,11 @@ Seit Etappe 1 ist der **Auftrag** die Einheit, die der Mensch sieht; Läufe blei
 ```json
 {
   "request": "<string, Pflicht: der Auftrag im Wortlaut des Menschen>",
-  "attachments": "<string, optional: JSON-Array [{\"filename\":\"angebot.pdf\",\"contentType\":\"application/pdf\",\"contentBase64\":\"...\"}]>",
-  "extraCareful": false
+  "attachments": "<string, optional: JSON-Array [{\"filename\":\"angebot.pdf\",\"contentType\":\"application/pdf\",\"contentBase64\":\"...\"}]>"
 }
 ```
 
-Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (auch `text/x-markdown`), `text/plain` (Parameter wie `; charset=utf-8` werden ignoriert). `extraCareful = true` verlangt „Extra careful“: den Standardweg mit einem Plan (Abschnitte mit Wortbudgets) vor dem Schreiben und nach der ersten Fassung einer Prüfung jeder ausdrücklichen Anforderung des Anliegens, sonst eine Korrektur; im Web wird dabei nie gesucht. Das gibt es nur, solange `Orders:CarefulOutline` für die Person auf `On` steht (Ausnahmen in `Orders:CarefulOutlineOverrides`, Standard `Off`). Solange es niemandem angeboten wird, gehört der Parameter nicht zum Eingabeschema; solange es irgendwem angeboten wird, steht er darin, und die Werkzeugbeschreibung bekommt den Satz „With extraCareful it can take up to about 10 minutes.“ Ein Aufruf mit `extraCareful = true` von einer Person, der es nicht angeboten wird, wird mit „Extra careful is not available. Please send the order without it.“ abgelehnt; nichts wird gestartet, und ein sorgfältiger Auftrag läuft nie als etwas anderes.
+Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (auch `text/x-markdown`), `text/plain` (Parameter wie `; charset=utf-8` werden ignoriert). Einen Parameter für einen langsameren Weg gibt es nicht; `extraCareful` von einem Client mit gespeicherter alter Werkzeugliste wird überlesen, und der Auftrag läuft auf dem Standardweg.
 
 **Ausgabe `submit_order`:**
 ```json
@@ -491,7 +490,7 @@ Die Web-Oberfläche ist Blazor Server (Cookie-Auth). Die von außen erreichbaren
 
 | Endpunkt | Methode | Auth | Zweck |
 |----------|---------|------|-------|
-| `/start` | GET | Cookie | Neuer Auftrag: Anliegen, Dateien mit Quittung; „Extra careful“ nur, solange der Person angeboten |
+| `/start` | GET | Cookie | Neuer Auftrag: Anliegen, Dateien mit Quittung |
 | `/work`, `/orders` | GET | Cookie | „My work“: die Aufträge der Person, neueste Aktivität zuerst (Administratoren können alle Nutzer zeigen) |
 | `/orders/{id}` | GET | Cookie | Auftragsseite: Fortschritt, Text, offene Punkte, „How it was made“, Versionen |
 | `/about-me` | GET | Cookie | „About me“ („Tell Atelier once“) |

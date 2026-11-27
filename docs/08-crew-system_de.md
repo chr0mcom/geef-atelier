@@ -2,16 +2,16 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-11-27 (D-091: Stufe 8d, neu geschrieben auf den heutigen Stand: zwei Aufstellungen im Code, Crew-Snapshot, Modellmatrix, Prüfer des Direktwegs, alte Läufe; die entfernten Teile stehen am Ende; zuvor 2026-11-26 Hinweis, wo das Crew-System steht, D-076: Dateien über das Upload-Ticket; 2026-11-25, D-075 Teil B: Nachbesserungslauf, D-074: Recherche im Grounding-Schritt; 2026-11-24, D-067: strenges Lesen des Snapshots; ältere Vermerke stehen in der Git-Historie)
+Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: „Extra careful“ entfernt, eine Aufstellung; D-091: Stufe 8d, neu geschrieben auf den heutigen Stand: zwei Aufstellungen im Code, Crew-Snapshot, Modellmatrix, Prüfer des Direktwegs, alte Läufe; die entfernten Teile stehen am Ende; zuvor 2026-11-26 Hinweis, wo das Crew-System steht, D-076: Dateien über das Upload-Ticket; 2026-11-25, D-075 Teil B: Nachbesserungslauf, D-074: Recherche im Grounding-Schritt; 2026-11-24, D-067: strenges Lesen des Snapshots; ältere Vermerke stehen in der Git-Historie)
 
 ## Überblick
 
 Eine „Crew“ ist die Aufstellung eines Laufs: ein Schreiber und seine Prüfungen. Seit Stufe 8d (D-091) gibt es **eine
 Arbeitsweise, den Direktweg** (D-068 bis D-077, [15-developer-guide_de.md](15-developer-guide_de.md)), und seine
-Aufstellungen stehen **nur im Code**. Niemand setzt mehr Crews zusammen, bearbeitet oder speichert sie. Vom Crew-System
+Aufstellung steht **nur im Code**. Niemand setzt mehr Crews zusammen, bearbeitet oder speichert sie. Vom Crew-System
 bleiben:
 
-- zwei Aufstellungen in `Geef.Atelier.Core.Domain.Crew.SystemCrew`,
+- eine Aufstellung in `Geef.Atelier.Core.Domain.Crew.SystemCrew`,
 - der **Crew-Snapshot**, den jeder Lauf speichert und der so festhält, womit er gelaufen ist,
 - die **Modellmatrix**, die beim Bau des Snapshots die Modelle zuweist.
 
@@ -27,47 +27,37 @@ Das frühere System (Vorlagen und Profile in der Datenbank, Editoren und weitere
 | **CrewTemplate** | Eine Aufstellung im Code: Schreiber, Prüfungen, Evaluationsstrategie, Convergence-Override, Domäne. |
 | **CrewSnapshot** | Die vollständig eingebettete Kopie der Aufstellung, als JSONB in `Runs.CrewSnapshot` gespeichert. |
 
-## Die zwei Aufstellungen
+## Die Aufstellung
 
-`SystemCrew` hat genau zwei Vorlagen. `ResolveOrderSnapshotAsync` wählt nach dem Modus des Auftrags eine aus, und
+`SystemCrew` hat genau eine Vorlage, `direct`. `ResolveOrderSnapshotAsync` nimmt sie für jeden neuen Lauf, und
 `CrewService.ResolveCodeTemplateSnapshotAsync` macht daraus den Snapshot (bauen, Modelle zuweisen, Modell-Aliase auflösen).
-Es gibt einen produktiven Pipeline-Assembler, `DirectPipelineAssembler`, und er nimmt nur diese beiden Namen an.
+Es gibt einen produktiven Pipeline-Assembler, `DirectPipelineAssembler`; er nimmt diesen Namen an und, nur für gespeicherte
+Läufe, `direct-outline`.
 
 | Vorlage | Verwendet für | Schreiber | Prüfungen |
 |---|---|---|---|
-| `direct` | jeden Direct-Auftrag und jeden Nachbesserungslauf | `direct-writer` | `deterministic-checks`, `source-fact-check` |
-| `direct-outline` („Extra careful“) | einen Careful-Auftrag | `direct-writer`, nach einem Planungsaufruf | dieselben zwei und `requirements-check` |
+| `direct` | jeden Auftrag und jeden Nachbesserungslauf | `direct-writer` | `deterministic-checks`, `source-fact-check` |
 
 | Profil | Anzeigename | Modell |
 |---|---|---|
 | `direct-writer` | Writer | Slot `Executor` |
 | `deterministic-checks` | Automatic checks | keins |
 | `source-fact-check` | Fact check | Slot `FactReviewer` |
-| `requirements-check` | Request check | kein Slot: fest auf dem ersten Kandidaten von `Intake` (heute der Alias für Claude Sonnet), ein anderes Modell als der vorgesehene Schreiber |
 
-Keine der beiden Aufstellungen hat Advisors, Werkzeuge oder Schritte nach den Prüfungen. Der **einzige Zugang zum Web** ist
+Sie hat keine Advisors, Werkzeuge oder Schritte nach den Prüfungen. Der **einzige Zugang zum Web** ist
 die Recherche im Grounding-Schritt ([unten](#recherche-im-grounding-schritt-d-074)).
 
-### „Extra careful“ (`direct-outline`, D-087)
+### Die entfernte Variante `direct-outline` (D-087)
 
-- Es wird nur angeboten, wenn `Orders:CarefulOutline` für die Person `On` ist (`Orders:CarefulOutlineOverrides` je
-  Benutzername). Standard ist `Off`.
-- Solange es nicht angeboten wird, zeigt `/start` diese Wahl nicht. `submit_order` blendet den Parameter `extraCareful` aus
-  seinem Schema aus, solange es niemandem angeboten wird, und lehnt `extraCareful=true` mit „Extra careful is not
-  available. Please send the order without it.“ ab. Ein angenommener Careful-Auftrag läuft nie stillschweigend als etwas
-  anderes. „Start again“ eines alten Careful-Auftrags füllt die Anfrage ohne diese Wahl aus, sagt „Extra careful is not
-  available now, so this request uses the standard way.“, und nichts läuft, bevor die Person sie abschickt.
-- **Gliederung** (`WritingPlanner`): Ein Aufruf des Schreibermodells vor dem ersten Schreibdurchgang teilt den Text in
-  Abschnitte mit Wortbudgets. Er sieht Anfrage und Dateien wie der Schreiber. Ein Aufruf, der scheitert oder keine lesbare
-  Gliederung liefert, wird nicht wiederholt: Der Text entsteht ohne Gliederung, und der Lauf bekommt die Warnung
-  `writer.no_plan`. Die Kosten werden unter dem Akteur `direct-outline` erfasst.
-- **Prüfung der Anforderungen** (`RequirementsCheckReviewer`): siehe
-  [unten](#prüfung-der-anforderungen-in-direct-outline-d-087).
+„Extra careful“ war eine zweite Vorlage: ein Planungsaufruf vor dem Schreiben und eine dritte Prüfung, `requirements-check`.
+Sie wurde nach ihrer Messung entfernt (zweiter Zusatz zu D-087). Gespeicherte Läufe behalten Snapshot und Vorlagennamen; sie
+gelten als Läufe des Direktwegs und lassen sich lesen, fortsetzen und ändern (eine Änderung nutzt `direct`). Wird ein solcher
+Lauf ausgeführt, lässt `DirectPipelineAssembler` `requirements-check` aus; einen Planungsaufruf gibt es nicht.
 
 ## EvaluationStrategies
 
 Das Enum `EvaluationStrategy` behält `Parallel` (0), `Sequential` (1), `FailFast` (2) und `Priority` (3), weil gespeicherte
-Snapshots sie nennen. Beide Aufstellungen nutzen `Parallel`: Alle Prüfungen laufen, alle Befunde werden gesammelt.
+Snapshots sie nennen. Die Aufstellung nutzt `Parallel`: Alle Prüfungen laufen, alle Befunde werden gesammelt.
 
 ## CrewSnapshot-Format (SchemaVersion 3)
 
@@ -131,8 +121,8 @@ Snapshots, deshalb werden Einträge nur angehängt.
   ohne API-Schlüssel als nicht verfügbar.
 - Alle Regeln stehen in einer Funktion (`ModelChooser`), abgesichert durch `ModelAssignmentInvariantTests`. Harte Regeln
   werden nie gelockert: Der Provider ist nutzbar, und ein bezahlter Kandidat geht nur an einen Reviewer, nur in der Domäne
-  Legal oder Academic oder ab 3 Reviewern desselben Slots, und an höchstens 2 Reviewer je Aufstellung. Bei den zwei
-  heutigen Aufstellungen bekommt die Faktenprüfung deshalb nie ein bezahltes Modell.
+  Legal oder Academic oder ab 3 Reviewern desselben Slots, und an höchstens 2 Reviewer je Aufstellung. Bei der heutigen
+  Aufstellung bekommt die Faktenprüfung deshalb nie ein bezahltes Modell.
 - Reviewer mit Slot teilen sich das Modell des Schreibers nicht, solange es eine erlaubte Alternative gibt, und bevorzugen
   eine andere Anbieterfamilie.
 - Ein Profil ohne Slot behält seine Bindung. Ist es das Modell des Schreibers, sagt eine Warnung das.
@@ -144,7 +134,7 @@ Die Begründung der Matrix steht in D-066 im Entscheidungsprotokoll.
 
 ## Konvergenz und Auslieferung
 
-Beide Aufstellungen laufen mit `MaxIterations: 2` (der Schreiber schreibt einmal und korrigiert höchstens einmal),
+Die Aufstellung läuft mit `MaxIterations: 2` (der Schreiber schreibt einmal und korrigiert höchstens einmal),
 `AbortOnCritical: false`, `DetectRegression: false` und `StagnationThreshold: 2`. Werte, die eine Aufstellung nicht
 überschreibt, kommen aus dem Abschnitt `Convergence`. Nur Befunde ab Schweregrad `Error` blockieren. Ein Reviewer, dessen
 Aufruf scheitert, wird isoliert und blockiert nicht; der Lauf bekommt die Warnung `review.reviewer_failed`.
@@ -287,8 +277,7 @@ Falsch-Blockier-Rate wird an synthetischen, unabhängig beschrifteten Aufträgen
 ## Vorlage `direct`: zwei Prüfer (D-073)
 
 In der Vorlage `direct` (`SystemCrew.DirectTemplate`) schreibt der Schreiber einmal und korrigiert höchstens einmal
-(`MaxIterations: 2`). Sie hat zwei Prüfer, beide setzt `DirectPipelineAssembler` beim Bau der Pipeline ein; `direct-outline`
-hat dieselben zwei und die Prüfung der Anforderungen, die am Ende dieses Abschnitts beschrieben ist.
+(`MaxIterations: 2`). Sie hat zwei Prüfer, beide setzt `DirectPipelineAssembler` beim Bau der Pipeline ein.
 
 | Prüfer | Profil | Modell | Was er tut |
 |---|---|---|---|
@@ -339,20 +328,6 @@ Modells samt seinem einen Ersatz lassen die Tatsachen ungeprüft, und „What wa
 - **Die Rechenprüfung sagt nie „stimmt“:** Die Prüfung ausgeschriebener Rechnungen im Text und der Summen in den Dateien nennt
   nur, was eindeutig falsch aussieht, und bittet die Person, es zu prüfen; sonst sagt „What was checked“ höchstens, dass nichts
   eindeutig Falsches gefunden wurde und dass nicht jede Rechnung so prüfbar ist. Frühere Berichte lesen sich ebenso.
-
-### Prüfung der Anforderungen in `direct-outline` (D-087)
-
-Der dritte Reviewer von `direct-outline` prüft nur die **erste** Fassung. Ein Aufruf eines anderen Modells als des
-Schreibers bekommt nur die eigenen Worte der Person (Anfrage, eigene Antworten und verlangte Änderungen, nie Annahmen,
-Profil oder Dateien) und den Text. Er listet jede ausdrückliche Anforderung wörtlich auf und sagt, ob der Text sie erfüllt.
-Die Länge bleibt außen vor, weil die automatischen Prüfungen sie abdecken.
-
-- Eine Anforderung blockiert nur, wenn sie als nicht erfüllt markiert ist, ihr Zitat lang genug ist (mindestens 3 Wörter
-  oder 12 Zeichen) und wirklich in den Worten der Person steht. Höchstens 10 Befunde.
-- Der Schreiber bekommt einen festen Satz mit diesem geprüften Zitat; nichts, was die Prüfung selbst formuliert hat,
-  erreicht den Schreiber, den Bericht oder die Seite.
-- Der Aufruf wird nicht wiederholt und wechselt nie auf ein anderes Modell. Scheitert er, blockiert er nicht, und der Lauf
-  bekommt die Warnung `writer.requirements_unchecked`.
 
 ## Recherche im Grounding-Schritt (D-074)
 

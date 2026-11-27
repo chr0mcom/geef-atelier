@@ -2,15 +2,15 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-11-27 (D-091: stage 8d, rewritten to what exists now: two setups in code, crew snapshot, model matrix, reviewers of the direct path, old runs; the removed parts are listed at the end; before that 2026-11-26 note on where the crew system fits, D-076: files through the upload ticket; 2026-11-25, D-075 part B: change run, D-074: research in the grounding step; 2026-11-24, D-067: strict snapshot reading; older notes are in the git history)
+Last updated: 2026-11-27 (second addendum to D-087: "Extra careful" removed, one setup; D-091: stage 8d, rewritten to what exists now: two setups in code, crew snapshot, model matrix, reviewers of the direct path, old runs; the removed parts are listed at the end; before that 2026-11-26 note on where the crew system fits, D-076: files through the upload ticket; 2026-11-25, D-075 part B: change run, D-074: research in the grounding step; 2026-11-24, D-067: strict snapshot reading; older notes are in the git history)
 
 ## Overview
 
 A "crew" is the setup of a run: one writer and its checks. Since stage 8d (D-091) there is **one way of working, the direct
-path** (D-068 to D-077, [15-developer-guide.md](15-developer-guide.md)), and its setups exist **only in code**. Nobody
+path** (D-068 to D-077, [15-developer-guide.md](15-developer-guide.md)), and its setup exists **only in code**. Nobody
 composes, edits or stores crews any more. What remains of the crew system is:
 
-- two setups in `Geef.Atelier.Core.Domain.Crew.SystemCrew`,
+- one setup in `Geef.Atelier.Core.Domain.Crew.SystemCrew`,
 - the **crew snapshot** that every run stores, so that it records what it was run with,
 - the **model matrix**, which assigns the models when the snapshot is built.
 
@@ -26,46 +26,37 @@ The earlier system (templates and profiles in the database, editors and further 
 | **CrewTemplate** | A setup in code: writer, checks, evaluation strategy, convergence override, domain. |
 | **CrewSnapshot** | The fully embedded copy of the setup, stored as JSONB in `Runs.CrewSnapshot`. |
 
-## The two setups
+## The setup
 
-`SystemCrew` has exactly two templates. `ResolveOrderSnapshotAsync` picks one from the order mode, and
+`SystemCrew` has exactly one template, `direct`. `ResolveOrderSnapshotAsync` uses it for every new run, and
 `CrewService.ResolveCodeTemplateSnapshotAsync` turns it into the snapshot (build, assign models, resolve model aliases).
-There is one production pipeline assembler, `DirectPipelineAssembler`, and it accepts only these two names.
+There is one production pipeline assembler, `DirectPipelineAssembler`; it accepts this name and, for stored runs only,
+`direct-outline`.
 
 | Template | Used for | Writer | Checks |
 |---|---|---|---|
-| `direct` | every Direct order and every change run | `direct-writer` | `deterministic-checks`, `source-fact-check` |
-| `direct-outline` ("Extra careful") | a Careful order | `direct-writer`, after one planning call | the same two and `requirements-check` |
+| `direct` | every order and every change run | `direct-writer` | `deterministic-checks`, `source-fact-check` |
 
 | Profile | Shown as | Model |
 |---|---|---|
 | `direct-writer` | Writer | slot `Executor` |
 | `deterministic-checks` | Automatic checks | none |
 | `source-fact-check` | Fact check | slot `FactReviewer` |
-| `requirements-check` | Request check | no slot: fixed to the primary of `Intake` (today the Claude Sonnet alias), another model than the planned writer |
 
-Neither setup has advisors, tools or steps after the checks. The **only access to the web** is the research in the grounding
+It has no advisors, tools or steps after the checks. The **only access to the web** is the research in the grounding
 step ([below](#research-in-the-grounding-step-d-074)).
 
-### "Extra careful" (`direct-outline`, D-087)
+### The removed variant `direct-outline` (D-087)
 
-- It is offered only when `Orders:CarefulOutline` is `On` for the person (`Orders:CarefulOutlineOverrides` per user name).
-  The default is `Off`.
-- While it is not offered, `/start` shows no such option. `submit_order` hides the parameter `extraCareful` from its schema
-  while it is offered to nobody, and refuses `extraCareful=true` with "Extra careful is not available. Please send the order
-  without it." An accepted Careful order never silently runs as something else. "Start again" of an old Careful order fills
-  in the request without the option, says "Extra careful is not available now, so this request uses the standard way.", and
-  nothing runs until the person sends it.
-- **Outline** (`WritingPlanner`): one call of the writer's model before the first writing pass splits the text into sections
-  with word budgets. It sees the request and the files as the writer does. A call that fails or gives no readable plan is not
-  repeated: the text is written without an outline and the run gets the warning `writer.no_plan`. The cost is recorded as
-  actor `direct-outline`.
-- **Request check** (`RequirementsCheckReviewer`): see [below](#request-check-of-direct-outline-d-087).
+"Extra careful" was a second template: a planning call before the writing and a third check, `requirements-check`. It was
+removed after its measurement (second addendum to D-087). Stored runs keep their snapshot and their template name; they count
+as runs of the direct path, so they can be read, resumed and changed (a change uses `direct`). If such a run is executed,
+`DirectPipelineAssembler` leaves `requirements-check` out; there is no planning call.
 
 ## EvaluationStrategies
 
 The enum `EvaluationStrategy` keeps `Parallel` (0), `Sequential` (1), `FailFast` (2) and `Priority` (3), because stored
-snapshots name them. Both setups use `Parallel`: all checks run and all findings are collected.
+snapshots name them. The setup uses `Parallel`: all checks run and all findings are collected.
 
 ## CrewSnapshot format (SchemaVersion 3)
 
@@ -127,8 +118,8 @@ members are only ever appended.
   API key as unavailable.
 - All rules live in one function (`ModelChooser`), guarded by `ModelAssignmentInvariantTests`. Hard rules are never relaxed:
   the provider is usable, and a paid candidate goes only to a reviewer, only in the Legal or Academic domain or from 3
-  reviewers of the same slot on, and to at most 2 reviewers per setup. With the two setups of today the fact check therefore
-  never gets a paid model.
+  reviewers of the same slot on, and to at most 2 reviewers per setup. With the setup of today the fact check therefore never
+  gets a paid model.
 - Reviewers with a slot do not share the writer's model while a permitted alternative exists, and prefer another vendor
   family.
 - A profile without a slot keeps its binding. If it is the writer's model, a warning says so.
@@ -140,7 +131,7 @@ The rationale for the matrix is in D-066 in the decisions log.
 
 ## Convergence and delivery
 
-Both setups run with `MaxIterations: 2` (the writer writes once and corrects at most once), `AbortOnCritical: false`,
+The setup runs with `MaxIterations: 2` (the writer writes once and corrects at most once), `AbortOnCritical: false`,
 `DetectRegression: false` and `StagnationThreshold: 2`. Values a setup does not override come from the section `Convergence`.
 Only findings of severity `Error` or higher block. A reviewer whose call fails is isolated and does not block; the run gets
 the warning `review.reviewer_failed`.
@@ -279,8 +270,7 @@ The rate of false blocks is measured on synthetic, independently labelled reques
 ## Template `direct`: two reviewers (D-073)
 
 The template `direct` (`SystemCrew.DirectTemplate`) runs the writer once and corrects at most once (`MaxIterations: 2`).
-It has two reviewers, both injected at pipeline build time by `DirectPipelineAssembler`; `direct-outline` has the same two and
-the request check described at the end of this section.
+It has two reviewers, both injected at pipeline build time by `DirectPipelineAssembler`.
 
 | Reviewer | Profile | Model | What it does |
 |---|---|---|---|
@@ -330,20 +320,6 @@ model and its one fallback leave the facts unchecked, and "What was checked" say
 - **Recalculation never says "right":** the check of written calculations in the text and of totals in the files names only
   what looks clearly wrong and asks the person to check it; otherwise "What was checked" says at most that nothing clearly
   wrong was found and that not every calculation can be checked this way. Earlier reports read the same way.
-
-### Request check of `direct-outline` (D-087)
-
-The third reviewer of `direct-outline` checks the **first** version only. One call of another model than the writer gets only
-the person's own words (the request, the person's own answers and the changes asked for, never assumptions, profile or files)
-and the text. It lists every explicit requirement word for word and says whether the text meets it. The length is left out,
-because the automatic checks cover it.
-
-- A requirement blocks only when it is marked as not met and its quote is long enough (at least 3 words or 12 characters) and
-  really stands in the person's words. At most 10 findings.
-- The writer gets a fixed sentence with that verified quote; nothing the check phrased itself reaches the writer, the report
-  or the page.
-- The call is not repeated and never changes to another model. If it fails, it does not block, and the run gets the warning
-  `writer.requirements_unchecked`.
 
 ## Research in the grounding step (D-074)
 

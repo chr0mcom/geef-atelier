@@ -2,7 +2,7 @@
 
 *[Deutsch](14-admin-guide_de.md) · **English***
 
-*Last updated: 2026-11-27 (D-091: stage 8d, workshop editors, older review loop and older MCP tools removed with their switches; `Orders:CarefulOutline` now decides whether "Extra careful" is offered; before that `Orders:TellOnce = On`, addendum to D-083; `Research:Mode = On`, addendum to D-074)*
+*Last updated: 2026-11-27 ("Extra careful" removed with its switch, second addendum to D-087; D-091: stage 8d, workshop editors, older review loop and older MCP tools removed with their switches; before that `Orders:TellOnce = On`, addendum to D-083; `Research:Mode = On`, addendum to D-074)*
 
 This guide is for administrators: people who add accounts, decide which features are on and look after the providers. How
 to install and host Atelier is in the [developer and host guide](15-developer-guide.md) and the [README](../README.md).
@@ -40,7 +40,6 @@ show one of these as available that the viewer does not get, and it needs no cha
 | Skill "how to use Atelier" for AI assistants | `Mcp:Skills` (`Off`, `On`) | `Off` | `On` (D-088, checked on the real client with Claude Code) | – |
 | Questions as a form in the AI assistant | `Mcp:Elicitation` (`Off`, `On`) | `Off` | `On` (D-088, checked on the real client with Claude Code) | – |
 | Offer to save missing details under About me (“Tell Atelier once”) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `On` (addendum to D-083, acceptance passed) | – |
-| "Extra careful" (an outline first) | `Orders:CarefulOutline` (`Off`, `On`) | `Off` | `Off` (D-087, D-091) | `Orders:CarefulOutlineOverrides:<user>` |
 
 What the values mean:
 
@@ -56,7 +55,7 @@ What the values mean:
   never search. Atelier tries to hold back search words with an email address, a phone or account number, a date of birth or a
   street address that it recognizes; it does not recognize every form, names and other details in plain words not at all, and the
   person sees the words that went out on the result.
-  "Extra careful" never searches the web. The search service is set with `Tavily:Endpoint` and `Tavily:ApiKey` (`docker-compose.yml`
+  The search service is set with `Tavily:Endpoint` and `Tavily:ApiKey` (`docker-compose.yml`
   fills the key from `TAVILY_API_KEY`).
 - **Workshop menu:** with `true`, only administrators see the menu "Workshop" ("Runs", and "Providers" for administrators) and
   "Technical details" on the order page. The run pages still open for anyone signed in who types their address and show only their
@@ -69,18 +68,6 @@ What the values mean:
   under About me for your next texts”. `Off` shows none of it, and `profile` is offered read
   only with its earlier description. Administrators never see it on someone else's order, and saving goes only into the own About me
   (D-083). Way back: `Orders__TellOnce=WithoutPromise` (offer without the promise) or `Orders__TellOnce=Off`.
-- **"Extra careful"** (`Orders:CarefulOutline`, shipped `Off`; exceptions per user name
-  `Orders__CarefulOutlineOverrides__<name>=On`, D-087, D-091): the switch decides whether "Extra careful" is offered at all. With
-  `On` for a person, the start page shows the box, and a careful order runs on the standard way with one call first that splits the
-  text into sections with word budgets (fitted to the requested length when it can be read without a model). The writer then writes
-  along it, with the same automatic checks, the same fact check and the same "What was checked" as always, plus a check after the
-  first version whether every explicit requirement of the request is met (otherwise one correction). If no usable outline comes
-  back, the text is written in one go and the order says so. A change of such a text runs on the standard way without an outline.
-  When it is off for a person, the start page shows no such option, `submit_order` refuses `extraCareful=true` with "Extra careful
-  is not available. Please send the order without it.", and no order silently runs as something else. `submit_order` lists the
-  parameter `extraCareful` only while the feature is offered to anybody (the tool list is the same for everyone). "Start again" of an
-  old careful order then fills in the request without the option and says so; nothing runs until the person sends it. The shipped
-  setting stays `Off` until a measurement shows that the outline is better.
 
 **How to set a switch.** The settings are read at start. Set them as environment variables of the web service, with `__` in place
 of `:` (for example `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` passes variables one by one,
@@ -88,8 +75,8 @@ so put them under `environment` of the web service in a `docker-compose.override
 recreate the container. Every switch can be set back the same way.
 
 **Settings that no longer exist** (removed in stage 8d, D-091): `Mcp:LegacyTools`, `Orders:LegacySubmitDefaultMode`,
-`Convergence:BestDraft`, `Convergence:WriterBlockingOnly`, `Convergence:StopWithoutProgress` and their `…Overrides`, and everything
-under `Learning:`, `Knowledge:`, `Embeddings:` and `Finalizer:`. They do nothing; you can delete them from your environment.
+`Convergence:BestDraft`, `Convergence:WriterBlockingOnly`, `Convergence:StopWithoutProgress` and their `…Overrides`,
+`Orders:CarefulOutline` with `Orders:CarefulOutlineOverrides` (second addendum to D-087), and everything under `Learning:`, `Knowledge:`, `Embeddings:` and `Finalizer:`. They do nothing; you can delete them from your environment.
 
 ```mermaid
 flowchart LR
@@ -109,7 +96,7 @@ flowchart LR
 
 ## Providers and models
 
-Atelier writes with two setups that exist only in code: the standard way and "Extra careful". You do not build teams or edit role
+Atelier writes with one setup that exists only in code: the standard way. You do not build teams or edit role
 descriptions; those editors were removed in stage 8d (D-091).
 
 - **Models** are chosen by role from the model matrix and the live model catalog at the start of each run, not picked by hand

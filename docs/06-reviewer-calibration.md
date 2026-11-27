@@ -62,7 +62,7 @@ its system prompt and by one retry in code.
 
 The policy is configured via `ConvergenceOptions` (`src/Geef.Atelier.Infrastructure/Configuration/`) and read from the section `Convergence` in `appsettings.json`. A setup in code may override the values:
 
-| Value | `appsettings.json` | Override of `direct` and `direct-outline` |
+| Value | `appsettings.json` | Override of `direct` |
 |---|---|---|
 | `MaxIterations` | 6 | 2 |
 | `AbortOnCritical` | false | false |

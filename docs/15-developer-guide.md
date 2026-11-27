@@ -2,7 +2,7 @@
 
 *[Deutsch](15-developer-guide_de.md) · **English***
 
-*Last updated: 2026-11-27 (D-091: stage 8d, one pipeline assembler, two code-only setups, ten MCP tools and five stubs, old data and later database cleanup; before that research on for everyone and its guards, addendum to D-074; About me on the result, D-083)*
+*Last updated: 2026-11-27 (second addendum to D-087: one setup, "Extra careful" removed; D-091: stage 8d, one pipeline assembler, ten MCP tools and five stubs, old data and later database cleanup; before that research on for everyone and its guards, addendum to D-074; About me on the result, D-083)*
 
 This guide is for developers and for people who host Atelier. It gives the map of the current system and points to the detailed
 documents. Setup commands are in the [README](../README.md); the reasons behind every rule are in the
@@ -46,8 +46,7 @@ flowchart TB
 | Questions before the start | `Infrastructure/Intake/LlmClarifier.cs`, `Core/Domain/Intake/QuestionGate.cs`, `Application/Intake/OrderIntakeService.cs` |
 | Files | `Infrastructure/Sources/SourceIntakeService.cs` (extraction in a child process), `Infrastructure/Sources/UploadTicketService.cs` |
 | Direct path | `Infrastructure/Pipeline/Assembly/DirectPipelineAssembler.cs`, `Infrastructure/Pipeline/Direct/` |
-| The two setups and models | `Core/Domain/Crew/SystemCrew.cs`, `Core/Domain/Crew/Models/ModelMatrix.cs`, `Application/Crew/Models/ModelAssignmentService.cs`, `Infrastructure/Crew/ModelCatalog.cs` |
-| "Extra careful" (outline, request check) | `Infrastructure/Pipeline/Direct/WritingPlanner.cs`, `Infrastructure/Pipeline/Direct/RequirementsCheckReviewer.cs`, `Application/Orders/OrderRunExtensions.cs` |
+| The setup and models | `Core/Domain/Crew/SystemCrew.cs`, `Core/Domain/Crew/Models/ModelMatrix.cs`, `Application/Crew/Models/ModelAssignmentService.cs`, `Infrastructure/Crew/ModelCatalog.cs` |
 | Running runs | `Web/Services/RunOrchestratorService.cs` |
 | Export | `Application/Orders/IOrderExportService.cs`, `Infrastructure/Orders/` |
 | Checks without a model | `Core/Domain/Checks/RequestConstraintExtractor.cs`, `Infrastructure/Pipeline/Direct/DeterministicChecksReviewer.cs` |
@@ -61,23 +60,21 @@ flowchart TB
 
 All paths are below `src/Geef.Atelier.*`.
 
-## One way of writing, two setups
+## One way of writing, one setup
 
-`SystemCrew` holds two setups that exist only in code: `direct` (writer, `DeterministicChecksReviewer`, `SourceFactCheckReviewer`,
-at most one correction) and `direct-outline` ("Extra careful": `WritingPlanner` makes one call that plans sections with word
-budgets, then the same writer and checks plus `RequirementsCheckReviewer` after the first version). Every LLM role carries a
-`ModelSlot`; the concrete model is assigned per run from `ModelMatrix` and the live catalog (D-066) and frozen in the run's
-snapshot. The grounding of a run is only `OrderGroundingStep` (the order's files and, if looked up, the passages) plus the web
-research (`OrderResearchService` with the Tavily client; `Research:*`, `Tavily:Endpoint`, `Tavily:ApiKey`). A start without a
-search key logs a warning, and research then ends without a search.
+`SystemCrew` holds one setup that exists only in code: `direct` (writer, `DeterministicChecksReviewer`, `SourceFactCheckReviewer`,
+at most one correction). Every LLM role carries a `ModelSlot`; the concrete model is assigned per run from `ModelMatrix` and the
+live catalog (D-066) and frozen in the run's snapshot. The grounding of a run is only `OrderGroundingStep` (the order's files and,
+if looked up, the passages) plus the web research (`OrderResearchService` with the Tavily client; `Research:*`, `Tavily:Endpoint`,
+`Tavily:ApiKey`). A start without a search key logs a warning, and research then ends without a search.
 
-"Extra careful" is offered only while `Orders:CarefulOutline` (or an entry in `Orders:CarefulOutlineOverrides`) is `On` for the
-person. `OrderService` refuses a careful order otherwise, `submit_order` leaves `extraCareful` out of its schema while it is offered
-to nobody, and an accepted careful order always runs as `direct-outline` (`OrderRunExtensions.ResolveOrderSnapshotAsync`); a change
-of it runs as `direct`. To remove the feature, remove the switch, that mapping, the template in `SystemCrew` and the planner.
+Orders stored with the mode `Careful` and runs with the removed template `direct-outline` (second addendum to D-087) are carried
+on by the direct path: every new run uses `direct` (`OrderRunExtensions.ResolveOrderSnapshotAsync`), `SystemCrew.IsDirectPathTemplate`
+still counts `direct-outline`, and `DirectPipelineAssembler` leaves its extra check out when a stored snapshot is executed. The
+enum value and the database columns stay.
 
-`PipelineAssemblerSelector` asks the registered assemblers; the only production one, `DirectPipelineAssembler`, accepts the two
-setups. A run none accepts fails with "This task was set up for a way of working that no longer exists, so it cannot run. Please
+`PipelineAssemblerSelector` asks the registered assemblers; the only production one, `DirectPipelineAssembler`, accepts `direct` and,
+for stored runs, `direct-outline`. A run none accepts fails with "This task was set up for a way of working that no longer exists, so it cannot run. Please
 start it again."
 
 ## MCP tools
@@ -110,9 +107,9 @@ the same options and the same exception rules as the application (`OrderOptions.
 - a feature that is off for the viewer is never shown as available, also when another person has an exception;
 - signed out, the page shows the values for everyone; the table with setting names and raw values is rendered for administrators
   only and never shows an exception;
-- research counts as available only together with `Orders:IntakeMode = On`, and only for the standard way: the setups have no
-  grounding source of their own, so the only web access is `OrderResearchService`, which also refuses every order that is not
-  `OrderMode.Direct`. "Extra careful" does not search the web;
+- research counts as available only together with `Orders:IntakeMode = On`: the setup has no grounding source of its own, so the
+  only web access is `OrderResearchService`, which searches only for an order whose record of the questions says that research was
+  on for the person when the request was read;
 - research topics are checked by `ResearchQueryGate` twice: when the order is read, against the About me details the clarifier saw
   (topics held back there are counted in `IntakeRecord.ResearchWithheld`), and at the run against the details of the briefing;
 - a fact-check mode the page does not know is described as "points things out" and never as "may fix";

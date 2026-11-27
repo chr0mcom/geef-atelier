@@ -29,7 +29,7 @@ The documentation evolves alongside the brainstorming and is updated after every
 | [05-decisions-log.md](05-decisions-log.md) | Chronological, append-only log of all architecture decisions (D-001 ff.) | Historical |
 | [06-reviewer-calibration.md](06-reviewer-calibration.md) | Severity taxonomy and convergence policy; the parts about the old review loop are marked as historical (removed in D-091) | Living |
 | [07-design-system.md](07-design-system.md) | Theme system, typography, component inventory (as of design translation PS-3) | Living |
-| [08-crew-system.md](08-crew-system.md) | What remains of the crew system: the two setups in code, crew snapshot, model matrix, reviewers of the direct path, old runs; the removed parts are listed (D-091) | Living |
+| [08-crew-system.md](08-crew-system.md) | What remains of the crew system: the one setup in code, crew snapshot, model matrix, reviewers of the direct path, old runs; the removed parts are listed (D-091) | Living |
 | [09-endpoint-reference.md](09-endpoint-reference.md) | Reference of all externally reachable HTTP endpoints (MCP, OAuth, Web/Account) | Living |
 | [10-tool-system.md](10-tool-system.md) | Short note: the tool system was removed in stage 8d (D-091); the allow list for environment variables still applies | Note |
 | [11-specialization-packs.md](11-specialization-packs.md) | Short note: specialization packs were removed in stage 8d (D-091) | Note |
@@ -48,7 +48,7 @@ The cross-cutting process rules live in the parent infrastructure repository und
 
 ## Status
 
-- **Phase:** in production. Atelier writes every text on one way: the order with the direct path (D-068 to D-077). "Extra careful" (an outline first, D-087) exists only behind the switch `Orders:CarefulOutline`, shipped off. The older crew system and everything only it used (workshop, tools, learning, knowledge base, finishing steps, advisors, packs) were removed in stage 8d (D-091).
+- **Phase:** in production. Atelier writes every text on one way: the order with the direct path (D-068 to D-077). The variant "Extra careful" was removed after its measurement (second addendum to D-087). The older crew system and everything only it used (workshop, tools, learning, knowledge base, finishing steps, advisors, packs) were removed in stage 8d (D-091).
 - **Last updated:** 2026-11-27
 - **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-091, stage 8d: the rest of the older way of working is removed, after the first cut of stage 8c, D-089). No database table or column was dropped, so old orders and runs stay readable; the database cleanup is a separate later step. Documents mark what was removed.
 

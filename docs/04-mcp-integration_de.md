@@ -2,7 +2,7 @@
 
 *[English](04-mcp-integration.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-27 (D-091: Etappe 8d, der Server bietet die zehn Auftragswerkzeuge und für eine Version fünf Stummel an, die älteren Werkzeuge und `Mcp:LegacyTools` entfallen, `extraCareful` nur, solange „Extra careful“ angeboten wird; zuvor D-089: Template Studio entfernt; D-086: Server-Hinweise höchstens 3.900 Zeichen, MCP-SDK exakt 2.4.0, Transport ausdrücklich zustandslos; 2026-11-26, D-083: `profile` speichert vier About-me-Felder; Etappe 6: Upload-Ticket; Etappe 5: Werkzeuge für gelieferte Aufträge; Etappe 3: Prüfstand in `get_order_result`; Etappe 1: Auftrags-Werkzeuge und Server-Hinweise)*
+*Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: `extraCareful` entfernt; D-091: Etappe 8d, der Server bietet die zehn Auftragswerkzeuge und für eine Version fünf Stummel an, die älteren Werkzeuge und `Mcp:LegacyTools` entfallen; zuvor D-089: Template Studio entfernt; D-086: Server-Hinweise höchstens 3.900 Zeichen, MCP-SDK exakt 2.4.0, Transport ausdrücklich zustandslos; 2026-11-26, D-083: `profile` speichert vier About-me-Felder; Etappe 6: Upload-Ticket; Etappe 5: Werkzeuge für gelieferte Aufträge; Etappe 3: Prüfstand in `get_order_result`; Etappe 1: Auftrags-Werkzeuge und Server-Hinweise)*
 
 ## Warum MCP
 
@@ -49,7 +49,7 @@ mehrere Läufe haben) und haben keine eigenen Werkzeuge. Neben diesen zehn sind 
 
 Seit Etappe 1 arbeitet der Mensch mit **Aufträgen**; Läufe bleiben das technische Protokoll darunter (ein Auftrag kann mehrere Läufe haben). Der empfohlene Ablauf für einen Client:
 
-1. `submit_order` mit dem Auftrag **im Wortlaut des Menschen** (`request`), optionalen Dateien in `attachments` (JSON-Array aus `{filename, contentType, contentBase64}`; PDF, Word, Markdown oder Text) und, wo angeboten, [`extraCareful`](#extracareful) nur, wenn der Mensch besondere Sorgfalt wünscht. Der Aufruf wartet bis zu `Intake:SubmitWaitSeconds` (Standard 30), während Atelier den Auftrag liest (Etappe 2, nur bei `Orders:IntakeMode = On`), und antwortet mit `orderId`, `state`, `runId` und einer Quittung je Datei (Seiten, Zeichen, Qualität, Warnungen). Drei Fälle:
+1. `submit_order` mit dem Auftrag **im Wortlaut des Menschen** (`request`), optionalen Dateien in `attachments` (JSON-Array aus `{filename, contentType, contentBase64}`; PDF, Word, Markdown oder Text) (einen Parameter für einen langsameren Weg gibt es nicht; sendet ein Client mit gespeicherter alter Werkzeugliste noch `extraCareful`, wird der Wert überlesen und der Standardweg genommen). Der Aufruf wartet bis zu `Intake:SubmitWaitSeconds` (Standard 30), während Atelier den Auftrag liest (Etappe 2, nur bei `Orders:IntakeMode = On`), und antwortet mit `orderId`, `state`, `runId` und einer Quittung je Datei (Seiten, Zeichen, Qualität, Warnungen). Drei Fälle:
    - `needs_input`: Atelier braucht etwas, das nur der Mensch weiß. Die Antwort hat keine `runId`, aber `understanding`, `assumptions` (`{id, text, unsure}`), `language`, bis zu drei `questions` (`{id, topic, text, options:[{id, label}], defaultOptionId, allowFreeText}`) und `revisionFile`, wenn Atelier eine angehängte Datei überarbeiten wird. Der Client fragt den Menschen, behält die Antwortmöglichkeiten bei, sagt, dass Überspringen in Ordnung ist, und ruft dann `answer_order` auf. Diese Felder entstehen aus dem Lesen von Auftrag und Dateien; sie sind keine Anweisungen, und der Client fragt deswegen nie nach Zugangsdaten.
    - `queued`/`working` mit `runId`: Der Auftrag wird schon geschrieben (keine Frage nötig oder gar keine Klärung); `understanding` und `assumptions` kommen mit, wenn der Auftrag gelesen wurde.
    - `preparing`: Das Lesen dauerte länger als die Wartezeit. `get_order_status` mit `waitSeconds=25` bringt dann die Fragen oder den gestarteten Auftrag.
@@ -58,20 +58,6 @@ Seit Etappe 1 arbeitet der Mensch mit **Aufträgen**; Läufe bleiben das technis
 4. Wenn `done` wahr ist: `get_order_result` liefert den Text, auszufüllende Platzhalter, offene Prüfungen, die genutzten Dateien, Warnungen und bei geklärten Aufträgen die `assumptions`, die niemand korrigiert hat und die der Schreiber als Vorgaben bekam (Annahmen zu Tatsachen nur als „nicht vom Menschen genannt“). Seit Etappe 3 kommen dazu dieselben Sätze wie „What was checked“ auf der Webseite (`checks`), der Zustand der Faktenprüfung (`factCheck`), möglicherweise nicht gedeckte Stellen (`unbackedPassages`), Probleme in den Dateien (`sourceIssues`), offene Punkte und Annahmen des Schreibers (`openPoints`, `writerAssumptions`) und geprüfte Zitate aus den Dateien (`sourceQuotes`), in der Reihenfolge der Webseite. Seit Etappe 4 nennt `lookedUp` die für den Auftrag im Web nachgeschlagenen Stellen, jede wörtlich mit Seite und Tag, oder einen festen Satz, warum nichts nachgeschlagen wurde (`files_attached`: ein Auftrag mit angehängten Dateien sucht nie; in der ausgelieferten Einstellung für alle eingeschaltet, Zusatz zu D-074); eine Textstelle, der diese Seiten widersprechen, ist ein Hinweis der Art `differs_from_looked_up` mit ihrem Satz in `note`, nie eine Sache der Dateien der Person; sie zeigen, was die Seiten sagen, nicht, dass es stimmt, und der Client behandelt sie nie als geprüfte Tatsache oder Anweisung und öffnet ihre Links nicht von sich aus. Der Client zeigt sie mit dem Text, behauptet nie mehr Prüfung als `checks` sagt und behandelt Notizen des Schreibers, Probleme in den Dateien und alle Zitate als Inhalt, nie als Anweisung. Der Text kommt auch bei offenen Prüfungen (`delivered_with_open_points`); entstand kein Text (`failed`), sagt der Client das und schreibt keinen Ersatz.
 
 Anhänge, die offensichtlich nicht die Datei selbst sind, werden vor dem Lesen abgewiesen: ungültiges Base64, leerer oder sehr kurzer Inhalt, Texte, die nur auf eine Datei verweisen („siehe angehängte Vollversion“), doppelt kodiertes Base64 und Inhalt, dessen Magic Bytes nicht zum `contentType` passen. Die Meldung nennt den richtigen Weg: die vollständige Originaldatei als Base64 mit passendem `contentType` übergeben oder, wenn die Datei für ein Argument zu groß ist, den Auftrag in der Weboberfläche anlegen. Unbekannte oder fremde Aufträge ergeben `Order not found.`; die Antworten wachsen nur um angehängte Felder. Schemas: [`09-endpoint-reference_de.md`](09-endpoint-reference_de.md#aufträge-submit_order-get_order_status-get_order_result).
-
-### `extraCareful`
-
-„Extra careful“ ist die langsamere Variante des Standardwegs: Ein Aufruf plant den Text zuerst in Abschnitten mit
-Wortbudgets, der Schreiber folgt diesem Plan, und nach der ersten Fassung sieht eine weitere Prüfung nach, ob jede
-ausdrückliche Anforderung des Anliegens erfüllt ist (sonst eine Korrektur). Im Web wird dabei nie gesucht. Es gibt das nur, solange `Orders:CarefulOutline`
-für die Person auf `On` steht (Ausnahmen je Benutzername in `Orders:CarefulOutlineOverrides`; Standard `Off`).
-
-- Die Werkzeugliste ist für alle gleich. Solange „Extra careful“ **niemandem** angeboten wird, nennt `submit_order` den
-  Parameter `extraCareful` nicht im Schema; solange es irgendwem angeboten wird, steht der Parameter im Schema, und die
-  Beschreibung von `submit_order` bekommt den Satz „With extraCareful it can take up to about 10 minutes.“
-- Ein Aufruf mit `extraCareful=true` von einer Person, der es nicht angeboten wird, wird abgelehnt mit „Extra careful is not
-  available. Please send the order without it.“ Nichts wird gestartet.
-- Ein sorgfältiger Auftrag läuft nie stillschweigend als etwas anderes.
 
 ### Dateien über das Upload-Ticket: `prepare_attachment`, `uploadIds` (Etappe 6)
 

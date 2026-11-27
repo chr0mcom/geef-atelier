@@ -38,8 +38,8 @@ public static class OrderProgressMapper
 
     /// <summary>
     /// Builds the steps of the progress display: direct path <c>files</c> (only with sources), <c>write</c>, <c>check</c>,
-    /// <c>fix</c> (only when a second iteration began), <c>done</c>; careful path <c>files</c> (only with sources), <c>write</c>,
-    /// <c>review</c>, <c>done</c>. Clarified orders (<paramref name="intake"/> given) start with <c>understand</c> and, when
+    /// <c>fix</c> (only when a second iteration began), <c>done</c>; <see cref="OrderMode.Careful"/>, which stands only for stored runs of
+    /// the removed review loop, <c>files</c> (only with sources), <c>write</c>, <c>review</c>, <c>done</c>. Clarified orders (<paramref name="intake"/> given) start with <c>understand</c> and, when
     /// questions were asked, <c>answers</c>. The elapsed time counts from <paramref name="versionStartedAt"/> when it is given (a run that
     /// changes an earlier version counts from its own start, not from the order), otherwise from <paramref name="orderCreatedAt"/>.
     /// </summary>

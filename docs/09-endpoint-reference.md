@@ -2,7 +2,7 @@
 
 *[Deutsch](09-endpoint-reference_de.md) · **English***
 
-*Last updated: 2026-11-27 (D-091: stage 8d, removed endpoints, pages and tools taken out: ten MCP tools plus five stubs for one version, no artifact download, no SignalR hub, no workshop editors; `extraCareful` only while offered; before that `Research:Mode` shipped `On`; D-083: `profile` and About me fields; stage 6: upload ticket; stage 5: tools for delivered orders; stages 1 to 4: order tools, questions, what was checked, looked-up passages)*
+*Last updated: 2026-11-27 (second addendum to D-087: `extraCareful` removed; D-091: stage 8d, removed endpoints, pages and tools taken out: ten MCP tools plus five stubs for one version, no artifact download, no SignalR hub, no workshop editors; before that `Research:Mode` shipped `On`; D-083: `profile` and About me fields; stage 6: upload ticket; stage 5: tools for delivered orders; stages 1 to 4: order tools, questions, what was checked, looked-up passages)*
 
 All externally reachable HTTP endpoints of Geef.Atelier: MCP, OAuth 2.1
 and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
@@ -43,12 +43,11 @@ Since stage 1 an **order** is the unit the person sees; runs stay the technical 
 ```json
 {
   "request": "<string, required: the person's request word for word>",
-  "attachments": "<string, optional: JSON array [{\"filename\":\"offer.pdf\",\"contentType\":\"application/pdf\",\"contentBase64\":\"...\"}]>",
-  "extraCareful": false
+  "attachments": "<string, optional: JSON array [{\"filename\":\"offer.pdf\",\"contentType\":\"application/pdf\",\"contentBase64\":\"...\"}]>"
 }
 ```
 
-Supported `contentType` values: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (also `text/x-markdown`), `text/plain` (parameters such as `; charset=utf-8` are ignored). `extraCareful = true` asks for "Extra careful": the standard way with a plan (sections with word budgets) before the writing and a check of every explicit requirement of the request after the first version, otherwise one correction; it never searches the web. It exists only while `Orders:CarefulOutline` is `On` for the person (exceptions in `Orders:CarefulOutlineOverrides`, default `Off`). While it is offered to nobody, the parameter is not part of the input schema; while it is offered to anybody, it is listed and the tool description adds "With extraCareful it can take up to about 10 minutes." A call with `extraCareful = true` from a person it is not offered to is refused with "Extra careful is not available. Please send the order without it."; nothing is started and a careful order never runs as something else.
+Supported `contentType` values: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (also `text/x-markdown`), `text/plain` (parameters such as `; charset=utf-8` are ignored). There is no parameter for a slower way; `extraCareful` from a client with a cached older tool list is ignored, and the order runs on the standard way.
 
 **`submit_order` output:**
 ```json
@@ -490,7 +489,7 @@ The web interface is Blazor Server (cookie auth). The externally reachable route
 
 | Endpoint | Method | Auth | Purpose |
 |----------|---------|------|-------|
-| `/start` | GET | Cookie | New order: request, files with receipts; "Extra careful" only while offered to the person |
+| `/start` | GET | Cookie | New order: request, files with receipts |
 | `/work`, `/orders` | GET | Cookie | "My work": the person's orders, newest activity first (administrators can show all users) |
 | `/orders/{id}` | GET | Cookie | Order page: progress, text, open points, "How it was made", versions |
 | `/about-me` | GET | Cookie | "About me" ("Tell Atelier once") |

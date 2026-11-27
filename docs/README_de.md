@@ -29,7 +29,7 @@ Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsru
 | [05-decisions-log.md](05-decisions-log_de.md) | Chronologisches, append-only Protokoll aller Architektur-Entscheidungen (D-001 ff.) | Historisch |
 | [06-reviewer-calibration.md](06-reviewer-calibration_de.md) | Severity-Taxonomie und Convergence-Policy; die Teile zur alten Prüfschleife sind als historisch gekennzeichnet (in D-091 entfernt) | Living |
 | [07-design-system.md](07-design-system_de.md) | Theme-System, Typografie, Komponenten-Inventar (Stand Design-Translation PS-3) | Living |
-| [08-crew-system.md](08-crew-system_de.md) | Was vom Crew-System bleibt: die zwei Aufstellungen im Code, Crew-Snapshot, Modellmatrix, Prüfer des Direktwegs, alte Läufe; die entfernten Teile sind aufgeführt (D-091) | Living |
+| [08-crew-system.md](08-crew-system_de.md) | Was vom Crew-System bleibt: die eine Aufstellung im Code, Crew-Snapshot, Modellmatrix, Prüfer des Direktwegs, alte Läufe; die entfernten Teile sind aufgeführt (D-091) | Living |
 | [09-endpoint-reference.md](09-endpoint-reference_de.md) | Referenz aller extern erreichbaren HTTP-Endpunkte (MCP, OAuth, Web/Account) | Living |
 | [10-tool-system.md](10-tool-system_de.md) | Kurzer Hinweis: Das Tool-System wurde in Stufe 8d entfernt (D-091); die Allowlist für Umgebungsvariablen gilt weiter | Hinweis |
 | [11-specialization-packs.md](11-specialization-packs_de.md) | Kurzer Hinweis: Die Spezialisierungs-Packs wurden in Stufe 8d entfernt (D-091) | Hinweis |
@@ -48,7 +48,7 @@ Im übergeordneten Infrastruktur-Repository unter `/srv/docker/docs/` liegen die
 
 ## Status
 
-- **Phase:** produktiv. Atelier schreibt jeden Text auf einem Weg: dem Auftrag mit dem Direktweg (D-068 bis D-077). „Extra careful“ (zuerst eine Gliederung, D-087) gibt es nur hinter dem Schalter `Orders:CarefulOutline`, ausgeliefert aus. Das ältere Crew-System und alles, was nur es nutzte (Werkstatt, Tools, Lernen, Wissensbasis, Abschlussschritte, Advisor, Packs), wurden in Stufe 8d entfernt (D-091).
+- **Phase:** produktiv. Atelier schreibt jeden Text auf einem Weg: dem Auftrag mit dem Direktweg (D-068 bis D-077). Die Variante „Extra careful“ wurde nach ihrer Messung entfernt (zweiter Zusatz zu D-087). Das ältere Crew-System und alles, was nur es nutzte (Werkstatt, Tools, Lernen, Wissensbasis, Abschlussschritte, Advisor, Packs), wurden in Stufe 8d entfernt (D-091).
 - **Letzte Aktualisierung:** 2026-11-27
 - **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-091, Stufe 8d: Der Rest der älteren Arbeitsweise ist entfernt, nach dem ersten Schnitt in Stufe 8c, D-089). Keine Datenbanktabelle oder -spalte wurde gelöscht, alte Aufträge und Läufe bleiben also lesbar; die Datenbankbereinigung ist ein eigener späterer Schritt. Die Dokumente kennzeichnen, was entfernt wurde.
 

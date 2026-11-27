@@ -9,8 +9,7 @@
 **Geef.Atelier** ist eine Text-Manufaktur: Aus dem Anliegen und den Dateien einer Person wird ein fertiger Text, und das
 Atelier sagt ehrlich, was geprüft wurde und was noch offen ist. Ein Anliegen wird ein **Auftrag**; höchstens drei kurze
 Fragen kommen vor dem Start; ein Schreibaufruf bekommt die Dateien im Volltext; danach folgen automatische Prüfungen und
-eine Faktenprüfung durch ein anderes Modell, mit höchstens einer Korrektur. „Extra careful“, nur dort angeboten, wo es
-eingeschaltet ist, ergänzt einen Plan vor dem Schreiben und eine Prüfung jeder ausdrücklichen Anforderung des Anliegens. Die
+eine Faktenprüfung durch ein anderes Modell, mit höchstens einer Korrektur. Einen zweiten, langsameren Weg gibt es nicht. Die
 Leitfäden [12](12-user-guide_de.md) bis [15](15-developer-guide_de.md) beschreiben das Produkt je Zielgruppe.
 
 Die ursprüngliche Vision war eine Maschine, die für jedes Werkstück eine Crew aus KI-Rollen zusammenstellt. Diese

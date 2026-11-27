@@ -4,7 +4,7 @@
 
 *Letzte Aktualisierung: 2026-11-27 (D-085: ältere Prüfschleife, drei Schutzschalter, ausgeliefert aus; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
-*Letzte Aktualisierung: 2026-11-27 (D-091: Rückbau, Schnitt 2, nur der Standardweg bleibt; zuvor D-090: Gateway-Failover nur auf dasselbe Modell; D-087: „Extra careful“ mit Gliederung hinter Schalter, Schleifen-Schalter je Konto, Messung vorbereitet; zuvor D-086: MCP-Server-Hinweise unter der Kürzungsgrenze, SDK exakt 2.4.0; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: „Extra careful“ entfällt; D-091: Rückbau, Schnitt 2, nur der Standardweg bleibt; zuvor D-090: Gateway-Failover nur auf dasselbe Modell; D-087: „Extra careful“ mit Gliederung hinter Schalter, Schleifen-Schalter je Konto, Messung vorbereitet; zuvor D-086: MCP-Server-Hinweise unter der Kürzungsgrenze, SDK exakt 2.4.0; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -3676,6 +3676,30 @@ selben Schalter `Orders:CarefulOutline` (mit `Off` unverändert):
   Reparatur mit denselben Kriterien gegen die gespeicherten Texte des Direktwegs. Ohne Sieg entfällt das Häkchen, und lange Texte laufen
   im Direktweg.
 
+**Zweiter Zusatz zu D-087 – Messung entschieden, „Extra careful“ entfällt (2026-11-27).** Die vorab festgelegte Messung ist
+entschieden: Auch die reparierte Variante (Gliederungsweg `direct-outline` mit Vorgabenprüfung) hat nicht klar genug gewonnen. Wie
+vorab festgelegt, entfällt das Häkchen, und lange Texte laufen im Direktweg.
+- **Entfernt**, was nur dafür da war: der Schalter `Orders:CarefulOutline` samt `CarefulOutlineOverrides`, die Vorlage
+  `direct-outline`, der Gliederungsschritt, die Vorgabenprüfung `requirements-check` und ihre Warncodes, das Häkchen auf `/start`, die
+  Kennzeichnung in „My work“ und auf der Auftragsseite, die Absätze der Erklärseite und `extraCareful` in `submit_order` (Schema,
+  Beschreibung, Skill, Zustand der Formular-Rückfrage). Die drei Schalter der Schleife aus D-085 samt Ausnahmen waren schon mit der
+  älteren Prüfschleife entfallen (D-091).
+- **Keine Migration, kein `DROP`.** Der Wert `OrderMode.Careful` und die Spalten bleiben; neue Aufträge sind immer `Direct`. Das
+  Aufräumen der Datenbank ist ein eigener, späterer Schritt.
+- **Gespeicherte Aufträge im Modus careful** bleiben lesbar und exportierbar. „Change something“ und `revise_order` schreiben die neue
+  Fassung auf dem Direktweg. Ein noch wartender Auftrag läuft wie ein Standardauftrag, auch beim Lesen der Anfrage und bei der Datei,
+  die überarbeitet werden soll. Ob im Web nachgeschlagen werden darf, steht weiter im Verlauf der Rückfragen: Wurde die Anfrage schon
+  als sorgfältiger Auftrag gelesen, wird nie nachgeschlagen.
+- **Gespeicherte Läufe mit `direct-outline`** gehören weiter zum Direktweg: lesbar, fortsetzbar, änderbar. Wird ein solcher Lauf noch
+  ausgeführt, lässt der Zusammenbau die Zusatzprüfung aus; einen Planungsaufruf gibt es nicht. Die technische Laufseite zeigt die
+  Aufstellung unter ihrem früheren Namen.
+- **Clients mit gespeicherter alter Werkzeugliste**, die `extraCareful` noch senden, bekommen den Direktweg; der unbekannte Wert wird
+  überlesen.
+- **Nachweis:** Ende-zu-Ende-Tests für einen fertigen sorgfältigen Auftrag mit `direct-outline` (Listen, Seiten, beide Exporte,
+  `revise_order`), einen wartenden und einen fortgesetzten Lauf dieser Vorlage, einen auf Antworten wartenden sorgfältigen Auftrag und
+  einen Aufruf mit `extraCareful`.
+- **Rückweg:** das vorige Image; in der Datenbank wurde nichts geändert.
+
 ## D-088 — MCP: Skill und Rückfragen als Formular, beide hinter Schaltern und ausgeliefert aus (2026-11-27)
 
 **Status:** gebaut und getestet (Schritte 2 und 3 der Prüfung neuer MCP-Fähigkeiten); beide Schalter ausgeliefert `Off`; Abnahme am
@@ -3950,14 +3974,8 @@ MCP-Werkzeuge des Standardwegs (`submit_order`, `answer_order`, `get_order_statu
 bleiben registriert: Jeder Parameter ist optional, und jeder Aufruf liefert einen Werkzeugfehler, der `submit_order`,
 `get_order_status` oder `get_order_result` nennt (Clients halten Werkzeuglisten im Cache). Sie entfallen in der nächsten Version.
 
-**„Extra careful“.** Ein sorgfältiger Auftrag läuft auf dem Direktweg mit vorheriger Gliederung (`direct-outline`, D-087), wenn
-`Orders:CarefulOutline` für die Person `On` ist (`CarefulOutlineOverrides` je Benutzername); ausgeliefert ist `Off`. Sonst gibt es die
-Option nicht: `/start` zeigt kein Kästchen, die Erklärseite erwähnt sie nicht, `submit_order` lässt `extraCareful` aus seinem Schema,
-solange sie niemand hat, und ein `extraCareful=true` für eine Person ohne die Option wird mit „Extra careful is not available. Please
-send the order without it.“ abgelehnt. Ein sorgfältiger Auftrag läuft nie still als etwas anderes; „Start again“ eines älteren
-sorgfältigen Auftrags sagt, dass der Standardweg genutzt wird, und startet nichts von selbst. Einschalten oder Entfernen berührt den
-Schalter, `ResolveOrderSnapshotAsync`, die Vorlage in `SystemCrew` und den Planer — in beide Richtungen ein kleiner Diff.
-`scripts/atelier-smoke.sh` nutzt `submit_order`, `answer_order(skip=true)`, `get_order_status` und `get_order_result`.
+**„Extra careful“** entfällt ganz (zweiter Zusatz zu D-087): Es gibt nur noch den Direktweg, und gespeicherte sorgfältige Aufträge
+werden dort weitergeführt. `scripts/atelier-smoke.sh` nutzt `submit_order`, `answer_order(skip=true)`, `get_order_status` und `get_order_result`.
 
 **Ältere Daten.** Kein `DROP`, keine Migration, keine gelöschte Zeile: Die Datenbank bleibt mit dem vorigen Image verträglich.
 Entfernte Entitäten sind nicht mehr gemappt; ihre Tabellen und die Spalten `Runs.GroundingCostEur`, `FinalizerCostEur`,

@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](14-admin-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-27 (D-091: Stufe 8d, Werkstatt-Editoren, ältere Prüfschleife und ältere MCP-Werkzeuge samt Schaltern entfernt; `Orders:CarefulOutline` entscheidet jetzt, ob „Extra careful“ angeboten wird; davor `Orders:TellOnce = On`, Zusatz zu D-083; `Research:Mode = On`, Zusatz zu D-074)*
+*Letzte Aktualisierung: 2026-11-27 („Extra careful“ samt Schalter entfernt, zweiter Zusatz zu D-087; D-091: Stufe 8d, Werkstatt-Editoren, ältere Prüfschleife und ältere MCP-Werkzeuge samt Schaltern entfernt; davor `Orders:TellOnce = On`, Zusatz zu D-083; `Research:Mode = On`, Zusatz zu D-074)*
 
 Dieser Leitfaden ist für die Administration: Menschen, die Konten anlegen, entscheiden, welche Funktionen an sind, und sich um die
 Anbieter kümmern. Installation und Betrieb beschreiben der [Leitfaden für Entwicklung und Betrieb](15-developer-guide_de.md)
@@ -42,7 +42,6 @@ geändert werden.
 | Skill „wie man Atelier benutzt“ für KI-Assistenten | `Mcp:Skills` (`Off`, `On`) | `Off` | `On` (D-088, am echten Client mit Claude Code geprüft) | – |
 | Rückfragen als Formular im KI-Assistenten | `Mcp:Elicitation` (`Off`, `On`) | `Off` | `On` (D-088, am echten Client mit Claude Code geprüft) | – |
 | Angebot, fehlende Angaben unter About me zu speichern („Tell Atelier once“) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `On` (Zusatz zu D-083, Abnahme bestanden) | – |
-| „Extra careful“ (zuerst eine Gliederung) | `Orders:CarefulOutline` (`Off`, `On`) | `Off` | `Off` (D-087, D-091) | `Orders:CarefulOutlineOverrides:<user>` |
 
 Was die Werte bedeuten:
 
@@ -59,7 +58,7 @@ Was die Werte bedeuten:
   gelesene Aufträge suchen nie. Atelier versucht, Suchwörter mit Mailadresse, Telefon- oder Kontonummer, Geburtsdatum oder
   Straßenanschrift zurückzuhalten, die es erkennt; es erkennt nicht jede Schreibweise, Namen und andere Angaben in Worten gar nicht,
   und die Person sieht am Ergebnis, welche Wörter hinausgingen.
-  „Extra careful“ sucht nie im Web. Den Suchdienst stellen `Tavily:Endpoint` und `Tavily:ApiKey` ein (`docker-compose.yml` füllt den
+  Den Suchdienst stellen `Tavily:Endpoint` und `Tavily:ApiKey` ein (`docker-compose.yml` füllt den
   Schlüssel aus `TAVILY_API_KEY`).
 - **Menü Workshop:** Mit `true` sehen nur Administratoren das Menü „Workshop“ („Runs“ und für die Administration „Providers“) und
   „Technical details“ auf der Auftragsseite. Die Lauf-Seiten öffnen sich weiter für alle Angemeldeten, die ihre Adresse eingeben,
@@ -73,19 +72,6 @@ Was die Werte bedeuten:
   denen er entstand. `WithoutPromise` (Code-Standard) nutzt „Save it under About me for your next texts“. `Off` zeigt nichts davon, und `profile` wird nur lesend mit seiner früheren Beschreibung angeboten. Die
   Administration sieht es nie an fremden Aufträgen, und gespeichert wird nur in die eigenen About-me-Angaben (D-083). Rückweg:
   `Orders__TellOnce=WithoutPromise` (Angebot ohne Zusage) oder `Orders__TellOnce=Off`.
-- **„Extra careful“** (`Orders:CarefulOutline`, ausgeliefert `Off`; Ausnahmen je Benutzername
-  `Orders__CarefulOutlineOverrides__<name>=On`, D-087, D-091): Der Schalter entscheidet, ob „Extra careful“ überhaupt angeboten
-  wird. Mit `On` für eine Person zeigt die Startseite das Kästchen, und ein solcher Auftrag läuft auf dem Standardweg mit einem
-  Aufruf vorweg, der den Text in Abschnitte mit Wortbudgets gliedert (an die verlangte Länge angepasst, wenn sie sich ohne Modell
-  lesen lässt). Der Schreiber schreibt danach, mit denselben automatischen Prüfungen, derselben Faktenprüfung und demselben „What
-  was checked“ wie immer, dazu einer Prüfung nach der ersten Fassung, ob jede ausdrückliche Vorgabe des Auftrags erfüllt ist
-  (sonst eine Korrektur). Kommt keine brauchbare Gliederung zurück, wird in einem Zug geschrieben, und der Auftrag sagt das. Eine
-  Änderung an einem solchen Text läuft auf dem Standardweg ohne Gliederung. Ist es für eine Person aus, zeigt die Startseite die
-  Option nicht, `submit_order` lehnt `extraCareful=true` mit „Extra careful is not available. Please send the order without it.“ ab,
-  und kein Auftrag läuft stillschweigend als etwas anderes. Den Parameter `extraCareful` führt `submit_order` nur auf, solange die
-  Funktion irgendjemandem angeboten wird (die Werkzeugliste ist für alle dieselbe). „Start again“ bei einem alten solchen Auftrag
-  trägt dann den Auftrag ohne die Option ein und sagt das; es läuft nichts, bevor die Person ihn abschickt. Ausgeliefert bleibt
-  `Off`, bis eine Messung zeigt, dass die Gliederung besser ist.
 
 **Einen Schalter setzen.** Die Einstellungen werden beim Start gelesen. Setz sie als Umgebungsvariablen des Webdienstes, mit `__`
 statt `:` (zum Beispiel `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` reicht Variablen einzeln
@@ -93,8 +79,8 @@ durch; trag sie deshalb unter `environment` des Webdienstes in einer `docker-com
 genügt nicht. Danach den Container neu erstellen. Jeder Schalter lässt sich auf demselben Weg zurücksetzen.
 
 **Einstellungen, die es nicht mehr gibt** (in Stufe 8d entfernt, D-091): `Mcp:LegacyTools`, `Orders:LegacySubmitDefaultMode`,
-`Convergence:BestDraft`, `Convergence:WriterBlockingOnly`, `Convergence:StopWithoutProgress` samt ihren `…Overrides` sowie alles
-unter `Learning:`, `Knowledge:`, `Embeddings:` und `Finalizer:`. Sie bewirken nichts; du kannst sie aus deiner Umgebung löschen.
+`Convergence:BestDraft`, `Convergence:WriterBlockingOnly`, `Convergence:StopWithoutProgress` samt ihren `…Overrides`,
+`Orders:CarefulOutline` samt `Orders:CarefulOutlineOverrides` (zweiter Zusatz zu D-087) sowie alles unter `Learning:`, `Knowledge:`, `Embeddings:` und `Finalizer:`. Sie bewirken nichts; du kannst sie aus deiner Umgebung löschen.
 
 ```mermaid
 flowchart LR
@@ -114,7 +100,7 @@ flowchart LR
 
 ## Anbieter und Modelle
 
-Atelier schreibt mit zwei Aufstellungen, die nur im Code stehen: dem Standardweg und „Extra careful“. Teams baust du nicht, und
+Atelier schreibt mit einer Aufstellung, die nur im Code steht: dem Standardweg. Teams baust du nicht, und
 Rollenbeschreibungen bearbeitest du nicht; diese Editoren wurden in Stufe 8d entfernt (D-091).
 
 - **Modelle** werden beim Start jedes Laufs nach Rolle aus der Modellmatrix und dem Live-Modellkatalog gewählt, nicht von Hand

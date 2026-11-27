@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](15-developer-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-27 (D-091: Stufe 8d, ein Pipeline-Assembler, zwei Aufstellungen nur im Code, zehn MCP-Werkzeuge und fünf Stummel, Altdaten und spätere Datenbankbereinigung; davor Recherche für alle eingeschaltet und ihre Sperren, Zusatz zu D-074; About me am Ergebnis, D-083)*
+*Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: eine Aufstellung, „Extra careful“ entfernt; D-091: Stufe 8d, ein Pipeline-Assembler, zehn MCP-Werkzeuge und fünf Stummel, Altdaten und spätere Datenbankbereinigung; davor Recherche für alle eingeschaltet und ihre Sperren, Zusatz zu D-074; About me am Ergebnis, D-083)*
 
 Dieser Leitfaden ist für Entwicklerinnen und Entwickler und für alle, die Atelier selbst betreiben. Er gibt die Karte des heutigen
 Systems und verweist auf die ausführlichen Dokumente. Die Einrichtungsbefehle stehen im [README](../README_de.md); die Gründe
@@ -46,8 +46,7 @@ flowchart TB
 | Fragen vor dem Start | `Infrastructure/Intake/LlmClarifier.cs`, `Core/Domain/Intake/QuestionGate.cs`, `Application/Intake/OrderIntakeService.cs` |
 | Dateien | `Infrastructure/Sources/SourceIntakeService.cs` (Extraktion im Kindprozess), `Infrastructure/Sources/UploadTicketService.cs` |
 | Direktweg | `Infrastructure/Pipeline/Assembly/DirectPipelineAssembler.cs`, `Infrastructure/Pipeline/Direct/` |
-| Die zwei Aufstellungen und die Modelle | `Core/Domain/Crew/SystemCrew.cs`, `Core/Domain/Crew/Models/ModelMatrix.cs`, `Application/Crew/Models/ModelAssignmentService.cs`, `Infrastructure/Crew/ModelCatalog.cs` |
-| „Extra careful“ (Gliederung, Vorgabenprüfung) | `Infrastructure/Pipeline/Direct/WritingPlanner.cs`, `Infrastructure/Pipeline/Direct/RequirementsCheckReviewer.cs`, `Application/Orders/OrderRunExtensions.cs` |
+| Die Aufstellung und die Modelle | `Core/Domain/Crew/SystemCrew.cs`, `Core/Domain/Crew/Models/ModelMatrix.cs`, `Application/Crew/Models/ModelAssignmentService.cs`, `Infrastructure/Crew/ModelCatalog.cs` |
 | Läufe ausführen | `Web/Services/RunOrchestratorService.cs` |
 | Export | `Application/Orders/IOrderExportService.cs`, `Infrastructure/Orders/` |
 | Prüfungen ohne Modell | `Core/Domain/Checks/RequestConstraintExtractor.cs`, `Infrastructure/Pipeline/Direct/DeterministicChecksReviewer.cs` |
@@ -61,25 +60,22 @@ flowchart TB
 
 Alle Pfade liegen unter `src/Geef.Atelier.*`.
 
-## Eine Art zu schreiben, zwei Aufstellungen
+## Eine Art zu schreiben, eine Aufstellung
 
-`SystemCrew` enthält zwei Aufstellungen, die nur im Code stehen: `direct` (Schreiber, `DeterministicChecksReviewer`,
-`SourceFactCheckReviewer`, höchstens eine Korrektur) und `direct-outline` („Extra careful“: `WritingPlanner` plant in einem Aufruf
-Abschnitte mit Wortbudgets, danach derselbe Schreiber und dieselben Prüfungen, dazu nach der ersten Fassung
-`RequirementsCheckReviewer`). Jede LLM-Rolle trägt einen `ModelSlot`; das konkrete Modell wird je Lauf aus `ModelMatrix` und dem
-Live-Katalog zugewiesen (D-066) und im Snapshot des Laufs eingefroren. Das Grounding eines Laufs ist nur `OrderGroundingStep` (die
-Dateien des Auftrags und, falls nachgeschlagen wurde, die Stellen) und die Web-Recherche (`OrderResearchService` mit dem
-Tavily-Client; `Research:*`, `Tavily:Endpoint`, `Tavily:ApiKey`). Ein Start ohne Suchschlüssel schreibt eine Warnung ins Log, und die
-Recherche endet dann ohne Suche.
+`SystemCrew` enthält eine Aufstellung, die nur im Code steht: `direct` (Schreiber, `DeterministicChecksReviewer`,
+`SourceFactCheckReviewer`, höchstens eine Korrektur). Jede LLM-Rolle trägt einen `ModelSlot`; das konkrete Modell wird je Lauf aus
+`ModelMatrix` und dem Live-Katalog zugewiesen (D-066) und im Snapshot des Laufs eingefroren. Das Grounding eines Laufs ist nur
+`OrderGroundingStep` (die Dateien des Auftrags und, falls nachgeschlagen wurde, die Stellen) und die Web-Recherche
+(`OrderResearchService` mit dem Tavily-Client; `Research:*`, `Tavily:Endpoint`, `Tavily:ApiKey`). Ein Start ohne Suchschlüssel
+schreibt eine Warnung ins Log, und die Recherche endet dann ohne Suche.
 
-„Extra careful“ wird nur angeboten, solange `Orders:CarefulOutline` (oder ein Eintrag in `Orders:CarefulOutlineOverrides`) für die
-Person `On` ist. Sonst lehnt `OrderService` einen solchen Auftrag ab, `submit_order` lässt `extraCareful` aus seinem Schema weg,
-solange es niemandem angeboten wird, und ein angenommener solcher Auftrag läuft immer als `direct-outline`
-(`OrderRunExtensions.ResolveOrderSnapshotAsync`); eine Änderung daran läuft als `direct`. Wer die Funktion entfernen will, entfernt
-den Schalter, diese Zuordnung, die Vorlage in `SystemCrew` und den Planer.
+Aufträge mit dem gespeicherten Modus `Careful` und Läufe mit der entfernten Vorlage `direct-outline` (zweiter Zusatz zu D-087)
+führt der Direktweg weiter: Jeder neue Lauf nutzt `direct` (`OrderRunExtensions.ResolveOrderSnapshotAsync`),
+`SystemCrew.IsDirectPathTemplate` zählt `direct-outline` weiter mit, und `DirectPipelineAssembler` lässt dessen Zusatzprüfung weg,
+wenn ein gespeicherter Snapshot ausgeführt wird. Enum-Wert und Datenbankspalten bleiben.
 
-`PipelineAssemblerSelector` fragt die registrierten Assembler; der einzige produktive, `DirectPipelineAssembler`, nimmt die zwei
-Aufstellungen an. Ein Lauf, den keiner annimmt, scheitert mit „This task was set up for a way of working that no longer exists, so it
+`PipelineAssemblerSelector` fragt die registrierten Assembler; der einzige produktive, `DirectPipelineAssembler`, nimmt `direct` und,
+für gespeicherte Läufe, `direct-outline` an. Ein Lauf, den keiner annimmt, scheitert mit „This task was set up for a way of working that no longer exists, so it
 cannot run. Please start it again.“
 
 ## MCP-Werkzeuge
@@ -115,9 +111,9 @@ Faktenprüfung. Getestete Regeln (`tests/…/Web/HowItWorks`):
   hat;
 - abgemeldet zeigt die Seite die Werte für alle; die Tabelle mit Einstellungsnamen und Rohwerten erscheint nur für Administratoren
   und zeigt nie eine Ausnahme;
-- Recherche gilt nur zusammen mit `Orders:IntakeMode = On` als verfügbar, und nur für den Standardweg: Die Aufstellungen haben keine
-  eigene Grounding-Quelle, der einzige Webzugang ist `OrderResearchService`, der jeden Auftrag ablehnt, der nicht
-  `OrderMode.Direct` ist. „Extra careful“ sucht nicht im Web;
+- Recherche gilt nur zusammen mit `Orders:IntakeMode = On` als verfügbar: Die Aufstellung hat keine eigene Grounding-Quelle, der
+  einzige Webzugang ist `OrderResearchService`, und er sucht nur für einen Auftrag, in dessen Verlauf der Rückfragen steht, dass die
+  Recherche beim Lesen der Anfrage für die Person eingeschaltet war;
 - Suchthemen prüft `ResearchQueryGate` zweimal: beim Lesen des Auftrags gegen die About-me-Angaben, die der Klärer sah (dort
   zurückgehaltene Themen zählt `IntakeRecord.ResearchWithheld`), und im Lauf gegen die Angaben des Briefings;
 - einen unbekannten Modus der Faktenprüfung beschreibt die Seite als „meldet“, nie als „korrigiert“;

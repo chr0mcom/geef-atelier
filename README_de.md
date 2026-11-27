@@ -51,16 +51,14 @@ Jeder Punkt nennt die Entscheidung, die ihn beschreibt.
   ausgelieferten Einstellung ändert er den Text nicht (D-073).
 - **Ein Ort für jede Version.** Aufträge, Versionen und Exporte (Word, PDF, Markdown) in der Web-App und über MCP (D-070, D-075).
 
-Atelier schreibt jeden Text auf diesem **Standardweg**. „Extra careful“ – ein Aufruf, der zuerst Abschnitte mit Wortbudgets plant,
-danach derselbe Schreiber und dieselben Prüfungen sowie eine Prüfung der ausdrücklichen Vorgaben des Auftrags – gibt es nur hinter
-einem Schalter (`Orders:CarefulOutline`, ausgeliefert `Off`, D-087, D-091). Solange er aus ist, zeigt die Web-App die Option nicht,
-und `submit_order` lehnt sie ab.
+Atelier schreibt jeden Text auf diesem **Standardweg**, auch lange. Einen zweiten, langsameren Weg gibt es nicht: Die Variante
+„Extra careful“ wurde gegen den Standardweg gemessen und entfernt (zweiter Zusatz zu D-087).
 
 Grenzen: Der Text kann trotzdem falsch sein; der Faktenprüfer kann etwas übersehen und meldet auch harmlose Sätze (D-075); Atelier
 ist kein Chat; es lernt nicht aus früheren Texten (die Lernschleife wurde entfernt, D-091; von einem Gedächtnis ist nur About me
 mit „Tell Atelier once“ gebaut, D-083); Scans ohne Text kann es nicht lesen (D-076). Atelier kann im Web nachschlagen, bei
 Aufträgen ohne Dateien und nur mit kurzen Themen aus dem Auftrag; gefundene Stellen können trotzdem falsch sein und stehen mit
-ihrer Seite da (D-074, nach bestandener Messung für alle eingeschaltet). „Extra careful“ sucht nie. Einen fertigen Text kann man
+ihrer Seite da (D-074, nach bestandener Messung für alle eingeschaltet). Einen fertigen Text kann man
 ändern („Change something“, D-078).
 
 ## Weiterlesen
@@ -184,16 +182,17 @@ Verträge: [docs/04-mcp-integration_de.md](docs/04-mcp-integration_de.md), [docs
 
 Die Einstellungen stehen in `src/Geef.Atelier.Web/appsettings.json` und lassen sich durch Umgebungsvariablen des Webdienstes
 überschreiben (`__` statt `:`). Die Schalter, die ändern, was eine Person tun kann (Fragen, Text ändern, Nachschlagen,
-Faktenprüfung, Upload-Ticket, „Extra careful“, „Tell Atelier once“, die MCP-Erweiterungen, das Menü Workshop), stehen mit ihren
+Faktenprüfung, Upload-Ticket, „Tell Atelier once“, die MCP-Erweiterungen, das Menü Workshop), stehen mit ihren
 Standardwerten im [Leitfaden für die Administration](docs/14-admin-guide_de.md#funktionen-schalten). Das Nachschlagen nutzt
 `Tavily:Endpoint` und `Tavily:ApiKey`; seine Grenzen stehen im Abschnitt `Research`. Die Einstellungen der entfernten Funktionen
 (`Mcp:LegacyTools`, `Orders:LegacySubmitDefaultMode`, `Convergence:BestDraft`, `Convergence:WriterBlockingOnly`,
-`Convergence:StopWithoutProgress`, `Learning:*`, `Knowledge:*`, `Embeddings:*`, `Finalizer:*`) gibt es nicht mehr (D-091).
+`Convergence:StopWithoutProgress`, `Learning:*`, `Knowledge:*`, `Embeddings:*`, `Finalizer:*`) gibt es nicht mehr (D-091), ebenso
+wenig `Orders:CarefulOutline` und `Orders:CarefulOutlineOverrides` (zweiter Zusatz zu D-087).
 
 ### Wie ein Text entsteht: Aufstellungen und Modelle
 
-Es gibt zwei Aufstellungen, beide nur im Code definiert: `direct` (Schreiber, Prüfungen ohne Modell, Faktenprüfung, höchstens eine
-Korrektur) und `direct-outline` („Extra careful“). Das Modell jeder Rolle kommt beim Start eines Laufs aus der Modellmatrix und dem
+Es gibt eine Aufstellung, nur im Code definiert: `direct` (Schreiber, Prüfungen ohne Modell, Faktenprüfung, höchstens eine
+Korrektur). Das Modell jeder Rolle kommt beim Start eines Laufs aus der Modellmatrix und dem
 Live-Modellkatalog (D-066): Claude läuft über `claude-cli`, OpenAI über `codex-cli`. Jeder Lauf speichert einen **Snapshot** seiner
 Aufstellung und seiner Modelle. Administratoren verwalten die Anbieter unter `/crew/providers`; im Menü „Workshop“, das nur die
 Administration sieht, solange `Ui:WorkshopForAdminsOnly` an ist (ausgeliefert), stehen „Runs“ und „Providers“. Teams,
@@ -385,8 +384,8 @@ Die Liste hält fest, wie das Projekt gewachsen ist. Sie bleibt zur Nachvollzieh
 und Auto-Crew, das Tool-System, die Lernschleife, die Vektor-Wissensbasis mit Embeddings, die alten Grounding-Quellen,
 Abschlussschritte und Run-Artefakte, Advisor, Spezialisierungs-Packs, die ältere Prüfschleife mit ihren Vorlagen und
 Schutzschaltern, die Werkstatt mit ihren Editoren und dem Dashboard, der Live-Hub des Dashboards, das Formular `/new` und die
-älteren MCP-Werkzeuge (fünf bleiben für eine Version als Stummel). Der Standardweg bleibt; „Extra careful“ bleibt hinter
-`Orders:CarefulOutline`. Keine Tabelle oder Spalte wurde gelöscht: Alte Aufträge und Läufe bleiben lesbar, und ein Lauf mit einer
+älteren MCP-Werkzeuge (fünf bleiben für eine Version als Stummel). Der Standardweg bleibt; „Extra careful“ wurde nach seiner
+Messung ebenfalls entfernt (zweiter Zusatz zu D-087). Keine Tabelle oder Spalte wurde gelöscht: Alte Aufträge und Läufe bleiben lesbar, und ein Lauf mit einer
 entfernten Aufstellung scheitert mit einem klaren Satz, statt zu laufen. Die früheren Einträge oben beschreiben, was zu ihrer Zeit
 gebaut wurde.
 

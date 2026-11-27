@@ -2,7 +2,7 @@
 
 *[Deutsch](13-ai-assistant-guide_de.md) · **English***
 
-*Last updated: 2026-11-27 (D-091: stage 8d, older tools removed, five stubs for one version, `extraCareful` only where offered; before that web search switched on for everyone, addendum to D-074; `profile` saves four About me details, D-083)*
+*Last updated: 2026-11-27 (`extraCareful` removed, second addendum to D-087; D-091: stage 8d, older tools removed, five stubs for one version; before that web search switched on for everyone, addendum to D-074; `profile` saves four About me details, D-083)*
 
 This guide is for people who want to use Atelier from an AI assistant such as Claude Code.
 Assistants connect through **MCP** (Model Context Protocol), a common way for assistants to use outside tools. The technical
@@ -74,7 +74,7 @@ table with the tool catalogue of the server, so it cannot silently go out of dat
 | Tool | What it is for |
 |---|---|
 | `prepare_attachment` | Prepares the upload of one file: a one-time upload command (valid 15 minutes) and an upload page (24 hours, after signing in). Only while `Uploads:Tickets` is `On`. |
-| `submit_order` | Places an order with the person's request word for word and optional `uploadIds`; `extraCareful` only where "Extra careful" is offered. |
+| `submit_order` | Places an order with the person's request word for word and optional `uploadIds`. |
 | `answer_order` | Sends the answers to the questions (or `skip=true`). |
 | `get_order_status` | Waits up to 50 seconds for a change; `done` says when the result is ready. |
 | `get_order_result` | The text with `checks`, open points, assumptions and, if research ran, `lookedUp`. |
@@ -92,16 +92,8 @@ as stubs, because clients keep tool lists cached: `submit_request`, `submit_auto
 `get_run_result` and `get_run_details`. All their parameters are optional, their description starts with "Removed: use … instead.",
 and every call fails with an error that names the successor (`submit_order`, `get_order_status`, `get_order_result`). All other
 old tool names are gone. Orders from earlier versions stay available through `list_orders` and `get_order_result`.
-
-## Extra careful
-
-"Extra careful" is offered only where the server setting `Orders:CarefulOutline` is `On`, for everyone or for single people
-(shipped `Off`). Then `submit_order` with `extraCareful=true` first plans the text in sections with word budgets, writes along the
-plan with the same checks as usual and checks after the first version whether every explicit requirement of the request is met
-(otherwise one correction). It can take up to about 10 minutes and never searches the web. While it is offered to nobody,
-`submit_order` does not list the parameter `extraCareful` at all. Because the tool list is the same for everyone, it lists it as
-soon as it is offered to anybody. A call with `extraCareful=true` for a person it is not offered to is refused with "Extra careful
-is not available. Please send the order without it." Such an order never silently runs as something else.
+`submit_order` no longer has the parameter `extraCareful` (second addendum to D-087); a client with a cached older tool list that
+still sends it gets the standard way.
 
 ## Files
 
@@ -136,7 +128,6 @@ is not available. Please send the order without it." Such an order never silentl
   translated or reworded detail can slip through. `lookedUp.searchWords` lists the words that went out (only for the person's
   own order, also without a text). `revise_order` does not search again.
   When the daily limit is reached, the text is written without it and `lookedUp` says so; the order does not fail.
-- `submit_order` with `extraCareful` never searches the web.
 
 ## Limits
 

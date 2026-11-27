@@ -2,11 +2,11 @@
 
 *[Deutsch](02-architecture_de.md) · **English***
 
-*Last updated: 2026-11-27 (D-091: stage 8d, document brought to the current state: only the direct path runs, the removed parts are gone from the description; before that 2026-11-26: pointer to the switches of the order features and the page `/how-it-works`; 2026-11-24, D-067: run warnings, `Runs.Outcome`, fail-loud start and snapshot handling, preparation timeout, in-process live updates, end-to-end tests; 2026-11-22, D-066: model matrix; 2026-08-04, D-064: model catalog for CLI providers)*
+*Last updated: 2026-11-27 (second addendum to D-087: "Extra careful" removed, one setup; D-091: stage 8d, document brought to the current state: only the direct path runs, the removed parts are gone from the description; before that 2026-11-26: pointer to the switches of the order features and the page `/how-it-works`; 2026-11-24, D-067: run warnings, `Runs.Outcome`, fail-loud start and snapshot handling, preparation timeout, in-process live updates, end-to-end tests; 2026-11-22, D-066: model matrix; 2026-08-04, D-064: model catalog for CLI providers)*
 
 Atelier turns a person's request and files into a finished text. The unit the person sees is the **order**; **runs** are the
 technical record underneath (one run per version of an order). Since stage 8d (D-091) there is **one way of working, the direct
-path**, with an optional variant "Extra careful". The earlier ways (the crew review loop, composed teams, the learning loop, the
+path**. The earlier ways (the crew review loop, composed teams, the learning loop, the
 agentic tool path, the vector knowledge base, advisors, specialization packs, finishing steps and the workshop editors) have been
 removed from the code; the git history and the [decisions log](05-decisions-log.md) keep their descriptions.
 
@@ -96,16 +96,11 @@ of the shown version (`Runs.SeedDraftText`, `Runs.ParentRunId`) and carries the 
 
 ## The direct path pipeline
 
-Two setups exist, both only in code (`SystemCrew`):
-
-| Setup | When | Writer and checks |
-|---|---|---|
-| `direct` | every order in mode `Direct` | writer, automatic checks without a model (`DeterministicChecksReviewer`), fact check (`SourceFactCheckReviewer`); at most two passes, that is at most one correction |
-| `direct-outline` | every order in mode `Careful` ("Extra careful", D-087) | as above, preceded by one planning call (`WritingPlanner`: sections with word budgets), plus the request check of the explicit requirements (`RequirementsCheckReviewer`) after the first version |
-
-`Careful` is accepted only while "Extra careful" is offered to the person (`Orders:CarefulOutline`, default `Off`,
-exceptions in `Orders:CarefulOutlineOverrides`). An order accepted as careful always runs as `direct-outline`, never
-silently as something else.
+One setup exists, only in code (`SystemCrew`): `direct` — writer, automatic checks without a model (`DeterministicChecksReviewer`)
+and fact check (`SourceFactCheckReviewer`); at most two passes, that is at most one correction. Every new run of every order uses
+it, whatever the stored mode of the order. Orders stored with the mode `Careful` and runs with the removed template
+`direct-outline` still belong to the direct path (second addendum to D-087): they are read, continued and changed there; if a
+stored `direct-outline` run is executed, its extra check `requirements-check` is left out.
 
 `IPipelineAssembler` has a single production assembler, `DirectPipelineAssembler`; `PipelineAssemblerSelector` refuses any
 run no assembler accepts (see [Old data](#old-data-runs-of-removed-ways-of-working)). `AtelierPipelineFactory` builds the
@@ -159,8 +154,7 @@ snapshots still carry an (empty) `advisors` list.
 - "Resume" is refused for such a run ("This task was set up for a way of working that no longer exists, so it cannot be
   continued. Please start it again.").
 - A snapshot that names a check this version no longer has fails the run with a plain sentence as well.
-- Starting an old "Extra careful" order again while the option is not offered fills in the request without it, says so, and
-  runs nothing until the person sends it.
+- A waiting order stored with the mode `Careful` is not an old way in this sense: it runs on the direct path.
 - Crash recovery and cleanup treat old runs like any other. `RunKind` keeps the values `Learning` and `CrewComposition` so
   that old rows can be read.
 
@@ -212,7 +206,7 @@ columns, the compose files still use a Postgres image with `pgvector`.
 | CachedInputTokens, ReasoningTokens | int | nullable; subsets of the tokens |
 | CancellationRequested | bool | set when the user wants to cancel |
 | CreatedByUser | text | nullable; owner (run isolation, D-042) |
-| CrewTemplateName | varchar(200) | nullable; setup name (`direct`, `direct-outline`, or a removed one on old runs) |
+| CrewTemplateName | varchar(200) | nullable; setup name (`direct`, or a removed one on old runs, for example `direct-outline`) |
 | CrewSnapshot | jsonb | nullable; the snapshot of the setup |
 | Kind | int | `0 = Standard`; `1 = Learning` and `2 = CrewComposition` exist only on old rows |
 | ParentRunId | uuid | nullable; the run this one resumes or changes |
@@ -334,7 +328,7 @@ Settings come from `appsettings.json` and environment variables (`__` instead of
 | `Orchestrator` | polling, parallel runs, cancellation polling, preparation timeout |
 | `Convergence` | defaults of the convergence policy |
 | `Sources`, `Uploads` | limits and retention of files; upload tickets |
-| `Orders` | request limits and waits, questions (`IntakeMode`), "Extra careful" (`CarefulOutline`), changing a text (`Revise`), `TellOnce` |
+| `Orders` | request limits and waits, questions (`IntakeMode`), changing a text (`Revise`), `TellOnce` |
 | `Intake` | the clarifier and its questions |
 | `Direct` | writer notes, arithmetic of totals in files, fact check |
 | `Research`, `Tavily` | web research and its limits; `Tavily:Endpoint` and `Tavily:ApiKey` |
@@ -398,7 +392,7 @@ cli-proxy) are described in [`ops/atelier-smoke.md`](ops/atelier-smoke.md) and [
 
 | Route | Function |
 |---|---|
-| `/start` | New order: request, files with receipts, "Extra careful" only when offered |
+| `/start` | New order: request, files with receipts |
 | `/work`, `/orders` | "My work": the person's orders |
 | `/orders/{id}` | Order page: questions, progress, text, open points, versions, changes, export |
 | `/about-me` | "About me" (the profile used in texts) |

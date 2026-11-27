@@ -4,7 +4,7 @@
 
 *Last updated: 2026-11-27 (D-085: older review loop, three safeguard switches, shipped off; before that 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
-*Last updated: 2026-11-27 (D-091: cleanup, cut 2, only the standard way remains; before that D-090: gateway failover to the same model only; D-087: “Extra careful” with an outline behind a switch, loop switches per account, measurement prepared; before that D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-27 (second addendum to D-087: "Extra careful" goes; D-091: cleanup, cut 2, only the standard way remains; before that D-090: gateway failover to the same model only; D-087: “Extra careful” with an outline behind a switch, loop switches per account, measurement prepared; before that D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -3541,6 +3541,28 @@ of the request it did not meet. The repair is general, not cut to particular tas
   measured with the same criteria against the stored texts of the direct path. Without a win the checkbox goes and long texts run on the
   direct path.
 
+**Second addendum to D-087 – measurement decided, "Extra careful" goes (2026-11-27).** The measurement fixed in advance is decided:
+the repaired variant (the outline way `direct-outline` with its request check) did not win clearly enough either. As fixed in advance,
+the checkbox goes, and long texts run on the direct path.
+- **Removed** is what only existed for it: the switch `Orders:CarefulOutline` with `CarefulOutlineOverrides`, the template
+  `direct-outline`, the outline step, the request check `requirements-check` and their warning codes, the checkbox on `/start`, the
+  label in "My work" and on the order page, the paragraphs of the explanation page and `extraCareful` in `submit_order` (schema,
+  description, skill, state of the form question). The three loop switches of D-085 and their overrides had already gone with the
+  older review loop (D-091).
+- **No migration, no `DROP`.** The value `OrderMode.Careful` and the columns stay; new orders are always `Direct`. Cleaning the
+  database is a separate, later step.
+- **Stored orders in the mode careful** stay readable and exportable. "Change something" and `revise_order` write the new version on
+  the direct path. One that is still waiting runs like a standard order, also while the request is read and for the file that is to be
+  revised. Whether the web may be searched is still decided by the record of the questions: a request already read as a careful order
+  is never looked up.
+- **Stored runs with `direct-outline`** still belong to the direct path: readable, resumable, changeable. If such a run is still
+  executed, the assembly leaves its extra check out; there is no planning call. The technical run page shows the setup under its
+  former name.
+- **Clients with a cached older tool list** that still send `extraCareful` get the direct path; the unknown value is ignored.
+- **Evidence:** end-to-end tests for a finished careful order with `direct-outline` (lists, pages, both exports, `revise_order`), a
+  pending and a continued run of that template, a careful order waiting for answers and a call with `extraCareful`.
+- **Way back:** the previous image; nothing in the database was changed.
+
 ## D-088 — MCP: skill and questions as a form, both behind switches and shipped off (2026-11-27)
 
 **Status:** built and tested (steps 2 and 3 of the review of new MCP capabilities); both switches shipped `Off`; acceptance on the
@@ -3804,13 +3826,8 @@ of the standard way (`submit_order`, `answer_order`, `get_order_status`, `get_or
 registered: every parameter is optional and every call returns a tool error that names `submit_order`, `get_order_status` or
 `get_order_result` (clients keep tool lists cached). They go in the next version.
 
-**"Extra careful".** A careful order runs on the direct path with an outline first (`direct-outline`, D-087) when `Orders:CarefulOutline`
-is `On` for the person (`CarefulOutlineOverrides` per user name); it is shipped `Off`. Otherwise the option does not exist: `/start`
-shows no checkbox, the explanation page does not mention it, `submit_order` leaves `extraCareful` out of its schema while nobody has it,
-and an `extraCareful=true` for a person without it is refused with "Extra careful is not available. Please send the order without
-it." A careful order never runs as something else; "Start again" of an older careful order says that the standard way is used and
-starts nothing on its own. Switching it on or removing it touches the switch, `ResolveOrderSnapshotAsync`, the template in `SystemCrew`
-and the planner — a small diff either way. `scripts/atelier-smoke.sh` uses `submit_order`, `answer_order(skip=true)`,
+**"Extra careful"** goes altogether (second addendum to D-087): only the direct path remains, and stored careful orders are carried on
+there. `scripts/atelier-smoke.sh` uses `submit_order`, `answer_order(skip=true)`,
 `get_order_status` and `get_order_result`.
 
 **Older data.** No `DROP`, no migration, no deleted row: the database stays compatible with the previous image. Removed entities are no

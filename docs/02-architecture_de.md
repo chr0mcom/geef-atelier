@@ -2,11 +2,11 @@
 
 *[English](02-architecture.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-27 (D-091: Etappe 8d, Dokument auf den aktuellen Stand gebracht: Es läuft nur noch der Direktweg, die entfernten Teile stehen nicht mehr in der Beschreibung; zuvor 2026-11-26: Verweis auf die Schalter der Auftragsfunktionen und die Seite `/how-it-works`; 2026-11-24, D-067: Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess, Ende-zu-Ende-Tests; 2026-11-22, D-066: Modellmatrix; 2026-08-04, D-064: Modell-Katalog für CLI-Provider)*
+*Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: „Extra careful“ entfernt, eine Zusammenstellung; D-091: Etappe 8d, Dokument auf den aktuellen Stand gebracht: Es läuft nur noch der Direktweg, die entfernten Teile stehen nicht mehr in der Beschreibung; zuvor 2026-11-26: Verweis auf die Schalter der Auftragsfunktionen und die Seite `/how-it-works`; 2026-11-24, D-067: Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess, Ende-zu-Ende-Tests; 2026-11-22, D-066: Modellmatrix; 2026-08-04, D-064: Modell-Katalog für CLI-Provider)*
 
 Atelier macht aus dem Anliegen und den Dateien einer Person einen fertigen Text. Die Einheit, die die Person sieht, ist der
 **Auftrag**; **Läufe** sind das technische Protokoll darunter (ein Lauf je Version eines Auftrags). Seit Etappe 8d (D-091)
-gibt es **eine Arbeitsweise, den Direktweg**, mit der Variante „Extra careful“. Die früheren Wege (die Prüfschleife mit
+gibt es **eine Arbeitsweise, den Direktweg**. Die früheren Wege (die Prüfschleife mit
 Crews, zusammengestellte Teams, die Learning-Schleife, der agentische Werkzeug-Pfad, die Vektor-Wissensbasis, Advisor,
 Spezialisierungs-Pakete, Abschlussschritte und die Werkstatt-Editoren) sind aus dem Code entfernt; ihre Beschreibungen
 bewahren die Git-Historie und das [Decisions-Log](05-decisions-log_de.md).
@@ -100,16 +100,12 @@ dem Text der gezeigten Version vorbelegt (`Runs.SeedDraftText`, `Runs.ParentRunI
 
 ## Die Pipeline des Direktwegs
 
-Es gibt zwei Zusammenstellungen, beide nur im Code (`SystemCrew`):
-
-| Zusammenstellung | Wann | Schreiber und Prüfungen |
-|---|---|---|
-| `direct` | jeder Auftrag im Modus `Direct` | Schreiber, automatische Prüfungen ohne Modell (`DeterministicChecksReviewer`), Faktenprüfung (`SourceFactCheckReviewer`); höchstens zwei Durchgänge, also höchstens eine Korrektur |
-| `direct-outline` | jeder Auftrag im Modus `Careful` („Extra careful“, D-087) | wie oben, davor ein Planungsaufruf (`WritingPlanner`: Abschnitte mit Wortbudgets), dazu nach der ersten Fassung die Prüfung der ausdrücklichen Anforderungen (`RequirementsCheckReviewer`) |
-
-`Careful` wird nur angenommen, solange „Extra careful“ der Person angeboten wird (`Orders:CarefulOutline`, Standard `Off`,
-Ausnahmen in `Orders:CarefulOutlineOverrides`). Ein als sorgfältig angenommener Auftrag läuft immer als `direct-outline`,
-nie stillschweigend als etwas anderes.
+Es gibt eine Zusammenstellung, nur im Code (`SystemCrew`): `direct` — Schreiber, automatische Prüfungen ohne Modell
+(`DeterministicChecksReviewer`) und Faktenprüfung (`SourceFactCheckReviewer`); höchstens zwei Durchgänge, also höchstens eine
+Korrektur. Jeder neue Lauf jedes Auftrags nutzt sie, gleich welcher Modus am Auftrag gespeichert ist. Aufträge mit dem
+gespeicherten Modus `Careful` und Läufe mit der entfernten Vorlage `direct-outline` gehören weiter zum Direktweg (zweiter Zusatz
+zu D-087): Dort werden sie gelesen, fortgesetzt und geändert; wird ein gespeicherter `direct-outline`-Lauf ausgeführt, entfällt
+seine Zusatzprüfung `requirements-check`.
 
 `IPipelineAssembler` hat genau einen produktiven Assembler, den `DirectPipelineAssembler`; der `PipelineAssemblerSelector`
 weist jeden Lauf ab, den keiner annimmt (siehe [Altdaten](#altdaten-läufe-entfernter-arbeitsweisen)).
@@ -167,8 +163,7 @@ tragen neue Snapshots weiterhin eine (leere) Liste `advisors`.
   cannot be continued. Please start it again.“).
 - Ein Snapshot, der eine Prüfung nennt, die es in dieser Version nicht mehr gibt, lässt den Lauf ebenfalls mit einem
   einfachen Satz fehlschlagen.
-- Wird ein alter „Extra careful“-Auftrag neu gestartet, während die Option nicht angeboten wird, füllt die Startseite das
-  Anliegen ohne sie aus, sagt das, und nichts läuft, bevor die Person es abschickt.
+- Ein wartender Auftrag mit dem gespeicherten Modus `Careful` ist in diesem Sinn kein alter Weg: Er läuft auf dem Direktweg.
 - Crash-Wiederherstellung und Aufräumen behandeln alte Läufe wie alle anderen. `RunKind` behält die Werte `Learning` und
   `CrewComposition`, damit alte Zeilen gelesen werden können.
 
@@ -222,7 +217,7 @@ Compose-Dateien weiterhin ein Postgres-Image mit `pgvector`.
 | CachedInputTokens, ReasoningTokens | int | nullable; Teilmengen der Tokens |
 | CancellationRequested | bool | gesetzt, wenn die Person abbrechen will |
 | CreatedByUser | text | nullable; Eigentümer (Trennung nach Nutzern, D-042) |
-| CrewTemplateName | varchar(200) | nullable; Name der Zusammenstellung (`direct`, `direct-outline` oder bei alten Läufen eine entfernte) |
+| CrewTemplateName | varchar(200) | nullable; Name der Zusammenstellung (`direct` oder bei alten Läufen eine entfernte, zum Beispiel `direct-outline`) |
 | CrewSnapshot | jsonb | nullable; der Snapshot der Zusammenstellung |
 | Kind | int | `0 = Standard`; `1 = Learning` und `2 = CrewComposition` gibt es nur in alten Zeilen |
 | ParentRunId | uuid | nullable; der Lauf, den dieser fortsetzt oder ändert |
@@ -345,7 +340,7 @@ Die Einstellungen kommen aus `appsettings.json` und Umgebungsvariablen (`__` sta
 | `Orchestrator` | Abfrageintervall, parallele Läufe, Abbruchabfrage, Vorbereitungs-Zeitlimit |
 | `Convergence` | Standardwerte der Konvergenzregel |
 | `Sources`, `Uploads` | Grenzen und Aufbewahrung von Dateien; Upload-Tickets |
-| `Orders` | Grenzen und Wartezeiten der Aufträge, Rückfragen (`IntakeMode`), „Extra careful“ (`CarefulOutline`), Text ändern (`Revise`), `TellOnce` |
+| `Orders` | Grenzen und Wartezeiten der Aufträge, Rückfragen (`IntakeMode`), Text ändern (`Revise`), `TellOnce` |
 | `Intake` | der Klärer und seine Fragen |
 | `Direct` | Notizen des Schreibers, Nachrechnen von Summen in Dateien, Faktenprüfung |
 | `Research`, `Tavily` | Web-Recherche und ihre Grenzen; `Tavily:Endpoint` und `Tavily:ApiKey` |
@@ -410,7 +405,7 @@ und ungesundem cli-proxy) sind in [`ops/atelier-smoke.md`](ops/atelier-smoke.md)
 
 | Route | Funktion |
 |---|---|
-| `/start` | Neuer Auftrag: Anliegen, Dateien mit Quittungen, „Extra careful“ nur, wenn angeboten |
+| `/start` | Neuer Auftrag: Anliegen, Dateien mit Quittungen |
 | `/work`, `/orders` | „My work“: die Aufträge der Person |
 | `/orders/{id}` | Auftragsseite: Fragen, Fortschritt, Text, offene Punkte, Versionen, Änderungen, Export |
 | `/about-me` | „About me“ (das Profil, das in Texten verwendet wird) |

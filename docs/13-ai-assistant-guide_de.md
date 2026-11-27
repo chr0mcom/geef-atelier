@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](13-ai-assistant-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-27 (D-091: Stufe 8d, ältere Werkzeuge entfernt, fünf Stummel für eine Version, `extraCareful` nur, wo angeboten; davor Websuche für alle eingeschaltet, Zusatz zu D-074; `profile` speichert vier About-me-Angaben, D-083)*
+*Letzte Aktualisierung: 2026-11-27 (`extraCareful` entfernt, zweiter Zusatz zu D-087; D-091: Stufe 8d, ältere Werkzeuge entfernt, fünf Stummel für eine Version; davor Websuche für alle eingeschaltet, Zusatz zu D-074; `profile` speichert vier About-me-Angaben, D-083)*
 
 Dieser Leitfaden ist für alle, die Atelier aus einem KI-Assistenten wie Claude Code nutzen wollen. Assistenten verbinden sich über **MCP** (Model Context Protocol), einen verbreiteten Weg, auf dem Assistenten
 fremde Werkzeuge benutzen. Den technischen Vertrag jedes Werkzeugs beschreiben [04-mcp-integration_de.md](04-mcp-integration_de.md)
@@ -79,7 +79,7 @@ vergleicht diese Tabelle mit dem Werkzeugkatalog des Servers, sie kann also nich
 | Werkzeug | Wofür |
 |---|---|
 | `prepare_attachment` | Bereitet das Hochladen einer Datei vor: ein einmaliger Upload-Befehl (15 Minuten gültig) und eine Upload-Seite (24 Stunden, nach Anmeldung). Nur solange `Uploads:Tickets` `On` ist. |
-| `submit_order` | Gibt einen Auftrag mit dem Wortlaut der Person auf, optional mit `uploadIds`; `extraCareful` nur, wo „Extra careful“ angeboten wird. |
+| `submit_order` | Gibt einen Auftrag mit dem Wortlaut der Person auf, optional mit `uploadIds`. |
 | `answer_order` | Schickt die Antworten auf die Fragen (oder `skip=true`). |
 | `get_order_status` | Wartet bis zu 50 Sekunden auf eine Änderung; `done` sagt, wann das Ergebnis bereit ist. |
 | `get_order_result` | Der Text mit `checks`, offenen Punkten, Annahmen und, falls recherchiert wurde, `lookedUp`. |
@@ -97,18 +97,8 @@ Namen als Stummel gelistet, weil Clients Werkzeuglisten zwischenspeichern: `subm
 `get_run_status`, `get_run_result` und `get_run_details`. Alle ihre Parameter sind optional, ihre Beschreibung beginnt mit
 „Removed: use … instead.“, und jeder Aufruf scheitert mit einer Fehlermeldung, die den Nachfolger nennt (`submit_order`,
 `get_order_status`, `get_order_result`). Alle anderen alten Werkzeugnamen gibt es nicht mehr. Aufträge aus früheren Versionen
-bleiben über `list_orders` und `get_order_result` erreichbar.
-
-## Extra careful
-
-„Extra careful“ wird nur angeboten, wo die Servereinstellung `Orders:CarefulOutline` `On` ist, für alle oder für einzelne Personen
-(ausgeliefert `Off`). Dann plant `submit_order` mit `extraCareful=true` den Text zuerst in Abschnitten mit Wortbudgets, schreibt
-nach dem Plan mit denselben Prüfungen wie sonst und prüft nach der ersten Fassung, ob jede ausdrückliche Vorgabe des Auftrags
-erfüllt ist (sonst eine Korrektur). Das kann bis etwa 10 Minuten dauern und sucht nie im Web. Solange es niemandem angeboten wird,
-führt `submit_order` den Parameter `extraCareful` gar nicht auf. Weil die Werkzeugliste für alle dieselbe ist, führt sie ihn auf,
-sobald es irgendjemandem angeboten wird. Ein Aufruf mit `extraCareful=true` für eine Person, der es nicht angeboten wird, wird
-abgelehnt mit „Extra careful is not available. Please send the order without it.“ Ein solcher Auftrag läuft nie stillschweigend
-als etwas anderes.
+bleiben über `list_orders` und `get_order_result` erreichbar. Den Parameter `extraCareful` hat `submit_order` nicht mehr (zweiter
+Zusatz zu D-087); sendet ein Client mit gespeicherter alter Werkzeugliste ihn noch, bekommt er den Standardweg.
 
 ## Dateien
 
@@ -145,7 +135,6 @@ als etwas anderes.
   eigenen Auftrag, auch ohne Text).
   `revise_order` sucht nicht neu. Ist die Tagesgrenze erreicht, wird der Text ohne Nachschlagen geschrieben, und `lookedUp` sagt
   es; der Auftrag scheitert nicht.
-- `submit_order` mit `extraCareful` sucht nie im Web.
 
 ## Grenzen
 

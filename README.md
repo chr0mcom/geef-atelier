@@ -49,15 +49,14 @@ Each point names the decision that describes it.
   change the text (D-073).
 - **One place for every version.** Orders, versions and exports (Word, PDF, Markdown) in the web app and over MCP (D-070, D-075).
 
-Atelier writes every text on this **standard way**. "Extra careful" – one call that first plans sections with word budgets, then the
-same writer and checks plus a check of the explicit requirements of the request – exists only behind a switch
-(`Orders:CarefulOutline`, shipped `Off`, D-087, D-091). While it is off, the web app does not show it and `submit_order` refuses it.
+Atelier writes every text on this **standard way**, long ones too. There is no second, slower way: the variant "Extra careful" was
+measured against the standard way and removed (second addendum to D-087).
 
 Limits: the text can still be wrong; the fact check can miss things and also flags harmless sentences (D-075); Atelier is not a
 chat; it does not learn from earlier texts (the learning loop was removed, D-091; of a memory only About me with "Tell Atelier
 once" is built, D-083); scans without text cannot be read (D-076). Atelier may look things up on the web, for orders without files
 and only with short topics from the request; passages it found can still be wrong and are shown with their page (D-074, switched
-on for everyone after its measurement passed). "Extra careful" never searches. A finished text can be changed ("Change
+on for everyone after its measurement passed). A finished text can be changed ("Change
 something", D-078).
 
 ## Read on
@@ -181,16 +180,16 @@ there is checked against the server by a test); contracts: [docs/04-mcp-integrat
 
 Settings live in `src/Geef.Atelier.Web/appsettings.json` and can be overridden by environment variables of the web service (`__` in
 place of `:`). The switches that change what a person can do (questions, changing a text, looking things up, fact check, upload
-ticket, "Extra careful", "Tell Atelier once", the MCP extensions, the workshop menu) are listed with their defaults in the
+ticket, "Tell Atelier once", the MCP extensions, the workshop menu) are listed with their defaults in the
 [guide for administrators](docs/14-admin-guide.md#switching-features). Looking things up uses `Tavily:Endpoint` and
 `Tavily:ApiKey`; its limits are in the `Research` section. The settings of the removed features (`Mcp:LegacyTools`,
 `Orders:LegacySubmitDefaultMode`, `Convergence:BestDraft`, `Convergence:WriterBlockingOnly`,
-`Convergence:StopWithoutProgress`, `Learning:*`, `Knowledge:*`, `Embeddings:*`, `Finalizer:*`) no longer exist (D-091).
+`Convergence:StopWithoutProgress`, `Learning:*`, `Knowledge:*`, `Embeddings:*`, `Finalizer:*`) no longer exist (D-091), and neither do
+`Orders:CarefulOutline` and `Orders:CarefulOutlineOverrides` (second addendum to D-087).
 
 ### How a text is written: setups and models
 
-There are two setups, both defined only in code: `direct` (writer, checks without a model, fact check, at most one correction) and
-`direct-outline` ("Extra careful"). The model of each role comes from the model matrix and the live model catalog at the start of a
+There is one setup, defined only in code: `direct` (writer, checks without a model, fact check, at most one correction). The model of each role comes from the model matrix and the live model catalog at the start of a
 run (D-066): Claude runs through `claude-cli`, OpenAI through `codex-cli`. Every run stores a **snapshot** of its setup and models.
 Administrators manage providers under `/crew/providers`; in the menu "Workshop", which only administrators see while
 `Ui:WorkshopForAdminsOnly` is on (shipped), you find "Runs" and "Providers". Teams, profile editors and the older review loop were
@@ -381,7 +380,7 @@ The list below records how the project grew. It is kept for provenance; the curr
 the tool system, the learning loop, the vector knowledge base with embeddings, the old grounding sources, finishing steps and run
 artifacts, advisors, specialization packs, the old review loop with its templates and safeguard switches, the workshop with its
 editors and dashboard, the live dashboard hub, the form `/new` and the older MCP tools (five stay as stubs for one version). The
-standard way remains; "Extra careful" stays behind `Orders:CarefulOutline`. No table or column was dropped: old orders and runs
+standard way remains; "Extra careful" was removed as well after its measurement (second addendum to D-087). No table or column was dropped: old orders and runs
 stay readable, and a run of a removed setup fails with a plain sentence instead of running. Earlier entries above describe what
 was built at their time.
 
