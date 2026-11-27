@@ -24,7 +24,7 @@ internal static class OrderAnswerRules
             var id = raw.QuestionId.Trim();
             if (given.ContainsKey(id))
                 throw new OrderAnswerException($"The question \"{id}\" was answered more than once.");
-            if (raw.Origin is not (AnswerOrigin.User or AnswerOrigin.Client))
+            if (raw.Origin is not (AnswerOrigin.User or AnswerOrigin.Client or AnswerOrigin.Form))
                 throw new OrderAnswerException($"The answer to \"{id}\" needs the origin \"user\" or \"client\".");
 
             var answer = raw with
@@ -42,7 +42,9 @@ internal static class OrderAnswerRules
             given[id] = answer;
         }
 
-        var origin = given.Count > 0 && given.Values.All(a => a.Origin == AnswerOrigin.Client) ? AnswerOrigin.Client : AnswerOrigin.User;
+        var origin = given.Count > 0 && given.Values.All(a => a.Origin == AnswerOrigin.Client) ? AnswerOrigin.Client
+            : given.Count > 0 && given.Values.All(a => a.Origin == AnswerOrigin.Form) ? AnswerOrigin.Form
+            : AnswerOrigin.User;
         var result = questions
             .Select(q => given.TryGetValue(q.Id, out var answer) ? answer : new OrderAnswer(q.Id, null, null, true, origin))
             .ToList();

@@ -2,9 +2,12 @@ using System.Reflection;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Infrastructure.Orders;
+using Geef.Atelier.Mcp.Forms;
 using Geef.Atelier.Mcp.Tools;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.AspNetCore;
 using ModelContextProtocol.Protocol;
@@ -22,8 +25,9 @@ public static class McpServiceExtensions
     /// <c>Orders:MaxWaitSeconds</c>, the same value that limits the wait. Trace lines of the SDK, which hold whole messages with upload
     /// tokens and file content, are never written (<see cref="McpMessageLogGuard"/>). The transport is stateless on purpose
     /// (<see cref="HttpServerSessionMode.Stateless"/>): every request stands alone, for clients of the 2026-07-28 revision as for older ones.
-    /// While <c>Mcp:Skills</c> is <c>On</c> the server also offers <see cref="AtelierSkill"/>; it is off by default, and then tool list,
-    /// instructions and capabilities are the same as without it (D-088).
+    /// While <c>Mcp:Skills</c> is <c>On</c> the server also offers <see cref="AtelierSkill"/>; while <c>Mcp:Elicitation</c> is <c>On</c>,
+    /// <c>submit_order</c> may ask its questions as a form of the client (<see cref="IMcpOrderForms"/>). Both are off by default, and then tool list,
+    /// instructions and capabilities are the same as without them (D-088).
     /// </summary>
     public static IServiceCollection AddAtelierMcp(this IServiceCollection services)
     {
@@ -62,6 +66,11 @@ public static class McpServiceExtensions
             services.AddSingleton(sp => new TicketMcpTool(method.CreateTool(sp)));
         foreach (var method in McpToolCatalog.LegacyTools.ToolMethods())
             services.AddSingleton(sp => new LegacyMcpTool(method.CreateTool(sp)));
+
+        services.AddDataProtection();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<IOrderFormStates, OrderFormStates>();
+        services.AddScoped<IMcpOrderForms, McpOrderForms>();
 
         services.AddHostedService<McpToolBindingCheck>();
         services.AddMcpMessageLogGuard();

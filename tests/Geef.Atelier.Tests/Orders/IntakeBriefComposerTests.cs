@@ -154,6 +154,27 @@ public sealed class IntakeBriefComposerTests
     }
 
     [Fact]
+    public void Answers_from_the_form_of_the_mcp_client_are_written_and_read_back_as_answers_of_the_person()
+    {
+        IReadOnlyList<OrderAnswer> fromPerson =
+        [
+            new("length", "short", null, false, AnswerOrigin.User),
+            new("q1", "o2", "Bitte mit Grill", false, AnswerOrigin.User),
+            new("q2", null, null, true, AnswerOrigin.User),
+        ];
+        var fromForm = fromPerson.Select(a => a with { Origin = AnswerOrigin.Form }).ToList();
+
+        var person = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), fromPerson, null, AssumptionsShown: true));
+        var form = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), fromForm, null, AssumptionsShown: true));
+
+        Assert.Equal(person.Text, form.Text);
+        Assert.DoesNotContain(IntakeBriefComposer.ByAssistant, form.Text, StringComparison.Ordinal);
+        var parts = BriefingSections.Parse(form.Text);
+        Assert.Contains("Wer kommt? → Ganzes Team – \"Bitte mit Grill\"", parts.PersonAnswers);
+        Assert.Empty(parts.AssistantAnswers);
+    }
+
+    [Fact]
     public void Answers_without_a_matching_question_and_a_revision_answer_without_a_guess_are_not_listed()
     {
         IReadOnlyList<OrderAnswer> answers = [new("q9", "o1", null, false, AnswerOrigin.User), new("revision", "no", null, false, AnswerOrigin.User)];

@@ -34,11 +34,28 @@ internal static class OrderDtoMappings
         new(assumption.Id, assumption.Text, assumption.Confidence == AssumptionConfidence.Unsure);
 
     public static OrderSubmittedDto ToDto(this OrderSubmission submission, IReadOnlyList<SourceReceipt> receipts) =>
-        Submitted(submission.OrderId, submission.State, submission.RunId, submission.Clarification, submission.Notices, receipts);
+        Submitted(submission.OrderId, submission.State, submission.RunId, submission.Clarification, submission.Notices, Sources(receipts));
 
     /// <summary>The answer of <c>submit_order</c> after it waited for the intake: built from the current order view.</summary>
     public static OrderSubmittedDto ToSubmittedDto(this OrderView view, IReadOnlyList<string> notices, IReadOnlyList<SourceReceipt> receipts) =>
-        Submitted(view.OrderId, view.Display.State, view.CurrentRun?.RunId, view.Clarification, notices, receipts);
+        Submitted(view.OrderId, view.Display.State, view.CurrentRun?.RunId, view.Clarification, notices, Sources(receipts));
+
+    /// <summary>
+    /// The answer of <c>submit_order</c> when it comes back with the answers of its form (D-088): built from the order after the answers,
+    /// with the receipts and notices of the first call, which the client has not seen yet.
+    /// </summary>
+    public static OrderSubmittedDto ToSubmittedDto(this OrderSubmission submission, IReadOnlyList<string> notices, IReadOnlyList<OrderSourceDto> sources) =>
+        Submitted(submission.OrderId, submission.State, submission.RunId, submission.Clarification, [.. notices, .. submission.Notices], sources);
+
+    /// <summary>
+    /// The answer of <c>submit_order</c> when the answers of its form were not used (D-088): the order as it is now, with the receipts and notices
+    /// of the first call and <paramref name="lead"/> before the hint of what to do next, if one is given.
+    /// </summary>
+    public static OrderSubmittedDto ToSubmittedDto(this OrderView view, IReadOnlyList<string> notices, IReadOnlyList<OrderSourceDto> sources, string? lead)
+    {
+        var dto = Submitted(view.OrderId, view.Display.State, view.CurrentRun?.RunId, view.Clarification, notices, sources);
+        return lead is null ? dto : dto with { Message = lead + " " + dto.Message };
+    }
 
     public static OrderStatusDto ToStatusDto(this OrderView view)
     {
@@ -288,13 +305,15 @@ internal static class OrderDtoMappings
         $"Before writing, Atelier has {questions}. Ask the person in your own words, show the answer options, and say that skipping is fine. " +
         "Then call answer_order with their answers (origin \"user\"), or with skip=true.";
 
+    private static IReadOnlyList<OrderSourceDto> Sources(IReadOnlyList<SourceReceipt> receipts) => receipts.Select(r => r.ToDto()).ToList();
+
     private static OrderSubmittedDto Submitted(
         Guid orderId,
         OrderDisplayState state,
         Guid? runId,
         ClarificationView? clarification,
         IReadOnlyList<string> notices,
-        IReadOnlyList<SourceReceipt> receipts)
+        IReadOnlyList<OrderSourceDto> sources)
     {
         var needsInput = state == OrderDisplayState.NeedsInput;
         var questions = needsInput ? Questions(clarification) : null;
@@ -303,7 +322,7 @@ internal static class OrderDtoMappings
             state.ToWire(),
             needsInput ? null : runId?.ToString(),
             WithNotices(SubmissionMessage(state, questions?.Count ?? 0), notices),
-            receipts.Select(r => r.ToDto()).ToList(),
+            sources,
             clarification?.Understanding,
             clarification?.Assumptions.Select(a => a.ToDto()).ToList(),
             questions,
