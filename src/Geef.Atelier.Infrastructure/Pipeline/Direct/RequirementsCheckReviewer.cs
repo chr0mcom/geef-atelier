@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
@@ -16,14 +17,39 @@ using FindingSeverity = Geef.Sdk.Results.FindingSeverity;
 
 namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 
-/// <summary>One explicit requirement of the request as the check read it: its words from the request, whether the text meets it, what is missing.</summary>
-internal sealed record RequirementVerdict(string Quote, string Status, string? Problem);
+/// <summary>One explicit requirement as the check read it: its words from the person's own words and whether the text meets it.</summary>
+internal sealed record RequirementVerdict(string Quote, string Status);
+
+/// <summary>
+/// The person's own words, the only input of the check and the only source of its quotes: the request as written, the person's own answers
+/// (not those an AI assistant gave for them, without the question) and the changes the person asked for. Never assumptions, the profile,
+/// headings of the composer or files.
+/// </summary>
+internal sealed record OwnWords(string Request, IReadOnlyList<string> Answers, IReadOnlyList<string> Changes)
+{
+    /// <summary>The own words of <paramref name="briefing"/>, read back like the material of the fact check (<see cref="BriefingSections.Parse"/>).</summary>
+    public static OwnWords From(string briefing)
+    {
+        var parts = BriefingSections.Parse(briefing ?? string.Empty);
+        var answers = parts.PersonAnswers
+            .Select(a => a.IndexOf(" → ", StringComparison.Ordinal) is var arrow and >= 0 ? a[(arrow + 3)..] : a)
+            .Select(a => a.Trim())
+            .Where(a => a.Length > 0)
+            .ToList();
+        return new OwnWords(parts.Request.Trim(), answers, parts.Changes.Select(c => c.Words.Trim()).Where(c => c.Length > 0).ToList());
+    }
+
+    /// <summary>All parts, each on its own, so that a quote never spans two of them.</summary>
+    public IEnumerable<string> Parts => new[] { Request }.Concat(Answers).Concat(Changes);
+}
 
 /// <summary>
 /// Check of "Extra careful" with an outline (D-087, repair after the measurement): after the <b>first</b> version one call of another model
-/// than the writer lists every explicit requirement of the request word for word and says whether the text meets it. Only a requirement
-/// whose words stand in the request (compared without case and white space) and that is marked <see cref="NotMet"/> becomes a blocking
-/// finding, so that the one correction of the direct path fixes it; at most <see cref="MaxFindings"/>. The length is left out (the checks
+/// than the writer gets only the person's own words (<see cref="OwnWords"/>) and the text, lists every explicit requirement word for word
+/// and says whether the text meets it. Only a requirement marked <see cref="NotMet"/> whose quote has at least <see cref="MinQuoteWords"/>
+/// words or <see cref="MinQuoteChars"/> characters and stands in one of the own words at word boundaries (compared without case and white
+/// space) becomes a blocking finding, at most <see cref="MaxFindings"/>. Its message and the correction are a fixed sentence with that
+/// verified quote (<see cref="Problem"/>); nothing the check wrote in its own words reaches the writer, the report or the page. The length is left out (the checks
 /// without a model cover it). Later passes are not checked again (cost cap); a call that fails is not repeated, the reviewer is then
 /// isolated as failed (never blocking) and the run gets the warning <see cref="UncheckedWarning"/>. No failover (another model would
 /// change the measured path).
@@ -45,7 +71,8 @@ internal sealed class RequirementsCheckReviewer(
     public const string Unclear = "unclear";
     public const int MaxFindings = 10;
     public const int MaxQuoteChars = 300;
-    public const int MaxProblemChars = 300;
+    public const int MinQuoteWords = 3;
+    public const int MinQuoteChars = 12;
 
     /// <summary>Hard limit of the one call.</summary>
     public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(120);
@@ -71,11 +98,10 @@ internal sealed class RequirementsCheckReviewer(
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["quote", "status", "problem"],
+                "required": ["quote", "status"],
                 "properties": {
                   "quote": { "type": "string" },
-                  "status": { "type": "string", "enum": ["met", "not_met", "unclear"] },
-                  "problem": { "type": ["string", "null"] }
+                  "status": { "type": "string", "enum": ["met", "not_met", "unclear"] }
                 }
               }
             }
@@ -96,25 +122,40 @@ internal sealed class RequirementsCheckReviewer(
     /// <inheritdoc/>
     public int Priority => 0;
 
-    /// <summary>The user prompt: the request, the text and what to list; nothing about any particular kind of text.</summary>
-    public static string UserPrompt(string brief, string draft)
+    /// <summary>The user prompt: the person's own words, the text and what to list; nothing about any particular kind of text.</summary>
+    public static string UserPrompt(OwnWords own, string draft)
     {
+        ArgumentNullException.ThrowIfNull(own);
         var sb = new StringBuilder();
-        sb.Append("Request (the person's own words):\n<<<REQUEST\n").Append(Defuse(brief, "REQUEST>>>")).Append("\nREQUEST>>>\n\n");
+        sb.Append("The person's request, in their own words:\n<<<REQUEST\n").Append(Defuse(own.Request, "REQUEST>>>")).Append("\nREQUEST>>>\n\n");
+        if (own.Answers.Count > 0)
+        {
+            sb.Append("The person's own answers to questions about it:\n");
+            foreach (var answer in own.Answers)
+                sb.Append("- ").Append(OneLine(Defuse(answer, "REQUEST>>>"), 1000)).Append('\n');
+            sb.Append('\n');
+        }
+        if (own.Changes.Count > 0)
+        {
+            sb.Append("Changes the person asked for:\n");
+            foreach (var change in own.Changes)
+                sb.Append("- ").Append(OneLine(Defuse(change, "REQUEST>>>"), 1000)).Append('\n');
+            sb.Append('\n');
+        }
         sb.Append("Text written for it:\n<<<TEXT\n").Append(Defuse(draft, "TEXT>>>")).Append("\nTEXT>>>\n\n");
-        sb.Append("List every explicit requirement the request states about the text: the parts or sections it must have and their order, ");
+        sb.Append("List every explicit requirement the person's words state about the text: the parts or sections it must have and their order, ");
         sb.Append("what each part must contain, the form, tone, language, form of address and readers, what the text must or must not do, ");
-        sb.Append("and the facts or figures the request asks to include or work out. Leave out the length; it is checked separately. ");
-        sb.Append("Do not list wishes the request does not state, and do not judge style or quality beyond what the request asks.\n");
-        sb.Append("For each requirement give \"quote\": its words copied exactly from the request (one short passage), ");
-        sb.Append("\"status\": \"met\", \"not_met\" or \"unclear\", and \"problem\": for not_met one sentence on what is missing or wrong, quoting the text where possible; otherwise null.\n");
-        sb.Append("Answer only with JSON: {\"requirements\": [{\"quote\": \"...\", \"status\": \"met\", \"problem\": null}]}");
+        sb.Append("and the facts or figures the person asks to include or work out. Leave out the length; it is checked separately. ");
+        sb.Append("Do not list wishes the person does not state, and do not judge style or quality beyond what they ask.\n");
+        sb.Append("For each requirement give \"quote\": its words copied exactly from the person's words above (one passage of at least three words) ");
+        sb.Append("and \"status\": \"met\", \"not_met\" or \"unclear\".\n");
+        sb.Append("Answer only with JSON: {\"requirements\": [{\"quote\": \"...\", \"status\": \"met\"}]}");
         return sb.ToString();
     }
 
     /// <summary>
     /// The requirements in <paramref name="json"/>; <c>null</c> when it is no object with a list <c>requirements</c>. Items without a quote
-    /// or with an unknown status are dropped.
+    /// or with an unknown status are dropped; any other field is ignored.
     /// </summary>
     public static IReadOnlyList<RequirementVerdict>? Parse(string? json)
     {
@@ -139,8 +180,7 @@ internal sealed class RequirementsCheckReviewer(
                 var status = Text(item, "status");
                 if (quote.Length == 0 || status is not (Met or NotMet or Unclear))
                     continue;
-                var problem = Text(item, "problem");
-                verdicts.Add(new RequirementVerdict(quote, status, problem.Length == 0 ? null : problem));
+                verdicts.Add(new RequirementVerdict(quote, status));
             }
             return verdicts;
         }
@@ -151,26 +191,42 @@ internal sealed class RequirementsCheckReviewer(
     }
 
     /// <summary>
-    /// The requirements that block: <see cref="NotMet"/>, with a quote that stands in <paramref name="brief"/> (without case and white
+    /// The requirements that block: <see cref="NotMet"/>, with a quote of at least <see cref="MinQuoteWords"/> words or
+    /// <see cref="MinQuoteChars"/> characters that stands in one part of <paramref name="own"/> at word boundaries (without case and white
     /// space), each quote once, at most <see cref="MaxFindings"/>.
     /// </summary>
-    public static IReadOnlyList<RequirementVerdict> Blocking(IReadOnlyList<RequirementVerdict> verdicts, string brief)
+    public static IReadOnlyList<RequirementVerdict> Blocking(IReadOnlyList<RequirementVerdict> verdicts, OwnWords own)
     {
-        var request = Normalize(brief);
+        ArgumentNullException.ThrowIfNull(own);
+        var parts = own.Parts.Select(Normalize).Where(p => p.Length > 0).ToList();
         return verdicts
-            .Where(v => v.Status == NotMet && Normalize(v.Quote) is { Length: > 0 } quote && request.Contains(quote, StringComparison.Ordinal))
+            .Where(v => v.Status == NotMet && Normalize(v.Quote) is { } quote && LongEnough(quote) && parts.Any(p => StandsIn(quote, p)))
             .DistinctBy(v => Normalize(v.Quote))
             .Take(MaxFindings)
             .ToList();
     }
 
-    /// <summary>The correction sentence for one requirement that is not met; built only from the quote and the problem, on one line.</summary>
+    /// <summary>The fixed correction sentence for one requirement that is not met, built only from its verified quote, on one line.</summary>
     public static string Problem(IReadOnlyDictionary<string, object>? metadata, string? message)
     {
         var quote = metadata is not null && metadata.TryGetValue("quote", out var q) ? q?.ToString() ?? string.Empty : string.Empty;
-        var sentence = string.Format(CultureInfo.InvariantCulture, "The request asks: \"{0}\". The text does not meet this yet.", OneLine(quote, MaxQuoteChars).Replace('"', '\''));
-        var why = OneLine(message ?? string.Empty, MaxProblemChars);
-        return why.Length == 0 ? sentence : sentence + " (" + why + ")";
+        return string.Format(CultureInfo.InvariantCulture, "The request asks: \"{0}\". The text does not meet this yet.", OneLine(quote, MaxQuoteChars).Replace('"', '\''));
+    }
+
+    private static bool LongEnough(string quote) =>
+        quote.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= MinQuoteWords || quote.Length >= MinQuoteChars;
+
+    private static bool StandsIn(string quote, string part)
+    {
+        for (var at = part.IndexOf(quote, StringComparison.Ordinal); at >= 0; at = part.IndexOf(quote, at + 1, StringComparison.Ordinal))
+        {
+            var before = at == 0 || !char.IsLetterOrDigit(part[at - 1]) || !char.IsLetterOrDigit(quote[0]);
+            var end = at + quote.Length;
+            var after = end == part.Length || !char.IsLetterOrDigit(part[end]) || !char.IsLetterOrDigit(quote[^1]);
+            if (before && after)
+                return true;
+        }
+        return false;
     }
 
     /// <inheritdoc/>
@@ -181,34 +237,37 @@ internal sealed class RequirementsCheckReviewer(
         if (iteration > 1)
             return Result(ReviewDecision.Approved, [], started);
 
-        var brief = context.GetRequired(AtelierContextKeys.GroundedBrief);
+        var own = OwnWords.From(context.GetRequired(AtelierContextKeys.GroundedBrief));
         var draft = context.TryGet(AtelierContextKeys.CurrentDraft, out var d) ? d ?? string.Empty : string.Empty;
-        var verdicts = await CallAsync(brief, draft, cancellationToken);
+        var verdicts = await CallAsync(own, draft, cancellationToken);
         if (verdicts is null)
         {
             await warningSink.ReportAsync(runId, RunWarningSources.Llm, UncheckedCode, UncheckedWarning, iteration, cancellationToken);
             throw new InvalidOperationException("The requirements check could not be completed.");
         }
 
-        var blocking = Blocking(verdicts, brief);
+        var blocking = Blocking(verdicts, own);
         logger.LogInformation("Run {RunId}: requirements check listed {Count}, {NotMet} not met and found in the request.", runId, verdicts.Count, blocking.Count);
         var findings = blocking.Select(ToFinding).ToList();
         return Result(findings.Count > 0 ? ReviewDecision.Rejected : ReviewDecision.Approved, findings, started);
     }
 
-    private async Task<IReadOnlyList<RequirementVerdict>?> CallAsync(string brief, string draft, CancellationToken ct)
+    private async Task<IReadOnlyList<RequirementVerdict>?> CallAsync(OwnWords own, string draft, CancellationToken ct)
     {
+        var model = profile.Model;
+        var answered = false;
         using var timeout = new CancellationTokenSource(Timeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
         try
         {
-            var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
+            var (client, resolved, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
+            model = resolved;
             var (tools, toolChoice, responseFormat) = StructuredOutput.Build(Tool, resolver.SupportsStructuredOutputs(profile.Provider));
             var response = await client.CompleteAsync(new LlmRequest
             {
                 Model = model,
                 SystemPrompt = SystemPrompt,
-                UserPrompt = UserPrompt(brief, draft),
+                UserPrompt = UserPrompt(own, draft),
                 MaxTokens = maxTokens,
                 Tools = tools,
                 ToolChoice = toolChoice,
@@ -216,7 +275,8 @@ internal sealed class RequirementsCheckReviewer(
                 DisableFailover = true,
                 ProxyTimeoutSeconds = (int)Math.Max(1, Timeout.TotalSeconds - 5),
             }, linked.Token);
-            Record(model, response);
+            answered = true;
+            Record(model, response.TokenUsage);
             var verdicts = Parse(StructuredOutput.ExtractJson(response));
             if (verdicts is null)
                 logger.LogWarning("Run {RunId}: the requirements check gave no readable answer.", runId);
@@ -229,15 +289,17 @@ internal sealed class RequirementsCheckReviewer(
         catch (Exception ex)
         {
             logger.LogWarning("Run {RunId}: the requirements check failed: {Error}", runId, ex.ToRedactedLogText());
+            if (!answered)
+                Record(model, new LlmTokenUsage { InputTokens = 0, OutputTokens = 0 });
             return null;
         }
     }
 
-    private void Record(string model, LlmResponse response)
+    /// <summary>One cost line per call that was sent, also for a call without an answer (zero tokens), so that every call is counted.</summary>
+    private void Record(string model, LlmTokenUsage usage)
     {
         if (costAccumulator is null)
             return;
-        var usage = response.TokenUsage;
         var costEur = pricingCatalog?.CalculateCostEur(model, usage.InputTokens, usage.OutputTokens, profile.Provider, cachedInputTokens: usage.CachedInputTokens ?? 0);
         costAccumulator.RecordActorCost(1, ActorType.Reviewer, profile.Name, model, usage.InputTokens, usage.OutputTokens, costEur,
             providerName: profile.Provider, cachedInputTokens: usage.CachedInputTokens ?? 0, reasoningTokens: usage.ReasoningTokens ?? 0);
@@ -247,7 +309,7 @@ internal sealed class RequirementsCheckReviewer(
     {
         ReviewerName = Name,
         Fingerprint = $"{Name}:{Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(Normalize(verdict.Quote))))[..12]}",
-        Message = verdict.Problem ?? string.Empty,
+        Message = Problem(new Dictionary<string, object> { ["quote"] = verdict.Quote }, null),
         Severity = FindingSeverity.Error,
         Category = FindingCategory,
         ArtifactReference = "draft",
