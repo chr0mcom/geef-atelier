@@ -1692,7 +1692,7 @@ die Anwendung über `WebApplicationFactory<Program>` gegen echtes Postgres (Test
 nur die HTTP-Gegenstellen (cli-proxy, Tavily, Embeddings), deren Anfragekörper aufgezeichnet werden. Die
 Tests weisen nach, dass Anhang und Websuche im Executor-Prompt ankommen, und schlagen fehl, wenn man die
 Grounding-Reparatur zurücknimmt. Jeder neue Pipeline-Weg bekommt hier einen Test vom Einstieg bis zum
-Ergebnis. Beschreibung: [02-architecture](02-architecture_de.md#testen-und-messen-d-067).
+Ergebnis. Beschreibung: [02-architecture](02-architecture_de.md#testen-und-messen).
 
 **D-067/2 — Warnungen am Lauf.** Was ein Lauf umgeht (übersprungene Quelle, ausgefallener Reviewer,
 abweichende Modellzuweisung, Failover, Finalizer-Problem), wird als Warnung in der neuen Tabelle

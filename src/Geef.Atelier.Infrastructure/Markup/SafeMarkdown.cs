@@ -1,4 +1,5 @@
 using Markdig;
+using Markdig.Extensions.AutoIdentifiers;
 using Markdig.Renderers;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
@@ -15,7 +16,10 @@ public static class SafeMarkdown
     /// <summary>Schemes a link may have in <see cref="ToSafeHtml"/>; anything else, relative addresses included, is shown as plain text.</summary>
     public static IReadOnlySet<string> AllowedSchemes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "http", "https", "mailto" };
 
-    /// <summary>Adds the extensions that are safe for texts nobody has reviewed.</summary>
+    /// <summary>
+    /// Adds the extensions that are safe for texts nobody has reviewed. Headings get the same anchors as on GitHub (letters such as
+    /// umlauts stay, every space becomes a hyphen), so that links to a section of a document work on both.
+    /// </summary>
     public static MarkdownPipelineBuilder UseSafeExtensions(this MarkdownPipelineBuilder builder) =>
         builder
             .UsePipeTables()
@@ -27,7 +31,7 @@ public static class SafeMarkdown
             .UseFootnotes()
             .UseDefinitionLists()
             .UseAbbreviations()
-            .UseAutoIdentifiers();
+            .UseAutoIdentifiers(AutoIdentifierOptions.AutoLink | AutoIdentifierOptions.GitHub);
 
     /// <summary>
     /// The HTML of <paramref name="markdown"/> in which nothing acts on its own: links stay links only for

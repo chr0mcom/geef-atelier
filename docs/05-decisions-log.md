@@ -1635,7 +1635,7 @@ application through `WebApplicationFactory<Program>` against real Postgres (Test
 counterparts (cli-proxy, Tavily, embeddings) are replaced, and their request bodies are recorded. The tests
 prove that attachment and web-search content reach the executor prompt, and they fail when the grounding
 repair is reverted. Every new pipeline path gets a test here from entry point to result. Description:
-[02-architecture](02-architecture.md#testing-and-measuring-d-067).
+[02-architecture](02-architecture.md#testing-and-measuring).
 
 **D-067/2 — Warnings at the run.** Whatever a run works around (skipped source, failed reviewer, deviating
 model assignment, failover, finalizer problem) is stored as a warning in the new table `RunWarnings`
