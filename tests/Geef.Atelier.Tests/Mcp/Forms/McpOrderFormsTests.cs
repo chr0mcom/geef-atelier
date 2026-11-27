@@ -34,7 +34,7 @@ public sealed class McpOrderFormsTests
 
     private OrderFormStates States => new(_keys, _time, Options.Create(_options));
 
-    private McpOrderForms Forms => new(_orders, States, Options.Create(_options), OrderToolTestData.Intake(), NullLogger<McpOrderForms>.Instance);
+    private McpOrderForms Forms => new(_orders, States, Options.Create(_options), NullLogger<McpOrderForms>.Instance);
 
     private string State(string username = "alice", string? client = "client-1", string arguments = Arguments, Guid? orderId = null) =>
         States.Protect(States.Create(orderId ?? _orderId, username, client, arguments, ["length", "q1"], Sources, ["Eine Datei war doppelt."]));
@@ -101,6 +101,16 @@ public sealed class McpOrderFormsTests
         var dto = await Forms.ResumeAsync(Call(Parameters(State(), null)), CancellationToken.None);
 
         Assert.StartsWith(McpOrderForms.CancelledLead, dto!.Message, StringComparison.Ordinal);
+        Assert.Empty(_orders.Answers);
+    }
+
+    [Fact]
+    public async Task A_form_sent_without_a_single_choice_counts_as_closed_and_starts_nothing()
+    {
+        var dto = await Forms.ResumeAsync(Call(Parameters(State(), Accept())), CancellationToken.None);
+
+        Assert.StartsWith(McpOrderForms.CancelledLead, dto!.Message, StringComparison.Ordinal);
+        Assert.Equal("needs_input", dto.State);
         Assert.Empty(_orders.Answers);
     }
 

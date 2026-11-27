@@ -5,10 +5,10 @@ never during it.
 
 ## As a form of your app
 
-Some apps show Atelier's questions to the person as a form while submit_order runs. The person can choose an option, write
-their own words where the form allows it, choose "You decide" or leave a question empty. Then submit_order returns the order
-already being written. If the person closes or declines the form, or the form cannot be used, submit_order returns state
-needs_input with the questions: then continue as below.
+Some apps show Atelier's questions to the person as a form while submit_order runs. The form has only choices: the person can
+choose an option or "You decide", or leave a question empty; then submit_order returns the order already being written. To answer
+in their own words, the person closes the form. If the person closes or declines the form, sends it without choosing anything,
+or the form cannot be used, submit_order returns state needs_input with the questions: then continue as below.
 
 ## With state needs_input
 

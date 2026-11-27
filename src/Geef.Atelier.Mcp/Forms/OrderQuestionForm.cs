@@ -14,13 +14,13 @@ internal sealed record OrderFormReading(OrderFormOutcome Outcome, IReadOnlyList<
 /// <summary>How the form of <c>submit_order</c> ended.</summary>
 internal enum OrderFormOutcome
 {
-    /// <summary>The person sent the form; every question has an answer, "You decide" or was left empty.</summary>
+    /// <summary>The person sent the form with at least one choice; every other question was left empty.</summary>
     Accepted = 0,
 
     /// <summary>The person declined to answer in the form.</summary>
     Declined = 1,
 
-    /// <summary>The form was closed or nothing came back.</summary>
+    /// <summary>The form was closed, nothing came back, or it was sent without a single choice.</summary>
     Cancelled = 2,
 
     /// <summary>Something came back that does not fit the form.</summary>
@@ -28,10 +28,10 @@ internal enum OrderFormOutcome
 }
 
 /// <summary>
-/// The form of <c>submit_order</c> for the questions of an order in state <c>needs_input</c> (D-088): one field per question with its answer options
-/// and "You decide", an optional field for own words where the question allows them, and a field for the revision guess. Nothing is required, so
-/// every question can be skipped. The message around it is fixed; questions, options and the file name come from the order and must pass
-/// <see cref="OrderFormText"/>.
+/// The form of <c>submit_order</c> for the questions of an order in state <c>needs_input</c> (D-088): one choice per question with its answer options
+/// and "You decide", and a choice for the revision guess. It has no field for typed text, so nothing can be entered into it; own words go through
+/// the chat after the person closes the form. Nothing is required, so every question can be skipped. The message around it is fixed; questions,
+/// options and the file name come from the order and must pass <see cref="OrderFormText"/>; forms are offered only for German and English orders.
 /// </summary>
 internal static partial class OrderQuestionForm
 {
@@ -44,15 +44,13 @@ internal static partial class OrderQuestionForm
     /// <summary>Label of the option "You decide", as on the web page.</summary>
     public const string DecideForMeLabel = "You decide";
 
-    /// <summary>Ending of the key of the field for own words.</summary>
-    public const string OwnWordsSuffix = "_text";
-
-    /// <summary>Title of the field for own words.</summary>
-    public const string OwnWordsTitle = "Or in your own words";
+    /// <summary>Languages of the orders whose questions may be shown as a form.</summary>
+    public static readonly IReadOnlySet<string> Languages = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "de", "en" };
 
     /// <summary>The fixed message of the form.</summary>
     public const string Message =
-        "Atelier has a few short questions before it writes your text. Skipping is fine: leave a question empty or choose \"You decide\". " +
+        "Atelier has a few short questions before it writes your text. Choose an answer or \"You decide\", or leave a question empty. " +
+        "To answer in your own words, close this form and tell your assistant. " +
         "Atelier never asks for passwords, PINs, TANs, keys, card or account numbers.";
 
     /// <summary>Labels of the revision guess, as on the web page.</summary>
@@ -62,10 +60,12 @@ internal static partial class OrderQuestionForm
     public const string RevisionNoLabel = "No, write something new";
 
     /// <summary>The form for <paramref name="clarification"/>, or <c>null</c> with the reason when the questions cannot be shown as a form.</summary>
-    public static (ElicitRequestParams? Form, string? Refused) Build(ClarificationView? clarification, int maxFreeTextChars)
+    public static (ElicitRequestParams? Form, string? Refused) Build(ClarificationView? clarification)
     {
         if (clarification is null)
             return (null, "no_clarification");
+        if (clarification.Language is not { } language || !Languages.Contains(language.Trim()))
+            return (null, "language");
         var questions = clarification.Questions ?? [];
         var revision = clarification.RevisionFileName;
         if (questions.Count == 0 && revision is null)
@@ -89,18 +89,11 @@ internal static partial class OrderQuestionForm
                     new ElicitRequestParams.EnumSchemaOption { Const = DecideForMeOption, Title = DecideForMeLabel },
                 ],
             };
-            if (question.AllowFreeText)
-                properties[question.Id + OwnWordsSuffix] = new ElicitRequestParams.StringSchema
-                {
-                    Title = OwnWordsTitle,
-                    Description = question.Text.Trim(),
-                    MaxLength = Math.Max(1, maxFreeTextChars),
-                };
         }
 
         if (revision is not null)
         {
-            if (!revision.IsSafeForForm(OrderFormText.MaxFileNameChars))
+            if (!revision.IsSafeForForm(OrderFormText.MaxFileNameChars, fileName: true))
                 return (null, "unsafe_file_name");
             properties[RevisionAnswer.QuestionId] = new ElicitRequestParams.TitledSingleSelectEnumSchema
             {
@@ -118,11 +111,12 @@ internal static partial class OrderQuestionForm
 
     /// <summary>
     /// Reads what came back for the form of <paramref name="clarification"/>. A sent form gives one answer per question, all with origin
-    /// <see cref="AnswerOrigin.Form"/>: the chosen option and/or own words, or "decide for me" for "You decide" and for an empty question; the revision
-    /// guess only when it was chosen. Anything that does not fit the form (an unknown field or option, a value that is no text, own words that are
-    /// too long or hold hidden characters, own words beside "You decide") makes the whole form <see cref="OrderFormOutcome.Invalid"/>.
+    /// <see cref="AnswerOrigin.Form"/>: the chosen option, or "decide for me" for "You decide" and for an empty question; the revision guess only when
+    /// it was chosen. A form sent without a single choice counts as closed (<see cref="OrderFormOutcome.Cancelled"/>), so a client that accepts forms
+    /// by itself never starts the order for the person. Anything that does not fit the form (an unknown field such as typed text, an unknown option,
+    /// a value that is no text) makes the whole form <see cref="OrderFormOutcome.Invalid"/>.
     /// </summary>
-    public static OrderFormReading Read(ElicitResult? result, ClarificationView clarification, int maxFreeTextChars)
+    public static OrderFormReading Read(ElicitResult? result, ClarificationView clarification)
     {
         ArgumentNullException.ThrowIfNull(clarification);
         if (result is null)
@@ -136,34 +130,21 @@ internal static partial class OrderQuestionForm
         var questions = clarification.Questions ?? [];
         var known = new HashSet<string>(StringComparer.Ordinal);
         var answers = new List<OrderAnswer>();
+        var chosen = 0;
         foreach (var question in questions)
         {
             known.Add(question.Id);
-            if (question.AllowFreeText)
-                known.Add(question.Id + OwnWordsSuffix);
-            if (!TryText(content, question.Id, out var choice) || !TryText(content, question.Id + OwnWordsSuffix, out var words))
+            if (!TryText(content, question.Id, out var choice))
                 return Invalid;
-            if (words is not null && (!question.AllowFreeText || words.Length > maxFreeTextChars || !words.IsSafeAnswer()))
-                return Invalid;
+            if (choice is not null)
+                chosen++;
 
-            if (choice == DecideForMeOption)
-            {
-                if (words is not null)
-                    return Invalid;
+            if (choice is null or DecideForMeOption)
                 answers.Add(new OrderAnswer(question.Id, null, null, true, AnswerOrigin.Form));
-            }
-            else if (choice is not null)
-            {
-                if (question.Options.All(o => o.Id != choice))
-                    return Invalid;
-                answers.Add(new OrderAnswer(question.Id, choice, words, false, AnswerOrigin.Form));
-            }
+            else if (question.Options.Any(o => o.Id == choice))
+                answers.Add(new OrderAnswer(question.Id, choice, null, false, AnswerOrigin.Form));
             else
-            {
-                answers.Add(words is null
-                    ? new OrderAnswer(question.Id, null, null, true, AnswerOrigin.Form)
-                    : new OrderAnswer(question.Id, null, words, false, AnswerOrigin.Form));
-            }
+                return Invalid;
         }
 
         if (clarification.RevisionFileName is not null)
@@ -172,10 +153,15 @@ internal static partial class OrderQuestionForm
             if (!TryText(content, RevisionAnswer.QuestionId, out var revision) || revision is not (null or RevisionAnswer.Yes or RevisionAnswer.No))
                 return Invalid;
             if (revision is not null)
+            {
+                chosen++;
                 answers.Add(new OrderAnswer(RevisionAnswer.QuestionId, revision, null, false, AnswerOrigin.Form));
+            }
         }
 
-        return content.Keys.All(known.Contains) ? new(OrderFormOutcome.Accepted, answers) : Invalid;
+        if (!content.Keys.All(known.Contains))
+            return Invalid;
+        return chosen == 0 ? new(OrderFormOutcome.Cancelled, []) : new(OrderFormOutcome.Accepted, answers);
     }
 
     private static OrderFormReading Invalid => new(OrderFormOutcome.Invalid, []);

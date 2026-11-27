@@ -50,7 +50,6 @@ internal sealed partial class McpOrderForms(
     IOrderService orders,
     IOrderFormStates states,
     IOptions<McpOptions> mcpOptions,
-    IOptions<IntakeOptions> intakeOptions,
     ILogger<McpOrderForms> logger) : IMcpOrderForms
 {
     /// <summary>Error when a <c>requestState</c> does not fit the call; it never says which check failed or whether an order exists.</summary>
@@ -116,7 +115,7 @@ internal sealed partial class McpOrderForms(
             return view.ToSubmittedDto(state.Notices, state.Sources, InvalidLead);
 
         var reading = TryResultOf(call.Parameters, out var result)
-            ? OrderQuestionForm.Read(result, clarification, intakeOptions.Value.MaxFreeTextChars)
+            ? OrderQuestionForm.Read(result, clarification)
             : new OrderFormReading(OrderFormOutcome.Invalid, []);
         switch (reading.Outcome)
         {
@@ -153,7 +152,7 @@ internal sealed partial class McpOrderForms(
             || !Guid.TryParse(answer.OrderId, out var orderId))
             return;
 
-        var (form, refused) = OrderQuestionForm.Build(clarification, intakeOptions.Value.MaxFreeTextChars);
+        var (form, refused) = OrderQuestionForm.Build(clarification);
         if (form is null)
         {
             LogFormRefused(logger, refused ?? "unknown");

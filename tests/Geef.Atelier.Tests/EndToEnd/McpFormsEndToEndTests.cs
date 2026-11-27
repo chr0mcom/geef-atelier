@@ -68,7 +68,7 @@ public sealed partial class McpFormsEndToEndTests(PostgresFixture postgres)
 
         var form = Assert.Single(forms);
         Assert.Equal(OrderQuestionForm.Message, form.Message);
-        Assert.Equal(["length", "length_text"], form.RequestedSchema!.Properties.Keys);
+        Assert.Equal(["length"], form.RequestedSchema!.Properties.Keys);
         var orderId = submitted.GetProperty("orderId").GetString()!;
         Assert.Contains(submitted.GetProperty("state").GetString(), new[] { "queued", "working" });
         Assert.False(string.IsNullOrEmpty(submitted.GetProperty("runId").GetString()));
@@ -184,8 +184,7 @@ public sealed partial class McpFormsEndToEndTests(PostgresFixture postgres)
         host.ReleaseOrchestrator();
 
         var orderId = submitted.GetProperty("orderId").GetString()!;
-        var keys = Assert.Single(forms).RequestedSchema!.Properties.Keys.ToList();
-        Assert.Equal(2, keys.Count(k => !k.EndsWith(OrderQuestionForm.OwnWordsSuffix, StringComparison.Ordinal)));
+        Assert.Equal(2, Assert.Single(forms).RequestedSchema!.Properties.Count);
         Assert.All(IntakeRecordJson.ParseAnswers((await LoadAsync(host, orderId)).AnswersJson), a =>
         {
             Assert.True(a.DecideForMe);
