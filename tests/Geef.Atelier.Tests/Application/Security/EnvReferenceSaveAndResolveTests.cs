@@ -111,8 +111,11 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
         await using (var scope = sp.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<IProviderRepository>().CreateAsync(HttpProvider(name, _forbidden), default);
 
-        await SendThroughResolverAsync(sp, name);
+        var failure = await SendThroughResolverAsync(sp, name);
 
+        var refusal = Assert.IsType<InvalidOperationException>(failure);
+        Assert.Contains("API key is not configured", refusal.Message, StringComparison.Ordinal);
+        Assert.Null(_handler.LastUri);
         Assert.Null(_handler.LastAuthorization);
         Assert.DoesNotContain("forbidden-secret", _handler.AllAuthorizations);
     }
@@ -131,8 +134,11 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
         Assert.Equal("llm.test", _handler.LastUri?.Host);
     }
 
-    /// <summary>One call to the provider <paramref name="name"/> the way a run makes it; only what was sent matters, not the answer.</summary>
-    private static async Task SendThroughResolverAsync(ServiceProvider sp, string name)
+    /// <summary>
+    /// One call to the provider <paramref name="name"/> the way a run makes it. A resolver that cannot build a client fails the test;
+    /// what the call itself throws is returned, because the answer of the fake endpoint is not a real one.
+    /// </summary>
+    private static async Task<Exception?> SendThroughResolverAsync(ServiceProvider sp, string name)
     {
         var resolver = new LlmClientResolver(
             sp.GetRequiredService<IHttpClientFactory>(),
@@ -140,14 +146,9 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
             sp.GetRequiredService<IServiceScopeFactory>(),
             NullLoggerFactory.Instance,
             sp.GetRequiredService<IEnvReferencePolicy>());
-        try
-        {
-            var (client, model, _) = resolver.ForProfile(name, "m", null);
-            await client.CompleteAsync(new LlmRequest { Model = model, SystemPrompt = "s", UserPrompt = "u", MaxTokens = 5 }, default);
-        }
-        catch (Exception)
-        {
-        }
+        var (client, model, _) = resolver.ForProfile(name, "m", null);
+        return await Record.ExceptionAsync(
+            () => client.CompleteAsync(new LlmRequest { Model = model, SystemPrompt = "s", UserPrompt = "u", MaxTokens = 5 }, default));
     }
 
     private sealed class CapturingHandler(string body = "{\"data\":[]}") : HttpMessageHandler
