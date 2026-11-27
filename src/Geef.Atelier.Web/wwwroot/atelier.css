@@ -973,6 +973,7 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
   margin: 0 auto;
   padding: 32px 32px 80px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 36px;
 }
 
@@ -993,7 +994,7 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 /* --- Run header --- */
 .run-header {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 32px;
   align-items: start;
   padding-bottom: 28px;
@@ -1042,6 +1043,7 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
   display: grid;
   gap: 14px;
   min-width: 230px;
+  max-width: 300px;
 }
 .run-meta .row {
   display: grid;
@@ -1062,6 +1064,15 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 }
 .run-meta .val { font-family: var(--font-mono); color: var(--ink-2); }
 .run-meta .actions { display: flex; gap: 8px; margin-top: 8px; }
+.run-meta p { margin: 0; }
+.run-header h1, .run-header .briefing-block { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .run-header { grid-template-columns: minmax(0, 1fr); }
+  .run-meta { min-width: 0; max-width: none; }
+  .detail .manuscript-wrap .head { flex-wrap: wrap; }
+  .detail .manuscript { padding: 32px 20px 40px; }
+  .detail .manuscript .colophon { flex-wrap: wrap; gap: 6px; }
+}
 
 /* --- THE PRESS — pipeline visualization --- */
 .press {
