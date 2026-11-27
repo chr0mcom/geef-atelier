@@ -183,6 +183,20 @@ public sealed class OrderIntakeServiceTests
     }
 
     [Fact]
+    public async Task A_revision_in_the_careful_mode_only_limits_the_questions()
+    {
+        var order = _orders.Add("Bitte überarbeite den angehängten Brief.", mode: OrderMode.Careful);
+        _sources.Attach(order.Id, "brief.txt", SourceKind.Text, "Sehr geehrte Frau Muster, …");
+        _clarifier.Enqueue(QuestionGateTests.Output([QuestionGateTests.Ask(GapTopic.Tone, "Wie soll er klingen?", ["Förmlich", "Locker"])], isRevision: true));
+
+        await Service().ProcessAsync(order.Id, CancellationToken.None);
+
+        var start = Assert.Single(_starter.Requests);
+        Assert.Null(start.Record!.RevisionSourceId);
+        Assert.Equal(GateDecision.DroppedRevisionRule, Assert.Single(start.Record.Trace).Decision);
+    }
+
+    [Fact]
     public async Task Profile_answers_reach_the_gate()
     {
         _memory = new FixedMemory(known: new Dictionary<GapTopic, MemoryAnswer> { [GapTopic.Sender] = new(GapTopic.Sender, "Eva Muster", "profile") });

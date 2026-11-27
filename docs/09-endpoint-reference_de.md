@@ -48,7 +48,7 @@ Seit Etappe 1 ist der **Auftrag** die Einheit, die der Mensch sieht; Läufe blei
 }
 ```
 
-Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (auch `text/x-markdown`), `text/plain` (Parameter wie `; charset=utf-8` werden ignoriert). Einen Parameter für einen langsameren Weg gibt es nicht; `extraCareful` von einem Client mit gespeicherter alter Werkzeugliste wird überlesen, und der Auftrag läuft auf dem Standardweg.
+Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (auch `text/x-markdown`), `text/plain` (Parameter wie `; charset=utf-8` werden ignoriert). Einen Parameter für einen langsameren Weg gibt es nicht; ein Aufruf mit `extraCareful=true` aus einer gespeicherten alten Werkzeugliste wird mit einem klaren Satz abgelehnt, und es entsteht kein Auftrag.
 
 **Ausgabe `submit_order`:**
 ```json

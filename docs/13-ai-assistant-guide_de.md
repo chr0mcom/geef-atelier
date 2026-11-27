@@ -98,7 +98,8 @@ Namen als Stummel gelistet, weil Clients Werkzeuglisten zwischenspeichern: `subm
 „Removed: use … instead.“, und jeder Aufruf scheitert mit einer Fehlermeldung, die den Nachfolger nennt (`submit_order`,
 `get_order_status`, `get_order_result`). Alle anderen alten Werkzeugnamen gibt es nicht mehr. Aufträge aus früheren Versionen
 bleiben über `list_orders` und `get_order_result` erreichbar. Den Parameter `extraCareful` hat `submit_order` nicht mehr (zweiter
-Zusatz zu D-087); sendet ein Client mit gespeicherter alter Werkzeugliste ihn noch, bekommt er den Standardweg.
+Zusatz zu D-087); ein Aufruf mit `extraCareful=true` aus einer gespeicherten
+alten Werkzeugliste wird mit einem klaren Satz abgelehnt, und es entsteht kein Auftrag.
 
 ## Dateien
 

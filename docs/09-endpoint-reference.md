@@ -47,7 +47,7 @@ Since stage 1 an **order** is the unit the person sees; runs stay the technical 
 }
 ```
 
-Supported `contentType` values: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (also `text/x-markdown`), `text/plain` (parameters such as `; charset=utf-8` are ignored). There is no parameter for a slower way; `extraCareful` from a client with a cached older tool list is ignored, and the order runs on the standard way.
+Supported `contentType` values: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (also `text/x-markdown`), `text/plain` (parameters such as `; charset=utf-8` are ignored). There is no parameter for a slower way; a call with `extraCareful=true` from a client with a cached older tool list is refused with a plain sentence, and no order is created.
 
 **`submit_order` output:**
 ```json
