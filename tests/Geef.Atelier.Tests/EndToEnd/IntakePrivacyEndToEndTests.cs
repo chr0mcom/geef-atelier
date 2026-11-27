@@ -19,10 +19,8 @@ namespace Geef.Atelier.Tests.EndToEnd;
 
 /// <summary>
 /// Over the real wiring: the "About me" profile reaches the clarifier and every writer briefing (answered, skipped,
-/// started after the deadline), but never an outside search service: Tavily web search, the embeddings of
-/// the learning search (learning switched on), the query shaping and the refinement get only the request as written, and each of
-/// these services is really called. Also for <c>submit_request</c> with an own crew and for a resumed run. A clarified careful
-/// order with the default crew searches nothing at all (D-079).
+/// started after the deadline), but never an outside search service. A clarified "Extra careful" order searches nothing at all
+/// (D-079).
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
@@ -32,8 +30,6 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
     private const string AnswerMarker = "ANTWORTMARKER Innenhof Nord";
     private const string AssumptionMarker = "ANNAHMEMARKER Datum bleibt offen";
     private const string Request = "Schreib eine kurze Pressemitteilung über die Eröffnung unseres neuen Standorts in Leipzig.";
-
-    private static readonly string[] ResearchProviders = ["tavily-refined", "learning-retriever-default"];
 
     private const string AskLength =
         """{"topic":"length","resolution":"ask","user_can_know":true,"web_researchable":false,"impact":"high","assumption":"Etwa 300 Wörter","confidence":"unsure","question":null}""";
@@ -46,47 +42,6 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
 
     private static string Clarify(string gaps) =>
         $$"""{"text_type":"Pressemitteilung","language":"de","understanding":"Eine Pressemitteilung zur Eröffnung.","is_revision":false,"revision_file":null,"length_scale":"standard","gaps":[{{gaps}}],"research_topics":[]}""";
-
-    [Fact]
-    public async Task Submit_request_with_an_own_crew_and_its_resumed_run_send_no_profile_to_any_search_service()
-    {
-        await using var host = await StartAsync(IntakeMode.Off, learning: true);
-        await SaveProfileAsync(host, AtelierEndToEndHost.McpTokenUser);
-        host.Tavily.ResultText = "Leipzig hat einen neuen Standort.";
-
-        var crew = JsonSerializer.Serialize(new
-        {
-            executorProfileName = SystemCrew.DefaultExecutorProfile.Name,
-            reviewerProfileNames = new[] { SystemCrew.BriefingFidelityProfile.Name },
-            groundingProviderNames = ResearchProviders,
-        });
-        var submitted = await host.CallMcpToolAsync("submit_request", new { briefingText = Request, customCrew = crew });
-        host.ReleaseOrchestrator();
-        var runId = Guid.Parse(submitted.GetProperty("runId").GetString()!);
-        await host.WaitForTerminalAsync(runId);
-
-        Assert.True(host.Llm.AnyExecutorPromptContains(ProfileMarker), host.Llm.Describe());
-        AssertEveryServiceWasCalled(host.External.All);
-        AssertResearchSawOnlyTheRequest(host, ProfileMarker);
-        var researched = host.External.All.Count;
-
-        await host.QueryAsync(db => db.Runs.Where(r => r.Id == runId).ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatus.Failed)));
-        var resumedId = await host.WithScopeAsync(sp => sp.GetRequiredService<IRunService>()
-            .ResumeRunAsync(new ResumeOptions(runId, UseSeedDraft: true, MaxIterationsOverride: null), AtelierEndToEndHost.McpTokenUser));
-        await host.WaitForTerminalAsync(resumedId);
-
-        Assert.True(host.External.All.Count > researched, "The resumed run did not search again.");
-        AssertEveryServiceWasCalled(host.External.All.Skip(researched).ToList());
-        AssertResearchSawOnlyTheRequest(host, ProfileMarker);
-    }
-
-    private static void AssertEveryServiceWasCalled(IReadOnlyList<ExternalCall> calls)
-    {
-        var tavily = calls.Where(c => c.Client == FakeTavilyEndpoint.ClientName).ToList();
-        var described = string.Join("; ", calls.Select(c => $"{c.Client} {c.Url}"));
-        Assert.True(tavily.Count > 0, $"No web search call. {described}");
-        Assert.True(calls.Any(c => c.Client == FakeEmbeddingsEndpoint.ClientName), $"No embeddings call for the learning search. {described}");
-    }
 
     [Fact]
     public async Task A_clarified_careful_order_gives_profile_answers_and_assumptions_to_the_writer_and_nothing_to_search()
@@ -207,12 +162,14 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
             return true;
         });
 
-    private Task<AtelierEndToEndHost> StartAsync(IntakeMode mode, bool withWorker = true, bool learning = false) =>
+    private Task<AtelierEndToEndHost> StartAsync(IntakeMode mode, bool withWorker = true) =>
         AtelierEndToEndHost.StartAsync(postgres, services =>
         {
-            services.PostConfigure<OrderOptions>(o => o.IntakeMode = mode);
-            if (learning)
-                services.PostConfigure<LearningOptions>(o => o.Enabled = true);
+            services.PostConfigure<OrderOptions>(o =>
+            {
+                o.IntakeMode = mode;
+                o.CarefulOutline = CarefulOutlineMode.On;
+            });
             services.PostConfigure<IntakeOptions>(o => o.PollInterval = TimeSpan.FromMilliseconds(200));
             if (!withWorker)
             {

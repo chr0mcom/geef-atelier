@@ -92,33 +92,6 @@ public sealed class McpOrderEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Submit_request_with_a_template_links_its_run_to_a_careful_order()
-    {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
-
-        var submitted = await host.CallMcpToolAsync("submit_request", new
-        {
-            briefingText = Request,
-            crewTemplate = SystemCrew.KlassikTemplateName,
-        });
-        host.ReleaseOrchestrator();
-
-        Assert.Equal("Pending", submitted.GetProperty("status").GetString());
-        var runId = Guid.Parse(submitted.GetProperty("runId").GetString()!);
-        var orderId = Guid.Parse(submitted.GetProperty("orderId").GetString()!);
-
-        var run = await host.WaitForTerminalAsync(runId);
-        Assert.True(run.Status == RunStatus.Completed, $"Status {run.Status}, error '{run.ErrorMessage}'.\n{host.Llm.Describe()}");
-        Assert.Equal(orderId, run.OrderId);
-        Assert.Equal(1, run.OrderVersion);
-
-        var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId));
-        Assert.Equal(OrderMode.Careful, order.Mode);
-        Assert.Equal(OrderEntry.Mcp, order.Entry);
-        Assert.Equal(SystemCrew.KlassikTemplateName, run.CrewTemplateName);
-    }
-
-    [Fact]
     public async Task A_placeholder_attachment_is_rejected_with_a_message_the_client_can_read()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
@@ -147,9 +120,9 @@ public sealed class McpOrderEndToEndTests(PostgresFixture postgres)
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => host.CallMcpToolAsync("submit_auto_crew_request", new
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => host.CallMcpToolAsync("submit_order", new
         {
-            briefingText = "Summarise the file.",
+            request = "Summarise the file.",
             attachments = JsonSerializer.Serialize(new[]
             {
                 new
@@ -163,7 +136,7 @@ public sealed class McpOrderEndToEndTests(PostgresFixture postgres)
 
         Assert.True(ex.Message.Contains("full-version.md", StringComparison.Ordinal), ex.Message);
         Assert.Contains("placeholder", ex.Message);
-        Assert.Contains("Atelier web app", ex.Message);
-        Assert.Equal(0, await host.QueryAsync(db => db.Runs.CountAsync()));
+        Assert.Contains("prepare_attachment", ex.Message);
+        Assert.Equal(0, await host.QueryAsync(db => db.Orders.CountAsync()));
     }
 }

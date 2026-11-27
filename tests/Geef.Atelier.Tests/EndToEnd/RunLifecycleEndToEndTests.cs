@@ -62,31 +62,6 @@ public sealed class RunLifecycleEndToEndTests(PostgresFixture postgres)
         Assert.Equal(iterations.Count, host.Llm.CallsFor(LlmRole.Executor).Count);
     }
 
-    [Fact]
-    public async Task Submit_request_over_mcp_runs_to_completion()
-    {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
-
-        var submitted = await host.CallMcpToolAsync("submit_request", new
-        {
-            briefingText = Briefing,
-            crewTemplate = SystemCrew.KlassikTemplateName,
-        });
-        host.ReleaseOrchestrator();
-        var runId = Guid.Parse(submitted.GetProperty("runId").GetString()!);
-
-        var run = await host.WaitForTerminalAsync(runId);
-        Assert.True(run.Status == RunStatus.Completed, $"Status {run.Status}, error '{run.ErrorMessage}'.\n{host.Llm.Describe()}");
-        Assert.Equal(ScriptedLlmEndpoint.DefaultExecutorText, run.FinalText);
-        Assert.Single(await IterationsAsync(host, runId));
-
-        var status = await host.CallMcpToolAsync("get_run_status", new { runId = runId.ToString() });
-        Assert.Equal(nameof(RunStatus.Completed), status.GetProperty("status").GetString());
-
-        var result = await host.CallMcpToolAsync("get_run_result", new { runId = runId.ToString() });
-        Assert.Equal(ScriptedLlmEndpoint.DefaultExecutorText, result.GetProperty("finalText").GetString());
-    }
-
     private static Task<List<IterationEntity>> IterationsAsync(AtelierEndToEndHost host, Guid runId) =>
         host.QueryAsync(db => db.Iterations.AsNoTracking()
             .Where(i => i.RunId == runId)

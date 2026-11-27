@@ -210,18 +210,4 @@ public sealed class IntakeEndToEndTests(PostgresFixture postgres)
         Assert.DoesNotContain(AnswerBlock, Assert.Single(host.Llm.CallsFor(LlmRole.Executor)).Messages.Last(m => m.Role == "user").Content);
     }
 
-    [Fact]
-    public async Task Submit_request_never_reaches_the_clarifier()
-    {
-        await using var host = await StartAsync(postgres, IntakeMode.Shadow);
-        host.Script.ExecutorText = Words(150);
-
-        var submitted = await host.CallMcpToolAsync("submit_request", new { briefingText = "Schreib eine Einladung zum Sommerfest." });
-        host.ReleaseOrchestrator();
-        await host.WaitForTerminalAsync(Guid.Parse(submitted.GetProperty("runId").GetString()!));
-        await Task.Delay(TimeSpan.FromSeconds(1));
-
-        Assert.Empty(ClarifierCalls(host));
-        Assert.Empty(await host.QueryAsync(db => db.OrderIntakeShadows.AsNoTracking().ToListAsync()));
-    }
 }
