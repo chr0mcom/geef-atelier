@@ -75,6 +75,17 @@ public sealed class GetOrderResultLookedUpTests
         Assert.Contains(OrderDtoMappings.LookedUpNote, dto.Note!, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task The_search_words_reach_the_client_and_are_null_when_none_are_listed()
+    {
+        var with = await GetAsync(new OrderLookedUpView(ResearchStatus.NothingFound, OrderResearchLines.NothingFound, 0, [], ["Mindestlohn 2027 Höhe"]));
+        var without = await GetAsync(new OrderLookedUpView(ResearchStatus.NothingFound, OrderResearchLines.NothingFound, 0, []));
+
+        Assert.Equal(["Mindestlohn 2027 Höhe"], with.LookedUp!.SearchWords);
+        Assert.Null(without.LookedUp!.SearchWords);
+        Assert.Contains("lookedUp.searchWords", McpServerInstructions.Text, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("javascript:alert(1)")]
     [InlineData("file:///etc/passwd")]

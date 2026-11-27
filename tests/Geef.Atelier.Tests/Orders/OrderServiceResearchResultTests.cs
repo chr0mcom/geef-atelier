@@ -64,6 +64,21 @@ public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task The_search_words_that_went_out_are_shown_to_the_owner_and_never_to_an_administrator_viewing_the_order()
+    {
+        await using var host = await StartAsync();
+        var (orderId, _) = await DeliveredAsync(host, Report(lookedUp: true), "Liebe Eltern, der Mindestlohn steigt.");
+        await StoreResearchAsync(host, orderId, OrderResearchLinesTests.Research(ResearchStatus.Found, [Entry]));
+
+        var owner = await ResultAsync(host, orderId);
+        var admin = (await host.WithScopeAsync(async sp => await sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, null, "some-admin")))!;
+
+        Assert.Equal(["minimum wage 2027"], owner.LookedUp!.SearchWords);
+        Assert.NotNull(admin.LookedUp);
+        Assert.Null(admin.LookedUp!.SearchWords);
+    }
+
+    [Fact]
     public async Task Found_research_is_not_shown_for_a_run_whose_report_does_not_say_it_used_it()
     {
         await using var host = await StartAsync();

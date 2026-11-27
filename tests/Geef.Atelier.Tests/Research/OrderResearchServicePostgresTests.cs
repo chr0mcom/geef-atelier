@@ -79,7 +79,7 @@ public sealed class OrderResearchServicePostgresTests(PostgresFixture fixture)
     }
 
     private static string Clarify(string topic) =>
-        IntakeRecordJson.Serialize(IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = [topic] });
+        IntakeRecordJson.Serialize(IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = [topic], ResearchAllowed = true });
 
     private async Task<OrderEntity> AddAsync(OrderEntity order)
     {

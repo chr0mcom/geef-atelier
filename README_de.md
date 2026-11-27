@@ -243,7 +243,8 @@ ATELIER_DOMAIN=<your-domain>
 LLM_OPENROUTER_API_KEY=<openrouter-api-key>
 
 # Tavily Web Search (https://tavily.com) — nötig für das Nachschlagen auf dem Standardweg (Research:Mode, ausgeliefert On) und für
-# die Grounding-Profile tavily, news-search und tavily-news; ohne Schlüssel zusätzlich Research__Mode=Off setzen
+# die Grounding-Profile tavily, news-search und tavily-news; ohne Schlüssel die Recherche mit Research__Mode=Off unter
+# services.web.environment in docker-compose.override.yml ausschalten (diese .env-Datei allein erreicht den Webdienst nicht)
 TAVILY_API_KEY=
 ```
 

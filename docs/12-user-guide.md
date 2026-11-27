@@ -71,7 +71,7 @@ The page of your request shows, from top to bottom:
 | **What was checked** | Only the checks that really ran (see below). Always ends with: "These checks look for the problems named here. They do not prove that everything in the text is right." |
 | **Open points** | "Fill these in before you send the text" (the gaps), checks that were not met, passages that may not be backed by what you gave, problems found in your files. |
 | **Assumptions** | What you did not say and what was assumed. |
-| **Looked up** | Only when Atelier looked something up on the web for this request: passages copied word for word from the pages, with the page and the day. They show what the pages say, not that it is true. If nothing could be looked up, one sentence says why (for example, the daily limit was reached). |
+| **Looked up** | Only when Atelier looked something up on the web for this request: the search words that were sent (only you see them), and passages copied word for word from the pages, with the page and the day. They show what the pages say, not that it is true. If nothing could be looked up, one sentence says why (for example, the daily limit was reached). |
 | **From your files** | Which files were used and how. |
 | **How it was made** | Your request, the steps and the versions. |
 
@@ -105,7 +105,7 @@ Only you can change it.
 language, and About me has nothing on it yet, the result shows a field for it with **Save**. What you save there goes into About me;
 if that field was filled under About me in the meantime, nothing is overwritten and the result says “Already saved under About me”.
 From your next request on, Atelier takes it from About me instead of guessing or asking, and the writer gets it with every new
-request (hence the heading “Tell Atelier once – your next requests will not leave this open again”). The text you are looking at keeps the details it was written with, and so does every change you ask for to it with
+request (hence the heading “Tell Atelier once – your next requests get it from About me”). The text you are looking at keeps the details it was written with, and so does every change you ask for to it with
 “Change something” – also a detail you have deleted under About me since then. To have the new value in this text, write it into
 your change. The result also says what the writer got from About me with that request (“With this request the writer got from
 About me: …”). You change or delete it under About me; that counts for your next requests. Whether the writer really uses it, for
@@ -116,8 +116,10 @@ example your sign-off word for word, depends on the text: check the result as al
 - Your request, your answers, your About me details and your files go to the AI services this Atelier uses to write and check the
   text.
 - Atelier may look things up on the web, but only on the standard way and only when you add no files. Then a web search service
-  gets a few short search topics that Atelier took from your request – never your answers or your files. Topics with words from
-  your About me details are held back (this compares words, so it can miss a word in another language). A change of a finished
+  gets a few short search words. The search words come from your request. Atelier leaves out email addresses, phone numbers,
+  account numbers and street addresses, but names or other personal details in your request can end up in them. Your answers and
+  your files are never sent, and a word from your About me details only when you also wrote it in your request (this compares
+  words, so it can miss a word in another language). The result lists the search words that were sent. A change of a finished
   text uses what was looked up the first time and does not search again. There is a daily limit; once it is reached, the text is
   written without looking things up, and the result says so. "Extra careful" never searches the web. Teams that administrators
   set up in the workshop can have their own web search.

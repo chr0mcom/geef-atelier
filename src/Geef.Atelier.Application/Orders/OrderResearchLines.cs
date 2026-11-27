@@ -16,15 +16,19 @@ public static class OrderResearchLines
     public const string RetrievedFormat = "retrieved {0}";
     public const string RetrievedDateFormat = "d MMM yyyy";
 
+    /// <summary>Lead of the search words that went to the search service, shown only to the person who placed the order.</summary>
+    public const string SearchWordsLead = "These search words went to a web search service. They come from your request:";
+
     public const string NothingFound = "Some facts were looked up on the web, but no page gave a usable passage. The text does not rely on the web.";
     public const string Failed = "Looking things up on the web did not work this time. The text was written without it.";
     public const string DailyLimit = "Nothing was looked up on the web today because the daily limit was reached. The text was written without it.";
     /// <summary>
     /// Said when every topic was withheld. Neutral on purpose: a topic is withheld for a word of the About me details, for a topic in
-    /// another language than the order, or for a link, an address, or account or access details, and only the number is stored.
+    /// another language than the order, for a link, an email address, a phone or account number, a date of birth or a street address,
+    /// or for access details, and only the number is stored. It never claims that the words that did go out held no personal details.
     /// </summary>
-    public const string AllWithheld = "Nothing was looked up on the web, so that no private details could reach a search engine.";
-    public const string SomeWithheld = "Some details were not looked up, so that no private details could reach a search engine.";
+    public const string AllWithheld = "Nothing was looked up on the web: Atelier held back every search word, for example because it held an address, a number or a word from your About me details.";
+    public const string SomeWithheld = "Some search words were held back and not looked up, for example because they held an address, a number or a word from your About me details.";
     public const string FilesAttached = "No web search was done because you attached files, so nothing from them can reach a search engine.";
 
     public const string FactsComparedLeadLookedUp = "Facts in the text were compared with your request, your answers, your files and the pages looked up.";
@@ -43,9 +47,17 @@ public static class OrderResearchLines
     /// when the delivered run did not use them (<paramref name="deliveredRunLookedUp"/>); every other status shows its sentence. The title
     /// of an entry is <see cref="ResearchAddress.SafeTitle"/>, also for research stored before that rule. Found
     /// research without an entry shows the sentence of <see cref="ResearchStatus.NothingFound"/>, so that it never stays silent; topics
-    /// that were withheld add <see cref="SomeWithheld"/> to entries and to that sentence.
+    /// that were withheld add <see cref="SomeWithheld"/> to entries and to that sentence. With <paramref name="showSearchWords"/> (only
+    /// for the person who placed the order) the view also lists the topics that went to the search service.
     /// </summary>
-    public static OrderLookedUpView? Build(OrderResearch? research, bool deliveredRunLookedUp)
+    public static OrderLookedUpView? Build(OrderResearch? research, bool deliveredRunLookedUp, bool showSearchWords = false)
+    {
+        var view = BuildView(research, deliveredRunLookedUp);
+        var words = showSearchWords ? (research?.TopicsSent ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).ToList() : [];
+        return view is null || words.Count == 0 ? view : view with { SearchWords = words };
+    }
+
+    private static OrderLookedUpView? BuildView(OrderResearch? research, bool deliveredRunLookedUp)
     {
         if (research is null || research.Status == ResearchStatus.NotNeeded)
             return null;

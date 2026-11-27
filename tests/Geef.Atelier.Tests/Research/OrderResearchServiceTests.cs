@@ -67,7 +67,7 @@ public sealed class OrderResearchServiceTests
     }
 
     private static string Clarify(IntakeRecordStatus status, params string[] topics) =>
-        IntakeRecordJson.Serialize(IntakeRecord.Fallback(status, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = topics });
+        IntakeRecordJson.Serialize(IntakeRecord.Fallback(status, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = topics, ResearchAllowed = true });
 
     private static OrderEntity Order(string? clarify, string? user = User, string? researchJson = null) => new()
     {
@@ -278,6 +278,7 @@ public sealed class OrderResearchServiceTests
         {
             Output = new ClarifierOutput("Aushang", "de", "Ein Aushang.", false, null, LengthScale.Standard, [], [TopicA, "sick leave rules for the employer"]),
             ResearchTopics = [TopicA, "sick leave rules for the employer"],
+            ResearchAllowed = true,
         });
 
         var withFreeText = await Ensure(s, Order(clarify), profile: "Anything else: Ich bin seit Mai krankgeschrieben.");
@@ -358,7 +359,33 @@ public sealed class OrderResearchServiceTests
         {
             ResearchTopics = topics,
             ResearchWithheld = withheld,
+            ResearchAllowed = true,
         });
+
+    [Fact]
+    public async Task An_order_read_before_research_was_switched_on_never_searches_after_the_switch()
+    {
+        var s = Create();
+        var waiting = Order(IntakeRecordJson.Serialize(IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with
+        {
+            ResearchTopics = [TopicA, TopicB],
+        }));
+
+        Assert.Null(await Ensure(s, waiting));
+        Assert.Null(await Ensure(s, waiting, files: true));
+        Assert.Empty(s.Search.Queries);
+        Assert.Empty(s.Condenser.Calls);
+        Assert.Equal((0, 0), (s.Orders.Sets, s.Orders.Counts));
+        Assert.Null(s.Orders.Find(waiting.Id)!.ResearchJson);
+    }
+
+    [Fact]
+    public async Task An_order_read_while_research_was_on_does_not_search_once_it_is_switched_off()
+    {
+        var s = Create(new ResearchOptions { Mode = ResearchMode.Off });
+
+        AssertNothingHappened(s, await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, TopicA))));
+    }
 
     [Fact]
     public async Task Topics_withheld_at_the_reading_stay_withheld_when_about_me_was_emptied_before_the_run()

@@ -48,8 +48,12 @@ What the values mean:
   when the order has files, and only for the first version (D-074). Daily limits: `Research:DailyOrderCap`,
   `Research:DailyOrderCapPerUser`; when one is reached, the text is written without looking things up and the result says so. It
   needs a search key (`TAVILY_API_KEY`); without one nothing goes to a search service, but every result with research topics says
-  that looking things up did not work, so switch it off (`Research__Mode=Off`) if you set no key. The way back for everyone is
-  `Research__Mode=Off`, for one person `Research__ModeOverrides__<user>=Off`. This switch covers the standard way only. "Extra careful" never searches the web. A workshop
+  that looking things up did not work, so switch it off (`Research__Mode=Off`, see “How to set a switch” below) if you set no key. The way back for everyone is
+  `Research__Mode=Off`, for one person `Research__ModeOverrides__<user>=Off`. The switch counts twice: only a request that was read
+  while research was on for the person can search, and only while it is still on; requests read before the switch was turned on
+  never search. Search words with an email address, a phone or account number, a date of birth or a street address are held back;
+  names and other details in plain words are not recognized, and the person sees the words that went out on the result. This switch
+  covers the standard way only. "Extra careful" never searches the web. A workshop
   template or an own team that someone chooses explicitly – on the older form `/new` or through the older tools (`submit_request`
   with `crewTemplate` or `customCrew`, `submit_auto_crew_request`) – uses the sources of that team, and these can include a web
   search whenever a search key is set, whatever `Research:Mode` says.
@@ -59,8 +63,7 @@ What the values mean:
   reading of the request had to assume or leave open while About me has nothing on it, and the line “With this request the writer got
   from About me: …”; AI assistants get the same as `aboutMeMissing`/`fromAboutMe` and can save these four fields with `profile`. Saving
   fills only fields that are still empty, in one locked step, and never overwrites. `On` (shipped since the acceptance passed) uses
-  the heading “Tell Atelier once – your next requests will not leave this open again”: the promise covers the reading of later
-  requests; a change of an existing text keeps the details it was written with. `WithoutPromise` (the code default) uses “Save it
+  the heading “Tell Atelier once – your next requests get it from About me”: every new request gets the detail, and a request that is read first no longer assumes it or asks for it; a change of an existing text keeps the details it was written with. `WithoutPromise` (the code default) uses “Save it
   under About me for your next texts”. `Off` shows none of it, and `profile` is offered read
   only with its earlier description. Administrators never see it on someone else's order, and saving goes only into the own About me
   (D-083). Way back: `Orders__TellOnce=WithoutPromise` (offer without the promise) or `Orders__TellOnce=Off`.

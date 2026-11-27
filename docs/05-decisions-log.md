@@ -2383,13 +2383,27 @@ up and the result says so; the order does not fail.
 
 **Checked in the code before switching on (for every account):** no search with attached files; none for "Extra careful"
 (D-079; now also blocked in the research service itself, not only by the choice of pipeline); only the short research topics of
-the clarifier go to the search service (at most five, each at most 120 characters, at most four searches), never answers, About
-me details, file contents or, on a failure, the request text; research runs only when the questions step ran (without a
+the clarifier go to the search service (at most five, each at most 120 characters, at most four searches), never answers, file
+contents or, on a failure, the request text, and a word from About me only when the request has it too; research runs only when the questions step ran (without a
 clarified record there are no topics); a change ("Change something") does not search again, it uses the stored research of the
 first version. **Gap found and fixed:** the topics were checked only against the About me details at the start of the run.
 Someone who changed or deleted a detail between the questions and the start, after the clarifier had put one of its words into a
 topic, would have sent that word. Now the reading already checks against the details the clarifier saw; topics held back there
 still count as held back. The sentence "the profile of the briefing counts" above therefore applies only in addition.
+
+**Follow-up after the privacy review (before switching on):** an independent review showed that names, addresses, phone and account
+numbers, dates of birth and health details from the request could reach a topic unfiltered, and that a result sentence claimed the
+opposite ("… so that no private details could reach a search engine."). Consequences: (1) a code filter without a model holds back
+topics with an email address, a phone number, an IBAN or a long number, a date of birth, a street with a house number or a postcode
+with a town, also when the request names them; years, periods, paragraphs, amounts and norm numbers still go out. Prompt and schema
+of the clarifier unchanged. (2) The texts now say that the search words come from the request and that names or other personal
+details can end up in them; the sentences about held-back words name causes only as examples. (3) The result shows the person who
+placed the order which search words were sent (web and MCP `lookedUp.searchWords`), never anyone else, administrators included.
+(4) Research runs only when it was on for the person when the request was read and the record says so (`IntakeRecord.ResearchAllowed`):
+orders read before the switch that are still waiting never search, also when resumed. (5) Other pages: passages with control or
+direction characters are dropped, page titles are cut, answers of the search service above 4 MiB are not read. **Limits, on
+purpose:** names, health details and other details in plain words are not recognized by the filter, nor is an email address written
+with spaces instead of signs ("name example example org").
 
 **Way back:** `Research__Mode=Off` (environment variable, restart of `web`, no new image). Exceptions per account stay possible
 with `Research__ModeOverrides__<account>`. Without a search key nothing goes to a search service; self-hosters who set no key
@@ -3317,8 +3331,9 @@ after that it stays `WithoutPromise`.
 check: after saving, the second order of account A had no gap and no question about the saved topic, the saved signature stood word
 for word in the text, and account B saw nothing of account A (empty profile, no foreign orders, foreign result refused).
 **Consequence:** `Orders:TellOnce = On` in `appsettings.json` (the code default stays `WithoutPromise`), own commit. The heading is
-narrower: "Tell Atelier once – your next requests will not leave this open again" instead of "… it will not leave this open again",
-because the promise covers the reading of later requests; the shown text and every change to it keep the details it was written
+narrower: "Tell Atelier once – your next requests get it from About me" instead of "… it will not leave this open again", because the
+code guarantees only that every new request gets the detail (and that a request that is read first no longer assumes it or asks for
+it; requests that skip the reading are not read); the shown text and every change to it keep the details it was written
 with. The explanation page and the guide say the same. **Way back:** `Orders__TellOnce=WithoutPromise` (offer without the promise)
 or `Orders__TellOnce=Off`.
 

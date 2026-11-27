@@ -7,11 +7,12 @@ namespace Geef.Atelier.Application.Orders;
 public static class AboutMeLines
 {
     /// <summary>
-    /// Heading of the offer under <see cref="TellOnceMode.On"/>. True by code for the next requests only: once saved, their reading takes
-    /// the topic from About me and never assumes it or asks for it again, and the writer gets it. This text and every change asked for to
-    /// it keep the details they were written with, so the heading speaks of the next requests.
+    /// Heading of the offer under <see cref="TellOnceMode.On"/>. True by code for every new request: once saved, the writer gets the
+    /// detail with the About me block of each new request, and a request that is read first takes it from About me instead of assuming
+    /// it or asking for it. This text and every change asked for to it keep the details they were written with, so the heading speaks
+    /// of the next requests and promises no more than that they get it.
     /// </summary>
-    public const string TellOnce = "Tell Atelier once – your next requests will not leave this open again";
+    public const string TellOnce = "Tell Atelier once – your next requests get it from About me";
 
     /// <summary>Heading of the offer under <see cref="TellOnceMode.WithoutPromise"/>.</summary>
     public const string TellOnceWithoutPromise = "Save it under About me for your next texts";

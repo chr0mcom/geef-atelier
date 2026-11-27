@@ -34,6 +34,7 @@ public sealed class SelfHostWordsTests : TestContext
         var search = cut.Find("[data-testid='self-host-search']").TextContent;
         Assert.Contains("without one, nothing goes to a web search", search, StringComparison.Ordinal);
         Assert.Contains("never files or answers", search, StringComparison.Ordinal);
+        Assert.Contains("names or other details from the request can be among them", search, StringComparison.Ordinal);
         Assert.Single(cut.FindAll("h1"));
     }
 

@@ -73,6 +73,7 @@ public static class IntakeRecordJson
         ResearchTopics = record.ResearchTopics ?? [],
         HeldBack = record.HeldBack?.Where(q => !string.IsNullOrWhiteSpace(q)).ToList() is { Count: > 0 } held ? held : null,
         ResearchWithheld = record.ResearchWithheld is > 0 ? record.ResearchWithheld : null,
+        ResearchAllowed = record.ResearchAllowed == true ? true : null,
     };
 
     private static ClarifierOutput Normalize(ClarifierOutput output) => output with

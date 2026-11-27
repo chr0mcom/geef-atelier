@@ -75,7 +75,7 @@ Die Seite deines Auftrags zeigt von oben nach unten:
 | **What was checked** | Nur die Prüfungen, die wirklich gelaufen sind (siehe unten). Endet immer mit: „These checks look for the problems named here. They do not prove that everything in the text is right.“ (Diese Prüfungen suchen die genannten Probleme. Sie beweisen nicht, dass alles im Text stimmt.) |
 | **Open points** | „Fill these in before you send the text“ (die Lücken), nicht erfüllte Prüfungen, Stellen, die das von dir Gegebene vielleicht nicht stützt, Probleme in deinen Dateien. |
 | **Assumptions** | Was du nicht gesagt hast und was angenommen wurde. |
-| **Looked up** | Nur wenn Atelier für diesen Auftrag etwas im Web nachgeschlagen hat: Stellen, wörtlich von den Seiten übernommen, mit Seite und Tag. Sie zeigen, was die Seiten sagen, nicht, dass es stimmt. Konnte nichts nachgeschlagen werden, sagt ein Satz, warum (zum Beispiel, weil die Tagesgrenze erreicht war). |
+| **Looked up** | Nur wenn Atelier für diesen Auftrag etwas im Web nachgeschlagen hat: die gesendeten Suchwörter (nur du siehst sie) und Stellen, wörtlich von den Seiten übernommen, mit Seite und Tag. Sie zeigen, was die Seiten sagen, nicht, dass es stimmt. Konnte nichts nachgeschlagen werden, sagt ein Satz, warum (zum Beispiel, weil die Tagesgrenze erreicht war). |
 | **From your files** | Welche Dateien wie genutzt wurden. |
 | **How it was made** | Dein Auftrag, die Schritte und die Versionen. |
 
@@ -110,8 +110,8 @@ nicht wiederholen. Nur du kannst es ändern.
 oder offen lassen, und steht dazu noch nichts unter About me, zeigt das Ergebnis dafür ein Feld mit **Save**. Was du dort
 speicherst, kommt in About me; wurde das Feld inzwischen unter About me ausgefüllt, wird nichts überschrieben, und das Ergebnis sagt
 „Already saved under About me“. Ab deinem nächsten Auftrag nimmt Atelier es aus About me, statt es zu raten oder danach zu
-fragen, und der Schreiber bekommt es bei jedem neuen Auftrag (daher die Überschrift „Tell Atelier once – your next requests will not
-leave this open again“, sinngemäß: Deine nächsten Aufträge lassen das nicht mehr offen). Der Text, den du gerade siehst, behält die Angaben, mit denen er entstand, und ebenso
+fragen, und der Schreiber bekommt es bei jedem neuen Auftrag (daher die Überschrift „Tell Atelier once – your next requests get it from About me“, sinngemäß: Deine
+nächsten Aufträge bekommen es aus About me). Der Text, den du gerade siehst, behält die Angaben, mit denen er entstand, und ebenso
 jede Änderung, um die du mit „Change something“ bittest – auch eine Angabe, die du inzwischen unter About me gelöscht hast. Soll der
 neue Wert in diesen Text, schreib ihn in deine Änderung. Das Ergebnis sagt außerdem, was der Schreiber mit diesem Auftrag aus About
 me bekam („With this request the writer got from About me: …“). Ändern oder löschen kannst du es unter About me; das gilt für deine
@@ -122,9 +122,10 @@ nächsten Aufträge. Ob der Schreiber es wirklich verwendet, etwa deinen Gruß w
 - Dein Auftrag, deine Antworten, deine About-me-Angaben und deine Dateien gehen an die KI-Dienste, die dieses Atelier zum
   Schreiben und Prüfen nutzt.
 - Atelier kann im Web nachschlagen, aber nur auf dem Standardweg und nur, wenn du keine Dateien anhängst. Dann bekommt ein
-  Suchdienst einige kurze Suchthemen, die Atelier aus deinem Auftrag gebildet hat – nie deine Antworten oder deine Dateien. Themen
-  mit Wörtern aus deinen About-me-Angaben werden zurückgehalten (das vergleicht Wörter und kann deshalb ein Wort in einer anderen
-  Sprache übersehen). Eine Änderung eines fertigen Textes nutzt, was beim ersten Mal nachgeschlagen wurde, und sucht nicht neu. Es
+  Suchdienst einige kurze Suchwörter. Sie stammen aus deinem Auftrag. Atelier lässt Mailadressen, Telefonnummern, Kontonummern und
+  Straßenanschriften weg, aber Namen oder andere persönliche Angaben aus deinem Auftrag können darin landen. Deine Antworten und
+  deine Dateien werden nie gesendet, ein Wort aus deinen About-me-Angaben nur, wenn du es auch in den Auftrag geschrieben hast (das
+  vergleicht Wörter und kann deshalb ein Wort in einer anderen Sprache übersehen). Das Ergebnis nennt die gesendeten Suchwörter. Eine Änderung eines fertigen Textes nutzt, was beim ersten Mal nachgeschlagen wurde, und sucht nicht neu. Es
   gibt eine Tagesgrenze; ist sie erreicht, wird der Text ohne Nachschlagen geschrieben, und das Ergebnis sagt es. „Extra careful“
   sucht nie im Web. Teams, die die Administration in der Werkstatt einrichtet, können eine eigene Websuche haben.
 - Nur du und die Administration dieses Ateliers sehen deine Aufträge.

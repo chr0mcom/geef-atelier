@@ -129,7 +129,7 @@ public sealed class ShippedResearchSettingsTests
     {
         Id = Guid.NewGuid(), CreatedByUser = user, RequestText = "Schreib einen Aushang zum neuen Mindestlohn.", Mode = OrderMode.Direct,
         State = OrderState.Ready, Entry = OrderEntry.Web, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
-        ClarifyJson = IntakeRecordJson.Serialize(IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = ["Mindestlohn 2027 Höhe"] }),
+        ClarifyJson = IntakeRecordJson.Serialize(IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = ["Mindestlohn 2027 Höhe"], ResearchAllowed = true }),
     };
 
     private static int Count(string text, string part) => text.Split(part).Length - 1;

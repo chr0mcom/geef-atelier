@@ -50,8 +50,12 @@ Was die Werte bedeuten:
   nie, wenn der Auftrag Dateien hat, und nur für die erste Version (D-074). Tagesgrenzen: `Research:DailyOrderCap`,
   `Research:DailyOrderCapPerUser`; ist eine erreicht, wird der Text ohne Nachschlagen geschrieben, und das Ergebnis sagt es. Sie
   braucht einen Suchschlüssel (`TAVILY_API_KEY`); ohne ihn geht nichts an einen Suchdienst, aber jedes Ergebnis mit Suchthemen
-  meldet, dass das Nachschlagen nicht geklappt hat – ohne Schlüssel also ausschalten (`Research__Mode=Off`). Rückweg für alle:
-  `Research__Mode=Off`, für eine Person `Research__ModeOverrides__<user>=Off`. Dieser Schalter gilt nur für den Standardweg. „Extra careful“ sucht nie im Web. Eine
+  meldet, dass das Nachschlagen nicht geklappt hat – ohne Schlüssel also ausschalten (`Research__Mode=Off`, siehe „Einen Schalter setzen“ unten). Rückweg für alle:
+  `Research__Mode=Off`, für eine Person `Research__ModeOverrides__<user>=Off`. Der Schalter zählt doppelt: Suchen kann nur ein
+  Auftrag, der gelesen wurde, während die Recherche für die Person an war, und nur, solange sie noch an ist; vor dem Einschalten
+  gelesene Aufträge suchen nie. Suchwörter mit Mailadresse, Telefon- oder Kontonummer, Geburtsdatum oder Straßenanschrift werden
+  zurückgehalten; Namen und andere Angaben in Worten erkennt das nicht, und die Person sieht am Ergebnis, welche Wörter hinausgingen.
+  Dieser Schalter gilt nur für den Standardweg. „Extra careful“ sucht nie im Web. Eine
   Werkstatt-Vorlage oder ein eigenes Team, das jemand ausdrücklich wählt – im älteren Formular `/new` oder über die älteren
   Werkzeuge (`submit_request` mit `crewTemplate` oder `customCrew`, `submit_auto_crew_request`) –, nutzt die Quellen dieses Teams,
   und dazu kann eine Websuche gehören, sobald ein Suchschlüssel gesetzt ist, unabhängig von `Research:Mode`.
@@ -62,8 +66,8 @@ Was die Werte bedeuten:
   Lesen des Auftrags angenommen oder offen gelassen werden musste und zu dem About me nichts hat, ein Feld, dazu die Zeile „With this
   request the writer got from About me: …“; KI-Assistenten bekommen dasselbe als `aboutMeMissing`/`fromAboutMe` und können diese vier
   Felder mit `profile` speichern. Gespeichert wird nur in Felder, die noch leer sind, in einem gesperrten Schritt, nie überschreibend.
-  `On` (ausgeliefert, seit die Abnahme bestanden ist) nutzt die Überschrift „Tell Atelier once – your next requests will not leave
-  this open again“: Die Zusage gilt für das Lesen späterer Aufträge; eine Änderung eines vorhandenen Textes behält die Angaben, mit
+  `On` (ausgeliefert, seit die Abnahme bestanden ist) nutzt die Überschrift „Tell Atelier once – your next requests get it from About me“: Jeder neue
+  Auftrag bekommt die Angabe, und ein Auftrag, der zuerst gelesen wird, nimmt sie nicht mehr an und fragt nicht mehr danach; eine Änderung eines vorhandenen Textes behält die Angaben, mit
   denen er entstand. `WithoutPromise` (Code-Standard) nutzt „Save it under About me for your next texts“. `Off` zeigt nichts davon, und `profile` wird nur lesend mit seiner früheren Beschreibung angeboten. Die
   Administration sieht es nie an fremden Aufträgen, und gespeichert wird nur in die eigenen About-me-Angaben (D-083). Rückweg:
   `Orders__TellOnce=WithoutPromise` (Angebot ohne Zusage) oder `Orders__TellOnce=Off`.

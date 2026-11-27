@@ -2479,13 +2479,27 @@ geschrieben, und das Ergebnis sagt es; der Auftrag scheitert nicht.
 
 **Vor dem Einschalten am Code nachgeprüft (für jedes Konto):** keine Suche mit angehängten Dateien; keine bei „Extra careful“
 (D-079; jetzt zusätzlich im Recherchedienst selbst gesperrt, nicht nur durch die Wahl des Ablaufs); an den Suchdienst gehen nur
-die kurzen Suchthemen des Klärers (höchstens fünf, je höchstens 120 Zeichen, höchstens vier Suchen), nie Antworten,
-About-me-Angaben, Dateiinhalte oder bei einem Fehlschlag der Auftragstext; gesucht wird nur, wenn die Rückfragen-Stufe lief
+die kurzen Suchthemen des Klärers (höchstens fünf, je höchstens 120 Zeichen, höchstens vier Suchen), nie Antworten, Dateiinhalte
+oder bei einem Fehlschlag der Auftragstext, ein Wort aus About me nur, wenn es auch im Auftrag steht; gesucht wird nur, wenn die Rückfragen-Stufe lief
 (ohne geklärten Datensatz keine Themen); eine Änderung („Change something“) sucht nicht neu, sie nutzt die gespeicherte
 Recherche der ersten Version. **Gefundene Lücke, behoben:** Die Suchthemen wurden nur gegen die About-me-Angaben zum Start des
 Laufs geprüft. Wer zwischen Rückfrage und Start eine Angabe änderte oder löschte, deren Wort der Klärer in ein Thema übernommen
 hatte, hätte dieses Wort gesendet. Jetzt prüft schon das Lesen gegen die Angaben, die der Klärer sah; zurückgehaltene Themen
 zählen weiter als zurückgehalten. Damit gilt der Satz „es gilt das Profil des Briefings“ oben nur noch zusätzlich.
+
+**Nachbesserung nach der Datenschutz-Prüfung (vor dem Einschalten):** Eine unabhängige Prüfung zeigte, dass Namen, Anschriften,
+Telefon- und Kontonummern, Geburtsdaten und Gesundheitsangaben aus dem Auftrag ungefiltert in ein Suchthema gelangen konnten und ein
+Ergebnissatz das Gegenteil behauptete („… so that no private details could reach a search engine.“). Folgen: (1) Ein Code-Filter
+ohne Modell hält Suchthemen mit Mailadresse, Telefonnummer, IBAN oder langer Ziffernfolge, Geburtsdatum, Straße mit Hausnummer oder
+Postleitzahl mit Ort zurück, auch wenn der Auftrag sie nennt; Jahreszahlen, Zeiträume, Paragraphen, Beträge und Normnummern gehen
+weiter durch. Klärer-Prompt und -Schema unverändert. (2) Die Texte sagen jetzt, dass die Suchwörter aus dem Auftrag stammen und
+Namen oder andere persönliche Angaben darin landen können; die Sätze zu zurückgehaltenen Wörtern nennen Ursachen nur als Beispiele.
+(3) Das Ergebnis zeigt der Person, der der Auftrag gehört, welche Suchwörter gesendet wurden (Web und MCP `lookedUp.searchWords`),
+nie anderen, auch nicht der Administration. (4) Gesucht wird nur, wenn beim Lesen des Auftrags die Recherche für die Person an war
+und das im Datensatz steht (`IntakeRecord.ResearchAllowed`): Aufträge, die vor dem Einschalten gelesen wurden und noch warten,
+suchen nie, auch nicht beim Fortsetzen. (5) Fremde Seiten: Stellen mit Steuer- oder Richtungszeichen werden verworfen, Seitentitel
+gekürzt, Antworten des Suchdienstes über 4 MiB nicht gelesen. **Grenzen, bewusst:** Namen, Gesundheitsangaben und andere Angaben in
+Worten erkennt der Filter nicht; eine Mailadresse mit Leerzeichen statt Zeichen („name beispiel example org“) ebenfalls nicht.
 
 **Rückweg:** `Research__Mode=Off` (Umgebungsvariable, Neustart von `web`, kein neues Image). Ausnahmen je Konto bleiben über
 `Research__ModeOverrides__<konto>` möglich. Ohne Suchschlüssel geht nichts an einen Suchdienst; wer Atelier selbst betreibt und
@@ -3444,8 +3458,9 @@ danach bleibt `WithoutPromise`.
 Faktenprüfung: Nach dem Speichern hatte der zweite Auftrag von Konto A keine Lücke und keine Rückfrage zum gespeicherten Thema, die
 gespeicherte Unterschrift stand wörtlich im Text, und Konto B sah nichts von Konto A (Profil leer, keine fremden Aufträge, fremdes
 Ergebnis abgewiesen). **Folge:** `Orders:TellOnce = On` in `appsettings.json` (Code-Standard bleibt `WithoutPromise`), eigener
-Commit. Die Überschrift ist enger gefasst: „Tell Atelier once – your next requests will not leave this open again“ statt „… it will
-not leave this open again“, weil die Zusage für das Lesen späterer Aufträge gilt; der gezeigte Text und jede Änderung daran behalten
+Commit. Die Überschrift ist enger gefasst: „Tell Atelier once – your next requests get it from About me“ statt „… it will not leave
+this open again“, weil der Code nur zusichert, dass jeder neue Auftrag die Angabe bekommt (und ein zuerst gelesener Auftrag sie nicht
+mehr annimmt oder erfragt; Aufträge, die das Lesen überspringen, werden nicht gelesen); der gezeigte Text und jede Änderung daran behalten
 die Angaben, mit denen er entstand. Erklärseite und Handbuch sagen es ebenso. **Rückweg:** `Orders__TellOnce=WithoutPromise`
 (Angebot ohne Zusage) oder `Orders__TellOnce=Off`.
 

@@ -31,7 +31,7 @@ public sealed class LandingSwitchesTests : TestContext
         Assert.Contains(RevisionLines.ChangeButton, cut.Find("[data-testid='landing-step-change']").TextContent, StringComparison.Ordinal);
         Assert.Contains("never does this when you add files", cut.Find("[data-testid='landing-step-research']").TextContent, StringComparison.Ordinal);
         Assert.StartsWith("It looks things up on the web only for gaps", cut.Find("[data-testid='landing-limit-web']").TextContent, StringComparison.Ordinal);
-        Assert.StartsWith("A web search service gets only a few short topics", cut.Find("[data-testid='landing-privacy-research']").TextContent, StringComparison.Ordinal);
+        Assert.StartsWith("To look things up, a web search service gets a few short search words", cut.Find("[data-testid='landing-privacy-research']").TextContent, StringComparison.Ordinal);
         Assert.DoesNotContain("Right now nothing goes to a web search", text, StringComparison.Ordinal);
         Assert.Contains("It does not change the text.", cut.Find("[data-testid='landing-step-factcheck']").TextContent, StringComparison.Ordinal);
         Assert.Contains(OrderCheckLines.FactsComparedLeadNoFiles + OrderCheckLines.FactsOpenOne, cut.Find("[data-testid='landing-example-checks']").TextContent, StringComparison.Ordinal);
@@ -84,13 +84,15 @@ public sealed class LandingSwitchesTests : TestContext
         var cut = RenderComponent<Landing>();
 
         Assert.Contains("never does this when you add files", cut.Find("[data-testid='landing-step-research']").TextContent, StringComparison.Ordinal);
-        Assert.Contains("shows what was looked up and on which page", cut.Find("[data-testid='landing-step-research']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("shows which search words were sent", cut.Find("[data-testid='landing-step-research']").TextContent, StringComparison.Ordinal);
         Assert.StartsWith("It looks things up on the web only for gaps", cut.Find("[data-testid='landing-limit-web']").TextContent, StringComparison.Ordinal);
         Assert.Contains("A page it finds can be wrong", cut.Find("[data-testid='landing-limit-web']").TextContent, StringComparison.Ordinal);
         var privacy = cut.Find("[data-testid='landing-privacy-research']").TextContent;
         Assert.Contains("only when you add no files", privacy, StringComparison.Ordinal);
-        Assert.Contains("It never gets your answers or your files.", privacy, StringComparison.Ordinal);
-        Assert.Contains("About me details are held back", privacy, StringComparison.Ordinal);
+        Assert.Contains("names or other personal details in your request can end up in them", privacy, StringComparison.Ordinal);
+        Assert.Contains("Your answers and your files are never sent", privacy, StringComparison.Ordinal);
+        Assert.Contains("only when you also wrote it in your request", privacy, StringComparison.Ordinal);
+        Assert.DoesNotContain("private details", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -14,7 +14,8 @@ namespace Geef.Atelier.Infrastructure.Research;
 /// raw page text on, Tavily's own answer off. Uses only <c>url</c>, <c>title</c> and <c>raw_content</c> of a result, cut to
 /// <see cref="ResearchOptions.RawCharsPerPage"/> (<see cref="TavilyTextExtensions.Cut"/>); results without raw text and results whose
 /// address is not acceptable by <see cref="ResearchAddress.Acceptable"/> (no http or https address, user information, longer than
-/// <see cref="ResearchAddress.MaxChars"/>) are left out.
+/// <see cref="ResearchAddress.MaxChars"/>) are left out. A title is cut to <see cref="MaxTitleChars"/>; an answer larger than
+/// <see cref="MaxAnswerBytes"/> is not read and ends as <see cref="InvalidAnswerCode"/>.
 /// </summary>
 internal sealed class TavilySearchClient(
     IHttpClientFactory httpClientFactory,
@@ -36,6 +37,12 @@ internal sealed class TavilySearchClient(
 
     /// <summary>Error code of an answer that is not the expected JSON.</summary>
     public const string InvalidAnswerCode = "invalid_answer";
+
+    /// <summary>Longest title of a page that is kept.</summary>
+    public const int MaxTitleChars = 300;
+
+    /// <summary>Largest answer of the search service that is read.</summary>
+    public const int MaxAnswerBytes = 4 * 1024 * 1024;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -61,7 +68,9 @@ internal sealed class TavilySearchClient(
             if (!response.IsSuccessStatusCode)
                 return Failed($"http_{(int)response.StatusCode}", started);
 
-            var json = await response.Content.ReadAsStringAsync(linked.Token);
+            var json = await ReadLimitedAsync(response.Content, linked.Token);
+            if (json is null)
+                return Failed(InvalidAnswerCode, started);
             var answer = Parse(json);
             if (answer is null)
                 return Failed(InvalidAnswerCode, started);
@@ -79,7 +88,7 @@ internal sealed class TavilySearchClient(
                     skipped++;
                     continue;
                 }
-                hits.Add(new TavilyHit(address, result.Title ?? string.Empty, raw));
+                hits.Add(new TavilyHit(address, (result.Title ?? string.Empty).Cut(MaxTitleChars), raw));
             }
 
             return new TavilySearchOutcome(hits, null, Elapsed(started)) { Skipped = skipped };
@@ -100,6 +109,23 @@ internal sealed class TavilySearchClient(
         {
             return Failed(InvalidAnswerCode, started);
         }
+    }
+
+    private static async Task<string?> ReadLimitedAsync(HttpContent content, CancellationToken ct)
+    {
+        if (content.Headers.ContentLength > MaxAnswerBytes)
+            return null;
+        await using var stream = await content.ReadAsStreamAsync(ct);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[81_920];
+        int read;
+        while ((read = await stream.ReadAsync(chunk, ct)) > 0)
+        {
+            if (buffer.Length + read > MaxAnswerBytes)
+                return null;
+            buffer.Write(chunk, 0, read);
+        }
+        return Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length).TrimStart('\uFEFF');
     }
 
     /// <summary>True for an address the research keeps (<see cref="ResearchAddress.Acceptable"/>).</summary>

@@ -63,6 +63,30 @@ public sealed class TavilySearchClientTests
     private static Task<HttpResponseMessage> Ok(string json) => Task.FromResult(StubHttpHandler.Json(json));
 
     [Fact]
+    public async Task A_long_title_is_cut_before_it_goes_anywhere()
+    {
+        var (client, _, provider) = Create((_, _, _) => Ok(Results(Result("https://example.org/a", "Raw text of the page.", new string('T', 5_000)))));
+        await using var _ = provider;
+
+        var outcome = await client.SearchAsync(Topic, 3, CancellationToken.None);
+
+        Assert.True(Assert.Single(outcome.Hits).Title.Length <= TavilySearchClient.MaxTitleChars);
+    }
+
+    [Fact]
+    public async Task An_answer_larger_than_the_limit_is_not_read_and_ends_as_invalid()
+    {
+        var huge = Results(Result("https://example.org/a", new string('x', TavilySearchClient.MaxAnswerBytes + 10)));
+        var (client, _, provider) = Create((_, _, _) => Ok(huge));
+        await using var _ = provider;
+
+        var outcome = await client.SearchAsync(Topic, 3, CancellationToken.None);
+
+        Assert.Equal(TavilySearchClient.InvalidAnswerCode, outcome.ErrorCode);
+        Assert.Empty(outcome.Hits);
+    }
+
+    [Fact]
     public async Task The_body_holds_the_topic_and_the_fixed_settings_and_nothing_else()
     {
         var (client, handler, provider) = Create((_, _, _) => Ok(Results(Result("https://example.org/a", "Raw text of the page."))));

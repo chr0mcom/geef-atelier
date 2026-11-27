@@ -64,7 +64,7 @@ public sealed class OrderResearchLinesTests
     [InlineData(ResearchStatus.NothingFound, "Some facts were looked up on the web, but no page gave a usable passage. The text does not rely on the web.")]
     [InlineData(ResearchStatus.Failed, "Looking things up on the web did not work this time. The text was written without it.")]
     [InlineData(ResearchStatus.DailyLimit, "Nothing was looked up on the web today because the daily limit was reached. The text was written without it.")]
-    [InlineData(ResearchStatus.AllWithheld, "Nothing was looked up on the web, so that no private details could reach a search engine.")]
+    [InlineData(ResearchStatus.AllWithheld, "Nothing was looked up on the web: Atelier held back every search word, for example because it held an address, a number or a word from your About me details.")]
     [InlineData(ResearchStatus.FilesAttached, "No web search was done because you attached files, so nothing from them can reach a search engine.")]
     public void Every_status_without_entries_shows_its_sentence_word_for_word_whether_or_not_the_text_used_the_research(ResearchStatus status, string sentence)
     {
@@ -79,10 +79,35 @@ public sealed class OrderResearchLinesTests
     }
 
     [Fact]
-    public void The_withheld_sentences_name_no_cause_because_a_link_or_account_details_count_as_well()
+    public void The_withheld_sentences_give_causes_only_as_examples_and_never_claim_that_nothing_private_went_out()
     {
-        Assert.DoesNotContain("About me", OrderResearchLines.AllWithheld, StringComparison.Ordinal);
-        Assert.DoesNotContain("About me", OrderResearchLines.SomeWithheld, StringComparison.Ordinal);
+        foreach (var sentence in new[] { OrderResearchLines.AllWithheld, OrderResearchLines.SomeWithheld })
+        {
+            Assert.Contains("for example", sentence, StringComparison.Ordinal);
+            Assert.DoesNotContain("private", sentence, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("could reach", sentence, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void The_search_words_that_went_out_are_listed_only_when_asked_for_the_owner()
+    {
+        var research = Research(ResearchStatus.NothingFound) with { TopicsSent = ["Mindestlohn 2027 Höhe", " Stichtag Erhöhung "] };
+
+        var owner = OrderResearchLines.Build(research, true, showSearchWords: true)!;
+        var other = OrderResearchLines.Build(research, true)!;
+
+        Assert.Equal(["Mindestlohn 2027 Höhe", "Stichtag Erhöhung"], owner.SearchWords);
+        Assert.Null(other.SearchWords);
+        Assert.Equal(owner.Note, other.Note);
+    }
+
+    [Fact]
+    public void Without_search_words_that_went_out_none_are_listed()
+    {
+        var view = OrderResearchLines.Build(Research(ResearchStatus.DailyLimit) with { TopicsSent = [] }, true, showSearchWords: true)!;
+
+        Assert.Null(view.SearchWords);
     }
 
     [Fact]
@@ -90,7 +115,7 @@ public sealed class OrderResearchLinesTests
     {
         var view = OrderResearchLines.Build(Research(ResearchStatus.Found, [Entry()], withheld: 2), true)!;
 
-        Assert.Equal("Some details were not looked up, so that no private details could reach a search engine.", view.Note);
+        Assert.Equal("Some search words were held back and not looked up, for example because they held an address, a number or a word from your About me details.", view.Note);
         Assert.Equal(2, view.Withheld);
         Assert.Single(view.Entries);
     }

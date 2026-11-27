@@ -31,7 +31,8 @@ internal sealed class OrderIntakeService(
     IOptions<IntakeOptions> options,
     ILogger<OrderIntakeService> logger,
     TimeProvider time,
-    IntakeSweepDeferrals deferrals) : IOrderIntakeService
+    IntakeSweepDeferrals deferrals,
+    IOptions<ResearchOptions>? research = null) : IOrderIntakeService
 {
     /// <summary>Error code when sources or profile could not be loaded.</summary>
     public const string PrepareFailedCode = "prepare_failed";
@@ -191,7 +192,7 @@ internal sealed class OrderIntakeService(
         var analysis = IntakeAnalysis.Analyse(order.RequestText, request.Candidates(), output, memory.Resolve(facts, output.TextType), settings.MaxQuestions);
         var gate = analysis.Gate;
         var revision = analysis.Revision;
-        var research = ResearchTopics(gate.ResearchTopics, order.RequestText, request.ProfileBlock, analysis.Output.Language);
+        var topics = ResearchTopics(gate.ResearchTopics, order.RequestText, request.ProfileBlock, analysis.Output.Language);
         var record = new IntakeRecord(
             IntakeRecord.CurrentSchemaVersion,
             IntakeRecordStatus.Ok,
@@ -203,13 +204,22 @@ internal sealed class OrderIntakeService(
             gate.Questions,
             gate.Assumptions,
             gate.FromMemory,
-            research.Topics,
+            topics.Topics,
             order.Mode == OrderMode.Direct ? revision?.SourceId : null,
             settings.BriefMode,
             gate.HeldBack,
-            research.Withheld > 0 ? research.Withheld : null);
+            topics.Withheld > 0 ? topics.Withheld : null,
+            ResearchAllowed(order) ? true : null);
         return new Analysis(record, gate.Questions.Count, true);
     }
+
+    /// <summary>
+    /// Whether looking things up on the web is switched on for the person of <paramref name="order"/> now, while the request is read: only
+    /// for the standard way (<see cref="OrderMode.Direct"/>) and only by <see cref="ResearchOptionsExtensions.ModeFor"/>. Without research
+    /// options it is off.
+    /// </summary>
+    private bool ResearchAllowed(OrderEntity order) =>
+        order.Mode == OrderMode.Direct && research?.Value is { } settings && settings.ModeFor(order.CreatedByUser) == ResearchMode.On;
 
     /// <summary>
     /// The research topics of the gate without those that <see cref="ResearchQueryGate"/> withholds against the About me details the

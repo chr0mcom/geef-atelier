@@ -18,7 +18,9 @@ namespace Geef.Atelier.Infrastructure.Research;
 /// found word for word and stores the result once per order. Every failure ends as a status with <see cref="OrderResearch.ErrorCode"/>.
 /// </summary>
 /// <remarks>
-/// Only orders of the standard way search (<see cref="OrderMode.Direct"/>); "Extra careful" never does. An order with attached files
+/// Only orders of the standard way search (<see cref="OrderMode.Direct"/>); "Extra careful" never does. Only a record whose reading
+/// found research switched on for the person searches (<see cref="IntakeRecord.ResearchAllowed"/>); orders read before, or while it
+/// was off, never do, whatever the switch says later. An order with attached files
 /// never searches (<see cref="ResearchStatus.FilesAttached"/>). Topics the intake already withheld against the About me details the
 /// clarifier read (<see cref="IntakeRecord.ResearchWithheld"/>) count as withheld. Otherwise only the topics that
 /// <see cref="ResearchQueryGate"/> lets go reach the search: it gets the values of the About me details without their field names
@@ -67,6 +69,8 @@ internal sealed class OrderResearchService(
             return null;
 
         var record = IntakeRecordJson.TryParse(order.ClarifyJson);
+        if (record is not { ResearchAllowed: true })
+            return null;
         var topics = Topics(record);
         var withheldAtIntake = WithheldAtIntake(record);
         if (topics.Count == 0 && withheldAtIntake == 0)
@@ -115,7 +119,7 @@ internal sealed class OrderResearchService(
         if (stored is { Status: ResearchStatus.FilesAttached })
             return stored;
         var record = IntakeRecordJson.TryParse(order.ClarifyJson);
-        if (Topics(record).Count == 0 && WithheldAtIntake(record) == 0)
+        if (record is not { ResearchAllowed: true } || (Topics(record).Count == 0 && WithheldAtIntake(record) == 0))
             return null;
 
         var research = new OrderResearch(OrderResearch.CurrentSchemaVersion, ResearchStatus.FilesAttached, [], 0, 0, 0, 0, 0, 0,
