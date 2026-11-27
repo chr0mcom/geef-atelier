@@ -42,15 +42,16 @@ Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsru
 > in den historischen Dokumenten dienen der Provenienz und sind auf GitHub nicht
 > auflösbar — das ist beabsichtigt.
 
-## Verbindlicher Entwicklungs-Workflow
+## Entwicklungs-Workflow
 
-Im übergeordneten Infrastruktur-Repository unter `/srv/docker/docs/` liegen die übergreifenden Prozess-Vorgaben, allen voran **`geef-workflow.md`** — die kanonische Anweisung an Claude Code, *wie* gebaut wird (außerhalb dieses Repositories, daher hier nicht verlinkt). Sie definiert die vier Phasen (Grounding / Execution / Evaluation / Finalize), die fünf Reviewer und die Advisor-Konsultationen. Alle Bau-Prompts in `docs/prompts/` verweisen darauf und ergänzen nur den schritt-spezifischen Scope. Die weiteren Dateien in jenem Ordner (z.B. `docker-deployment.md`, `contact-protection.md`) sind ebenfalls verbindlich und müssen beachtet werden.
+Änderungen entstehen in Phasen (Grounding, Execution, Evaluation, Finalize) mit unabhängigen Prüfungen; die Bau-Prompts und
+Berichte dieses Ablaufs liegen in den oben genannten, nicht veröffentlichten Arbeitsordnern.
 
 ## Status
 
 - **Phase:** produktiv. Atelier schreibt jeden Text auf einem Weg: dem Auftrag mit dem Direktweg (D-068 bis D-077). Die Variante „Extra careful“ wurde nach ihrer Messung entfernt (zweiter Zusatz zu D-087). Das ältere Crew-System und alles, was nur es nutzte (Werkstatt, Tools, Lernen, Wissensbasis, Abschlussschritte, Advisor, Packs), wurden in Stufe 8d entfernt (D-091).
 - **Letzte Aktualisierung:** 2026-11-27
-- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-091, Stufe 8d: Der Rest der älteren Arbeitsweise ist entfernt, nach dem ersten Schnitt in Stufe 8c, D-089). D-092 hat danach die Datenbank aufgeräumt: eine Baseline-Migration; die Tabellen und Spalten der entfernten Teile und die alten Testaufträge sind weg. Die Dokumente kennzeichnen, was entfernt wurde.
+- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-092: Die Datenbank wurde zu einer Baseline-Migration aufgeräumt, nachdem Stufe 8d, D-091, den Rest der älteren Arbeitsweise entfernt hatte). Die Dokumente kennzeichnen, was entfernt wurde.
 
 ## Konventionen
 

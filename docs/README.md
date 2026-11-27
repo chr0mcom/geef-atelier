@@ -42,15 +42,16 @@ The documentation evolves alongside the brainstorming and is updated after every
 > in the historical documents serve provenance and are not resolvable on GitHub —
 > this is intentional.
 
-## Binding development workflow
+## Development workflow
 
-The cross-cutting process rules live in the parent infrastructure repository under `/srv/docker/docs/`, foremost **`geef-workflow.md`** — the canonical instruction to Claude Code on *how* things are built (outside this repository, hence not linked here). It defines the four phases (Grounding / Execution / Evaluation / Finalize), the five reviewers and the advisor consultations. All build prompts in `docs/prompts/` reference it and only add the step-specific scope. The other files in that folder (e.g. `docker-deployment.md`, `contact-protection.md`) are likewise binding and must be observed.
+Changes are built in phases (grounding, execution, evaluation, finalize) with independent reviews; the build prompts and reports
+of that process are the unpublished working folders named above.
 
 ## Status
 
 - **Phase:** in production. Atelier writes every text on one way: the order with the direct path (D-068 to D-077). The variant "Extra careful" was removed after its measurement (second addendum to D-087). The older crew system and everything only it used (workshop, tools, learning, knowledge base, finishing steps, advisors, packs) were removed in stage 8d (D-091).
 - **Last updated:** 2026-11-27
-- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-091, stage 8d: the rest of the older way of working is removed, after the first cut of stage 8c, D-089). D-092 then cleaned the database: one baseline migration, the tables and columns of the removed parts and the old test orders are gone. Documents mark what was removed.
+- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-092: the database was cleaned up into one baseline migration, after stage 8d, D-091, removed the rest of the older way of working). Documents mark what was removed.
 
 ## Conventions
 

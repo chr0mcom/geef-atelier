@@ -2,9 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-27 (D-085: ältere Prüfschleife, drei Schutzschalter, ausgeliefert aus; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
-
-*Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: „Extra careful“ entfällt; D-091: Rückbau, Schnitt 2, nur der Standardweg bleibt; zuvor D-090: Gateway-Failover nur auf dasselbe Modell; D-087: „Extra careful“ mit Gliederung hinter Schalter, Schleifen-Schalter je Konto, Messung vorbereitet; zuvor D-086: MCP-Server-Hinweise unter der Kürzungsgrenze, SDK exakt 2.4.0; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-27 (Zusätze zu D-090 und D-092 nach der abschließenden Doku-Prüfung; D-092: Datenbank und Dateiablage aufgeräumt, eine Baseline-Migration; zweiter Zusatz zu D-087: „Extra careful“ entfällt; D-091: Rückbau, Schnitt 2, nur der Standardweg bleibt; zuvor D-090: Gateway-Failover nur auf dasselbe Modell; D-089: Rückbau, Schnitt 1; D-088: MCP-Skill und Rückfragen als Formular; D-085: ältere Prüfschleife, drei Schutzschalter; D-087: „Extra careful“ mit Gliederung hinter Schalter, Schleifen-Schalter je Konto, Messung vorbereitet; zuvor D-086: MCP-Server-Hinweise unter der Kürzungsgrenze, SDK exakt 2.4.0; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -26,7 +24,7 @@ Sechs Korrekturen: SDK-`FindingSeverity { Info, Warning, Error, Critical }`; `De
 Realfakten zur ursprünglichen Anthropic-Schicht. Konzepte (Tool-Use, defensive JSON, API-Key per Request, Resilience) bleiben in M1 gültig.
 
 ### D-014: Production-Domain für Schritt 10
-`geef.stefan-bechtel.de`, IP `95.216.100.213`, Traefik mit TLS.
+Die öffentliche Domain der Installation, hinter Traefik mit TLS.
 
 ### D-015: Schritt 4 — EventSink und Persistierung
 `IRunPersistenceService`, `PostgresEventSink` mit injizierter `Guid runId`, Severity-Mapping via `ToAtelierSeverity()`, Token-Tracking via Context-Key, Critical-Abort aus `PipelineFailedEvent.History` (SDK-Dekompilierung), `_lastExecutionContext` als `volatile`, `IServiceScopeFactory.CreateAsyncScope()` pro Event.
@@ -337,7 +335,7 @@ Seit Commit `28daafb` wird `appsettings.Development.json` nicht mehr getrackt. B
 
 ## D-027 — Post-Skeleton Schritt 4: CLI-Provider-Adapter (2026-05-13)
 
-**Kontext:** Alle drei Provider-Aufrufe liefen bisher über OpenRouter (Pay-as-you-go). Auf dem Atelier-Server (Hetzner, `95.216.100.213`) sind `claude` (Claude Code CLI, Subscription) und `codex` (OpenAI Codex CLI, Subscription) installiert — Subscription-Kapazität ohne Token-Abrechnung. Ziel: zweiter Provider-Pfad via neuem Side-Container, der diese CLIs als OpenAI-kompatibles HTTP exposed.
+**Kontext:** Alle drei Provider-Aufrufe liefen bisher über OpenRouter (Pay-as-you-go). Auf dem Atelier-Server sind `claude` (Claude Code CLI, Subscription) und `codex` (OpenAI Codex CLI, Subscription) installiert — Subscription-Kapazität ohne Token-Abrechnung. Ziel: zweiter Provider-Pfad via neuem Side-Container, der diese CLIs als OpenAI-kompatibles HTTP exposed.
 
 **Entscheidungen:**
 
@@ -557,7 +555,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 ### Deployment:
 
-- Backup: `backup/before-pgvector-migration-20260514-120931.dump` (34K, 48 TOC-Entries, PG16)
+- Vor der Migration wurde die Datenbank gesichert.
 - Postgres-Image gewechselt auf `pgvector/pgvector:pg16` (PG 16.13, Debian)
 - `vector`-Extension 0.8.2 installiert
 - Web-Container mit `--no-cache` neu gebaut
@@ -611,7 +609,7 @@ INSERT INTO "GroundingProviderProfiles" ... ('run-attachments', 'vector-store', 
 
 ### Deployment:
 
-- Backup: `backup/before-run-attachments-migration-20260514-165517.dump` (39K, 60 TOC-Entries)
+- Vor der Migration wurde die Datenbank gesichert.
 - Web-Container mit `--no-cache` neu gebaut
 - PR #7 gemerged (SHA: `f6832f9`), Branch `feat/run-attachments` gelöscht
 - Produktiv unter `https://geef.stefan-bechtel.de/new` (FileDropZone sichtbar)
@@ -1178,7 +1176,7 @@ Drei unabhängige Stabilitätsfixes nach Analyse zweier produktiver Runs, die al
 - `LlmClientResolver.ForProfile` normalisiert an der Call-Site vor der Weiterleitung.
 - Alle System-Profil-Konstanten auf kanonische Namen umgestellt. 16 neue Tests, 6 bestehende aktualisiert.
 
-**Fix 3 — Pflicht-Findings für Reviewer:** Ursache für „4 Reviewer, 0 Findings" in Run `76ae5590`: alle Reviewer-Prompts enthielten explizit *„No findings means approved=true with an empty findings array"* — eine Erlaubnis zur Nachlässigkeit. Behoben auf zwei Ebenen:
+**Fix 3 — Pflicht-Findings für Reviewer:** Ursache für „4 Reviewer, 0 Findings" in einem Run: alle Reviewer-Prompts enthielten explizit *„No findings means approved=true with an empty findings array"* — eine Erlaubnis zur Nachlässigkeit. Behoben auf zwei Ebenen:
 - System-Prompts: Satz entfernt, ersetzt durch *„You MUST always provide at least one finding — even on fully compliant text, use 'info' severity."*
 - Code-Guard (`ProfileBasedReviewer.ReviewAsync`): bei `approved=true && findings.Count==0` wird einmalig mit explizitem Hinweis wiederholt. 6 neue Tests.
 
@@ -1397,8 +1395,8 @@ sie greift nur bei **erzwungenen** Neuauflösungen, ein gewöhnlicher Aufruf nac
 probt weiterhin, und der interne 12-h-Sweep ist ausgenommen. Der Zeitstempel misst den **Versuch**,
 nicht den Erfolg — ein fehlgeschlagener Abruf schreibt keinen Cache-Eintrag, eine erfolgsbasierte
 Drossel würde also ausgerechnet in der Störung nicht drosseln. Anlass für die Härte ist die
-claude-Seite: eine Probe startet drei echte CLI-Subprozesse auf einem Abo, das Hermes und der
-DMS-Worker mitbenutzen. Für codex ist es ein HTTP-Request, die Drossel dort also günstig, aber vor
+claude-Seite: eine Probe startet drei echte CLI-Subprozesse auf einem geteilten Abo.
+Für codex ist es ein HTTP-Request, die Drossel dort also günstig, aber vor
 allem symmetrisch.
 
 *Inline-Kommentare.* `geef_architecture.md` §2.9 gibt die vorhandenen Kommentare in
@@ -1467,7 +1465,7 @@ wiederholt und Kontingent verbrennt).
 Reste nach Zeitüberschreitung, Abbruch oder Neustart räumt der nächste Lauf ab (älter als 1 h, nur
 UUID-Ordner); ein abgebrochener Request beendet den codex-Prozess.
 
-**D-065/5 — Kontingentschutz.** Bilder zehren am ChatGPT-Plus-Fenster, das BookForge mitnutzt. Daher
+**D-065/5 — Kontingentschutz.** Bilder zehren am codex-Kontingent, das andere Nutzer des Gateways mitnutzen. Daher
 ein Bildlauf gleichzeitig (`CODEX_IMAGE_MAX_CONCURRENT`, auf `CODEX_MAX_CONCURRENT − 1` begrenzt, belegt zusätzlich einen Codex-Platz), Zeitlimit
 300 s und Tagesdeckel 50 je UTC-Tag (`IMAGE_DAILY_MAX`, im Speicher, 0 = aus).
 
@@ -1564,7 +1562,7 @@ Der Learning-Extractor lief bisher bezahlt (`openrouter/openai/gpt-5.6-sol`) und
 - Die OpenRouter-Ableitung ist entfernt.
 - Der Atelier-Client loggt `x-cli-proxy-failover` als Warnung, weil ein Failover einen Reviewer unbemerkt auf das Standardmodell der Partner-CLI legt.
 
-**D-066/9 — Host-Default Codex = `gpt-6.2-sol`, nicht Astra.** Das weicht vom Wortlaut der Workflow-Regel „größtes Modell“ ab. Das Codex-Konto wird mit BookForge geteilt und war schon zweimal leer. Sol hat 500k Kontext, Astra 272k. Astra wird in der Matrix gezielt für Fakten genutzt. **Nachtrag 2026-11-23:** Der Server gibt neue Modelle nur an neue Client-Versionen frei. Die Host-CLI stand noch auf codex 0.151 und bekam `gpt-6.2-*` mit „not supported when using Codex with a ChatGPT account“ abgelehnt. Das hat codex auf dem Host bis zum Update lahmgelegt. Die Host-CLI ist jetzt auf 0.171.0 aktualisiert, dieselbe Version wie im cli-proxy-Container. Regel: Wer das Default-Modell ändert, prüft zuerst `codex --version` gegen den Container und danach `codex exec "OK" < /dev/null`.
+**D-066/9 — Host-Default Codex = `gpt-6.2-sol`, nicht Astra.** Das weicht vom Wortlaut der Workflow-Regel „größtes Modell“ ab. Das Codex-Kontingent wird geteilt. Sol hat 500k Kontext, Astra 272k. Astra wird in der Matrix gezielt für Fakten genutzt. **Nachtrag 2026-11-23:** Der Server gibt neue Modelle nur an neue Client-Versionen frei. Die Host-CLI stand noch auf codex 0.151 und bekam `gpt-6.2-*` mit „not supported when using Codex with a ChatGPT account“ abgelehnt. Das hat codex auf dem Host bis zum Update lahmgelegt. Die Host-CLI ist jetzt auf 0.171.0 aktualisiert, dieselbe Version wie im cli-proxy-Container. Regel: Wer das Default-Modell ändert, prüft zuerst `codex --version` gegen den Container und danach `codex exec "OK" < /dev/null`.
 
 **D-066/10 — Immer aktuelle Modelle ohne Codeänderung (Betreiberwunsch 2026-11-23).** Anlass: Die Host-CLI lehnte `gpt-6.2-sol` ab (siehe D-066/9), und die Matrix hätte ein `gpt-6.3-sol` erst nach einem Release genutzt. Drei Bausteine:
 
@@ -1575,7 +1573,7 @@ Der Learning-Extractor lief bisher bezahlt (`openrouter/openai/gpt-5.6-sol`) und
   - Ausgemusterte Codex-Generationen (gpt-4/5, Luna, `-mini`, o-Series) gehen auf den Alias ihrer Linie (Sol/Terra), sonst auf `gpt-astra-latest`.
   - Offene Gewichte (`gpt-oss`) sind kein Abo-Modell und bleiben unverändert.
 - **Nächtlicher Host-Abgleich** in `scripts/cli-proxy-selfupdate.sh` (Cron 03:40): Die Host-CLIs claude und codex unter `~/.npm-global` werden auf die im Container getestete Version gebracht, nur vorwärts. Danach wird das Host-Standardmodell von codex auf die neueste Sol-Version gestellt.
-  - Jeder Schritt wird mit einer echten Anfrage geprüft, bei Fehlschlag zurückgerollt und per Telegram gemeldet.
+  - Jeder Schritt wird mit einer echten Anfrage geprüft, bei Fehlschlag zurückgerollt und gemeldet.
   - Der Abgleich läuft auch dann, wenn der Container selbst aktuell ist. `HOST_ONLY=1` führt ihn einzeln aus.
 
 **D-066/11 — Härtung nach dem GEEF-Review (2026-11-23).**
@@ -3936,6 +3934,11 @@ Differenztest gegen `main` über die Szenario-Matrix für alle übrigen Kopfwert
 **Rückweg.** Gateway-Image zurück genügt nicht allein, solange `web` `same-model` schickt (dann wieder volles Failover); also zuerst
 `web` zurück, dann das Gateway.
 
+### Zusatz zu D-090 — ausgeliefert (2026-11-27)
+
+Gateway und Web-App wurden in der oben genannten Reihenfolge ausgeliefert (zuerst das Gateway). Die Statuszeile des Eintrags
+beschreibt den Stand davor.
+
 ## D-091 — Rückbau, Schnitt 2: nur der Standardweg bleibt (2026-11-27)
 
 **Kontext.** Stufe 8d des Rückbaus („Rückbau, Schnitt 2“). Sie ersetzt die Zwischenstufen 8a/8b: Die ältere Prüfschleife hat die
@@ -4093,3 +4096,22 @@ alten Migrationen und der Altdaten sind weg.
 **Rückweg.** Das vorige Image zusammen mit der unmittelbar vor der Umstellung gezogenen Datenbanksicherung (in eine leere
 Datenbank zurückgespielt) und, falls nötig, der Sicherung der Dateiablage. Das vorige Image kann die umgestellte Datenbank nicht
 lesen.
+
+### Zusatz zu D-092 — abschließende Doku-Prüfung (2026-11-27)
+
+Dokumente, öffentliche Seiten und der Installationsweg wurden am Code geprüft.
+
+- **Keine festen Wartezeiten.** Wartefristen, die frühere Einträge für Arbeiten gesetzt hatten (zum Beispiel Tabellen löschen
+  „frühestens einen Deploy und 30 Tage später“ in D-077 und D-078 oder Messungen „nachts“), gelten nicht mehr. Einen Schritt
+  schützt die Prüfung des aktuellen Zustands: Es wird nichts geschrieben, die Dienste sind gesund, das Rückspielen der Sicherung
+  ist geprüft, und es gibt einen Rückweg. Fachliche Zeitgrenzen des Produkts (Token-Gültigkeit, Timeouts, Aufbewahrung) sind
+  davon nicht berührt.
+- **DNS-Pinning.** Die in D-066 und D-077 genannte Härtung ist gegenstandslos: `url-fetch`, `rest-api` und der MCP-Client, um die
+  es ging, sind entfernt (D-089, D-091).
+- **Installationsweg**, gefunden beim Durchspielen aus einem frischen Klon: Der Webdienst bekommt jetzt seine öffentliche Adresse
+  (`OAuth__Issuer`, aus `ATELIER_DOMAIN`), statt beim eingebauten Standard zu bleiben; ein Passwort-Hash in `.env` braucht
+  einfache Anführungszeichen; die CLIs des Gateways werden mit ihrem eigenen Home-Ordner angemeldet;
+  `scripts/restore-backup.sh` ersetzt die Daten jetzt wirklich, in einer Transaktion (vorher endete das Rückspielen in eine
+  gefüllte Datenbank mit Fehlern, ließ die alten Daten stehen und meldete trotzdem Erfolg).
+- **Bereinigt.** Betriebsdetails (Serveradresse, Namen von Sicherungsdateien, andere Anwendungen auf demselben Rechner) wurden aus
+  früheren Einträgen entfernt; die Entscheidungen sind unverändert.

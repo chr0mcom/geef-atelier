@@ -2,9 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-11-27 (D-085: older review loop, three safeguard switches, shipped off; before that 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
-
-*Last updated: 2026-11-27 (D-092: database and file store cleanup, one baseline migration; second addendum to D-087: "Extra careful" goes; D-091: cleanup, cut 2, only the standard way remains; before that D-090: gateway failover to the same model only; D-087: “Extra careful” with an outline behind a switch, loop switches per account, measurement prepared; before that D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-27 (addenda to D-090 and D-092 after the final documentation check; D-092: database and file store cleanup, one baseline migration; second addendum to D-087: "Extra careful" goes; D-091: cleanup, cut 2, only the standard way remains; before that D-090: gateway failover to the same model only; D-089: cleanup, cut 1; D-088: MCP skill and questions as a form; D-085: older review loop, three safeguard switches; D-087: “Extra careful” with an outline behind a switch, loop switches per account, measurement prepared; before that D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -26,7 +24,7 @@ Six corrections: SDK `FindingSeverity { Info, Warning, Error, Critical }`; `Defa
 Reality facts about the original Anthropic layer. The concepts (tool use, defensive JSON, API key per request, resilience) remain valid in M1.
 
 ### D-014: production domain for step 10
-`geef.stefan-bechtel.de`, IP `95.216.100.213`, Traefik with TLS.
+The public domain of the installation, behind Traefik with TLS.
 
 ### D-015: Step 4 — event sink and persistence
 `IRunPersistenceService`, `PostgresEventSink` with an injected `Guid runId`, severity mapping via `ToAtelierSeverity()`, token tracking via a context key, critical-abort from `PipelineFailedEvent.History` (SDK decompilation), `_lastExecutionContext` as `volatile`, `IServiceScopeFactory.CreateAsyncScope()` per event.
@@ -337,7 +335,7 @@ Since commit `28daafb`, `appsettings.Development.json` is no longer tracked. Rat
 
 ## D-027 — post-skeleton step 4: CLI provider adapter (2026-05-13)
 
-**Context:** all three provider calls ran via OpenRouter (pay-as-you-go) so far. On the Atelier server (Hetzner, `95.216.100.213`), `claude` (Claude Code CLI, subscription) and `codex` (OpenAI Codex CLI, subscription) are installed — subscription capacity without token billing. Goal: a second provider path via a new side container that exposes these CLIs as OpenAI-compatible HTTP.
+**Context:** all three provider calls ran via OpenRouter (pay-as-you-go) so far. On the Atelier server, `claude` (Claude Code CLI, subscription) and `codex` (OpenAI Codex CLI, subscription) are installed — subscription capacity without token billing. Goal: a second provider path via a new side container that exposes these CLIs as OpenAI-compatible HTTP.
 
 **Decisions:**
 
@@ -557,7 +555,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 ### Deployment:
 
-- Backup: `backup/before-pgvector-migration-20260514-120931.dump` (34K, 48 TOC entries, PG16)
+- A database backup was taken before the migration.
 - Postgres image switched to `pgvector/pgvector:pg16` (PG 16.13, Debian)
 - `vector` extension 0.8.2 installed
 - Web container rebuilt with `--no-cache`
@@ -611,7 +609,7 @@ INSERT INTO "GroundingProviderProfiles" ... ('run-attachments', 'vector-store', 
 
 ### Deployment:
 
-- Backup: `backup/before-run-attachments-migration-20260514-165517.dump` (39K, 60 TOC entries)
+- A database backup was taken before the migration.
 - Web container rebuilt with `--no-cache`
 - PR #7 merged (SHA: `f6832f9`), branch `feat/run-attachments` deleted
 - In production at `https://geef.stefan-bechtel.de/new` (FileDropZone visible)
@@ -1196,7 +1194,7 @@ Three independent reliability fixes shipped together after production run analys
 - `LlmClientResolver.ForProfile` normalizes at the call site before forwarding.
 - All system profile constants updated to canonical names. 16 new tests, 6 existing tests updated.
 
-**Fix 3 — mandatory reviewer findings:** Root cause of "4 reviewers, 0 findings" in run `76ae5590`: all reviewer prompts explicitly stated *"No findings means approved=true with an empty findings array"* — permission to be lazy. Fixed at two levels:
+**Fix 3 — mandatory reviewer findings:** Root cause of "4 reviewers, 0 findings" in one run: all reviewer prompts explicitly stated *"No findings means approved=true with an empty findings array"* — permission to be lazy. Fixed at two levels:
 - System prompts: sentence removed, replaced with *"You MUST always provide at least one finding — even on fully compliant text, use 'info' severity."*
 - Code guard (`ProfileBasedReviewer.ReviewAsync`): if `approved=true && findings.Count==0`, retries once with explicit reminder. 6 new tests.
 
@@ -1484,7 +1482,7 @@ timestamp: it applies only to **forced** re-resolutions, an ordinary call after 
 probes, and the internal 12 h sweep is exempt. The timestamp records the **attempt**, not the
 success — a failed lookup writes no cache entry, so a success-based throttle would fail to throttle
 in exactly the outage it exists for. The reason for the strictness is the claude side: one probe
-spawns three real CLI subprocesses on a subscription shared with Hermes and the DMS worker. For
+spawns three real CLI subprocesses on a shared subscription. For
 codex it is a single HTTP request, so the throttle there is cheap — but above all symmetric.
 
 *Inline comments.* `geef_architecture.md` section 2.9 explicitly grants the existing comments in
@@ -1551,7 +1549,7 @@ burns quota).
 Leftovers after a timeout, cancellation or restart are swept by the next job (older than 1 h, UUID
 directories only); a cancelled request kills the codex process.
 
-**D-065/5 — Quota protection.** Images draw on the ChatGPT Plus window that BookForge shares. Hence one
+**D-065/5 — Quota protection.** Images draw on the codex quota that other consumers of the gateway share. Hence one
 image job at a time (`CODEX_IMAGE_MAX_CONCURRENT`, capped at `CODEX_MAX_CONCURRENT − 1`, which also holds one codex slot), a 300 s timeout and
 a daily cap of 50 per UTC day (`IMAGE_DAILY_MAX`, in memory, 0 = off).
 
@@ -1589,7 +1587,7 @@ Research: `reports/2026-11-22-modellrecherche.md`. Design: `docs/superpowers/spe
 - **Migration Step46:** new columns, crew domains, role classification of all known custom profiles, CLI rewrite for the manual rest, managed refiners, cleared legacy Studio default. It is idempotent, and a tolerant enum converter reads unknown values as manual.
 - **Learning extractor and Template Studio defaults** come from the matrix (no paid routes).
 - **cli-proxy:** codex models are read from the CLI's own `models_cache.json`. The Atelier client logs `x-cli-proxy-failover` warnings.
-- **Host codex default is `gpt-6.2-sol`, not Astra** (shared quota with BookForge, larger context). Addendum 2026-11-23: new models are only offered to current CLI versions; the host CLI (0.151) rejected `gpt-6.2-*` until it was updated to 0.171.0, the container's version.
+- **Host codex default is `gpt-6.2-sol`, not Astra** (shared quota, larger context). Addendum 2026-11-23: new models are only offered to current CLI versions; the host CLI (0.151) rejected `gpt-6.2-*` until it was updated to 0.171.0, the container's version.
 
 - **Always-current models without code changes (2026-11-23):** the cli-proxy exposes codex always-latest aliases `gpt-<line>-latest`, resolved to the newest listed model of the line in `models_cache.json`. They are listed first with `x_aliases` and translated to the concrete id before `-m`. Matrix, fallbacks, seeds and Step46 use `gpt-sol-latest`/`gpt-astra-latest`; run snapshots keep the concrete id. The nightly `scripts/cli-proxy-selfupdate.sh` also brings the host claude/codex CLIs to the container's tested version and moves the host codex default to the newest Sol, each step smoke-tested, rolled back on failure and reported.
 - **Review hardening (2026-11-23):**
@@ -3791,6 +3789,11 @@ both values in `LlmHttpRetryTests`.
 **Way back.** Rolling back the gateway image alone is not enough while `web` sends `same-model` (full failover again); roll back `web`
 first, then the gateway.
 
+### Addendum to D-090 — shipped (2026-11-27)
+
+Gateway and web app were shipped in the order given above (gateway first). The status line of the entry describes the state before
+that.
+
 ## D-091 — Cleanup, cut 2: only the standard way remains (2026-11-27)
 
 **Context.** Stage 8d of the cleanup ("removal cut 2"). It replaces the interim stages 8a/8b: the older review loop lost the
@@ -3939,3 +3942,20 @@ the test scaffolding. New tests cover the baseline, its seeds and the guard; tes
 
 **Rollback.** The previous image together with the database backup taken right before the conversion (restored into an empty
 database) and, if needed, the backup of the file store. The previous image cannot read the converted database.
+
+### Addendum to D-092 — final documentation check (2026-11-27)
+
+The documents, the public pages and the installation path were checked against the code.
+
+- **No fixed waiting periods.** Waiting periods that earlier entries set for work (for example deleting tables "at the earliest one
+  deploy and 30 days later" in D-077 and D-078, or measurements "at night") are not rules any more. What protects a step is a check
+  of the current state: nothing is being written, the services are healthy, a restore of the backup was tested, and there is a way
+  back. Time limits of the product (token lifetimes, timeouts, retention) are not affected.
+- **DNS pinning.** The hardening task named in D-066 and D-077 is obsolete: `url-fetch`, `rest-api` and the MCP client, the parts
+  it was about, were removed (D-089, D-091).
+- **Installation path**, found by running it from a fresh clone: the web service now receives its public address
+  (`OAuth__Issuer`, from `ATELIER_DOMAIN`) instead of keeping the built-in default; a password hash in `.env` needs single quotes;
+  the gateway CLIs are signed in with their own home folder; `scripts/restore-backup.sh` now really replaces the data, in one
+  transaction (before, restoring into a filled database ended with errors, kept the old data and still reported success).
+- **Redaction.** Operating details (server address, backup file names, other applications on the same host) were removed from
+  earlier entries; their decisions are unchanged.
