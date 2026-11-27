@@ -10,7 +10,7 @@ This is the continuously maintained documentation for **Geef.Atelier**: it turns
 |---|---|
 | [12-user-guide.md](12-user-guide.md) | Everyone who writes with Atelier in the browser |
 | [13-ai-assistant-guide.md](13-ai-assistant-guide.md) | People who use Atelier from an AI assistant (MCP) |
-| [14-admin-guide.md](14-admin-guide.md) | Administrators: accounts, switches, the older workshop |
+| [14-admin-guide.md](14-admin-guide.md) | Administrators: accounts, switches, providers |
 | [15-developer-guide.md](15-developer-guide.md) | Developers and hosts: map of the system, tests, rules |
 
 The running application also explains itself on the public page `/how-it-works`, which follows the current switches.
@@ -27,12 +27,12 @@ The documentation evolves alongside the brainstorming and is updated after every
 | [03-walking-skeleton-plan.md](03-walking-skeleton-plan.md) | The original 10-step build plan (historical; skeleton completed) | Historical |
 | [04-mcp-integration.md](04-mcp-integration.md) | MCP server: tools, auth (bearer + OAuth 2.1), transport | Living |
 | [05-decisions-log.md](05-decisions-log.md) | Chronological, append-only log of all architecture decisions (D-001 ff.) | Historical |
-| [06-reviewer-calibration.md](06-reviewer-calibration.md) | Severity taxonomy and convergence-policy standard for reviewers | Living |
+| [06-reviewer-calibration.md](06-reviewer-calibration.md) | Severity taxonomy and convergence policy; the parts about the old review loop are marked as historical (removed in D-091) | Living |
 | [07-design-system.md](07-design-system.md) | Theme system, typography, component inventory (as of design translation PS-3) | Living |
-| [08-crew-system.md](08-crew-system.md) | Crew/profile/template system, system profiles, advisor passes – the older way ("Workshop", "Extra careful") | Living |
+| [08-crew-system.md](08-crew-system.md) | What remains of the crew system: the two setups in code, crew snapshot, model matrix, reviewers of the direct path, old runs; the removed parts are listed (D-091) | Living |
 | [09-endpoint-reference.md](09-endpoint-reference.md) | Reference of all externally reachable HTTP endpoints (MCP, OAuth, Web/Account) | Living |
-| [10-tool-system.md](10-tool-system.md) | Central tool catalogue + agentic tool-use (Pull) + grounding (Push) + MCP client (D-060); actual state: Pull never wired and frozen, environment-variable allow list (D-067) | Living |
-| [11-specialization-packs.md](11-specialization-packs.md) | Generic actors + reusable scoped specialization packs (D-061) | Living |
+| [10-tool-system.md](10-tool-system.md) | Short note: the tool system was removed in stage 8d (D-091); the allow list for environment variables still applies | Note |
+| [11-specialization-packs.md](11-specialization-packs.md) | Short note: specialization packs were removed in stage 8d (D-091) | Note |
 | [ops/atelier-smoke.md](ops/atelier-smoke.md), [ops/atelier-watch.md](ops/atelier-watch.md) | Operations: mini run after deploy, watcher for stuck runs (German only) | Living |
 
 > **Internal working directories (not in the public repository):**
@@ -48,9 +48,9 @@ The cross-cutting process rules live in the parent infrastructure repository und
 
 ## Status
 
-- **Phase:** in production. Since the rebuild of November 2026 (D-068 to D-077) the default is the order with the direct path; the older crew system (with its extensions such as advisor passes, grounding, finalizers and the paused learning loop; Template Studio was removed in stage 8c, D-089) stays available as "Workshop" and "Extra careful".
-- **Last updated:** 2026-11-26
-- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-089 "cleanup, cut 1"). The rebuild following D-068 ends with stage 6 and the closing round 8a (D-077): stages 1b, 7, 8 (apart from 8a) and 9 are not built, and the older crew, tool and learning systems stay in place until the removal trigger in D-077 is met; the first cut of the removal (stage 8c, D-089) took out the parts nobody used; documents mark parts that are frozen or due for removal.
+- **Phase:** in production. Atelier writes every text on one way: the order with the direct path (D-068 to D-077). "Extra careful" (an outline first, D-087) exists only behind the switch `Orders:CarefulOutline`, shipped off. The older crew system and everything only it used (workshop, tools, learning, knowledge base, finishing steps, advisors, packs) were removed in stage 8d (D-091).
+- **Last updated:** 2026-11-27
+- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-091, stage 8d: the rest of the older way of working is removed, after the first cut of stage 8c, D-089). No database table or column was dropped, so old orders and runs stay readable; the database cleanup is a separate later step. Documents mark what was removed.
 
 ## Conventions
 

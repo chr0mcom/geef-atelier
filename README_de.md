@@ -30,7 +30,7 @@ zeigen deshalb nie etwas als verfügbar, was ausgeschaltet ist (D-080, D-084).
 |---|---|
 | willst einen Text und nutzt den Browser | [Leitfaden: Schreiben mit Atelier](docs/12-user-guide_de.md) |
 | nutzt einen KI-Assistenten (geprüft mit Claude Code) | [Leitfaden: aus einem KI-Assistenten](docs/13-ai-assistant-guide_de.md) |
-| betreibst Atelier für ein Team: Konten, Schalter, die ältere Werkstatt | [Leitfaden für die Administration](docs/14-admin-guide_de.md) |
+| betreibst Atelier für ein Team: Konten, Schalter, Anbieter | [Leitfaden für die Administration](docs/14-admin-guide_de.md) |
 | entwickelst oder betreibst es selbst | [Leitfaden für Entwicklung und Betrieb](docs/15-developer-guide_de.md) |
 
 ## Was es um das Schreiben herum tut – und was nicht
@@ -51,19 +51,24 @@ Jeder Punkt nennt die Entscheidung, die ihn beschreibt.
   ausgelieferten Einstellung ändert er den Text nicht (D-073).
 - **Ein Ort für jede Version.** Aufträge, Versionen und Exporte (Word, PDF, Markdown) in der Web-App und über MCP (D-070, D-075).
 
+Atelier schreibt jeden Text auf diesem **Standardweg**. „Extra careful“ – ein Aufruf, der zuerst Abschnitte mit Wortbudgets plant,
+danach derselbe Schreiber und dieselben Prüfungen sowie eine Prüfung der ausdrücklichen Vorgaben des Auftrags – gibt es nur hinter
+einem Schalter (`Orders:CarefulOutline`, ausgeliefert `Off`, D-087, D-091). Solange er aus ist, zeigt die Web-App die Option nicht,
+und `submit_order` lehnt sie ab.
+
 Grenzen: Der Text kann trotzdem falsch sein; der Faktenprüfer kann etwas übersehen und meldet auch harmlose Sätze (D-075); Atelier
-ist kein Chat; es lernt nicht aus früheren Texten (Lernen pausiert, D-067; Gedächtnis nicht gebaut, D-077); Scans ohne Text kann es
-nicht lesen (D-076); „Extra careful“ nutzt die ältere Schleife, sucht nicht im Web und hat kein „What was checked“. Auf dem
-Standardweg kann Atelier im Web nachschlagen, bei Aufträgen ohne Dateien und nur mit kurzen Themen aus dem Auftrag; gefundene
-Stellen können trotzdem falsch sein und stehen mit ihrer Seite da (D-074, nach bestandener Messung für alle eingeschaltet). Einen
-fertigen Text kann man ändern („Change something“, D-078). Ausdrücklich gewählte Werkstatt-Teams können eine eigene Websuche nutzen.
+ist kein Chat; es lernt nicht aus früheren Texten (die Lernschleife wurde entfernt, D-091; von einem Gedächtnis ist nur About me
+mit „Tell Atelier once“ gebaut, D-083); Scans ohne Text kann es nicht lesen (D-076). Atelier kann im Web nachschlagen, bei
+Aufträgen ohne Dateien und nur mit kurzen Themen aus dem Auftrag; gefundene Stellen können trotzdem falsch sein und stehen mit
+ihrer Seite da (D-074, nach bestandener Messung für alle eingeschaltet). „Extra careful“ sucht nie. Einen fertigen Text kann man
+ändern („Change something“, D-078).
 
 ## Weiterlesen
 
 | Dokument | Inhalt |
 |---|---|
 | [docs/README_de.md](docs/README_de.md) | Übersicht aller Dokumente |
-| [docs/05-decisions-log_de.md](docs/05-decisions-log_de.md) | Jede Entwurfsentscheidung und Messung, zuletzt D-067 bis D-077 |
+| [docs/05-decisions-log_de.md](docs/05-decisions-log_de.md) | Jede Entwurfsentscheidung und Messung, zuletzt D-091 (Stufe 8d) |
 | [docs/02-architecture_de.md](docs/02-architecture_de.md) | Schichten, Datenmodell, Schutzmechanismen, Schalter |
 | [docs/04-mcp-integration_de.md](docs/04-mcp-integration_de.md), [docs/09-endpoint-reference_de.md](docs/09-endpoint-reference_de.md) | MCP-Werkzeuge und HTTP-Endpunkte im Detail |
 
@@ -164,49 +169,36 @@ Voraussetzung: Der OAuth-Client muss im Admin-Panel unter `/admin/oauth-clients`
 
 ### MCP-Werkzeuge
 
-Die Auftragswerkzeuge (`submit_order`, `answer_order`, `get_order_status`, `get_order_result`, `revise_order`, `export_order`,
-`cancel_order`, `list_orders`, `profile`) und, solange `Uploads:Tickets` `On` ist, `prepare_attachment`. Solange
-`Mcp:LegacyTools` `true` ist (ausgeliefert), kommen die älteren Werkzeuge der Werkstatt hinzu. Hinter `Mcp:Skills` und
-`Mcp:Elicitation` (beide ausgeliefert `On`, D-088, mit Claude Code geprüft) kann der Server zusätzlich einen Skill zur Benutzung von Atelier anbieten und
-seine Rückfragen als Formular des Clients stellen. Überblick:
+Der Server bietet `submit_order`, `answer_order`, `get_order_status`, `get_order_result`, `revise_order`, `export_order`,
+`cancel_order`, `list_orders`, `profile` und, solange `Uploads:Tickets` `On` ist, `prepare_attachment`. Die älteren Werkzeuge
+wurden in Stufe 8d entfernt (D-091). Für eine Version bleiben `submit_request`, `submit_auto_crew_request`, `get_run_status`,
+`get_run_result` und `get_run_details` als Stummel: Jeder Aufruf scheitert mit einer Fehlermeldung, die den Nachfolger nennt.
+Hinter `Mcp:Skills` und `Mcp:Elicitation` (beide ausgeliefert `On`, D-088, mit Claude Code geprüft) kann der Server zusätzlich
+einen Skill zur Benutzung von Atelier anbieten und seine Rückfragen als Formular des Clients stellen. Überblick:
 [docs/13-ai-assistant-guide_de.md](docs/13-ai-assistant-guide_de.md) (die Werkzeugtabelle dort prüft ein Test gegen den Server);
 Verträge: [docs/04-mcp-integration_de.md](docs/04-mcp-integration_de.md), [docs/09-endpoint-reference_de.md](docs/09-endpoint-reference_de.md).
 
 ---
 
-## Die ältere Werkstatt: Crew-System
+## Konfiguration
 
-Das ist die Arbeitsweise aus der Zeit vor dem Umbau im November 2026; „Extra careful“ und die älteren Werkzeuge nutzen sie noch. Jeder Run verwendet eine konfigurierbare Crew aus Executor (schreibt den Draft) und Reviewern (bewerten den Draft). Das Standard-Template `"klassik"` reproduziert das ursprüngliche Verhalten mit zwei Reviewern in paralleler Ausführung.
+Die Einstellungen stehen in `src/Geef.Atelier.Web/appsettings.json` und lassen sich durch Umgebungsvariablen des Webdienstes
+überschreiben (`__` statt `:`). Die Schalter, die ändern, was eine Person tun kann (Fragen, Text ändern, Nachschlagen,
+Faktenprüfung, Upload-Ticket, „Extra careful“, „Tell Atelier once“, die MCP-Erweiterungen, das Menü Workshop), stehen mit ihren
+Standardwerten im [Leitfaden für die Administration](docs/14-admin-guide_de.md#funktionen-schalten). Das Nachschlagen nutzt
+`Tavily:Endpoint` und `Tavily:ApiKey`; seine Grenzen stehen im Abschnitt `Research`. Die Einstellungen der entfernten Funktionen
+(`Mcp:LegacyTools`, `Orders:LegacySubmitDefaultMode`, `Convergence:BestDraft`, `Convergence:WriterBlockingOnly`,
+`Convergence:StopWithoutProgress`, `Learning:*`, `Knowledge:*`, `Embeddings:*`, `Finalizer:*`) gibt es nicht mehr (D-091).
 
-**Verfügbare Evaluation-Strategien:** `Parallel` (Standard), `Sequential`, `FailFast`, `Priority`.
+### Wie ein Text entsteht: Aufstellungen und Modelle
 
-**System-Profile** sind im Code versioniert und read-only. **Custom-Profile** können per `ICrewService` oder MCP erstellt und in der DB gespeichert werden.
-
-Jeder Run speichert einen vollständig eingebetteten **CrewSnapshot** in der DB — damit bleibt der Run reproduzierbar, auch wenn Profile später geändert werden.
-
-**Modellmatrix (D-066):** Profile geben eine Rolle (`ModelSlot`) an, Crews ein Gebiet. Das System setzt jedem verwalteten Akteur beim Run-Start sein Modell aus `ModelMatrix`.
-
-- Claude läuft immer über `claude-cli`, OpenAI über `codex-cli`.
-- Verwaltete Reviewer meiden das Executor-Modell (geteilt nur mit Warnung, wenn kein anderer Kandidat nutzbar ist) und bevorzugen eine andere Familie; ein manuell gebundener Reviewer behält sein Modell und wird nur gewarnt.
-- Profile auf „Manual“ behalten ihr gewähltes Modell.
-
-Siehe [docs/08-crew-system_de.md](docs/08-crew-system_de.md).
-
-### Crew-Verwaltung in der UI
-
-| Seite | URL |
-|-------|-----|
-| Crew-Übersicht | `/crew` |
-| Template-Liste | `/crew/templates` |
-| Template anlegen/bearbeiten | `/crew/templates/new`, `/crew/templates/{name}` |
-| Reviewer-Profile | `/crew/profiles/reviewers` |
-| Executor-Profile | `/crew/profiles/executors` |
-| Grounding-Provider | `/crew/profiles/grounding-providers` |
-| Finalizer-Profile | `/crew/profiles/finalizers` |
-
-Diese Seiten erreicht man über das Menü „Workshop“, das nur Admins sehen, solange `Ui:WorkshopForAdminsOnly` an ist (ausgeliefert); die Adressen selbst bleiben wie bisher für alle Angemeldeten offen (D-077).
-
-Details: [docs/08-crew-system.md](docs/08-crew-system_de.md)
+Es gibt zwei Aufstellungen, beide nur im Code definiert: `direct` (Schreiber, Prüfungen ohne Modell, Faktenprüfung, höchstens eine
+Korrektur) und `direct-outline` („Extra careful“). Das Modell jeder Rolle kommt beim Start eines Laufs aus der Modellmatrix und dem
+Live-Modellkatalog (D-066): Claude läuft über `claude-cli`, OpenAI über `codex-cli`. Jeder Lauf speichert einen **Snapshot** seiner
+Aufstellung und seiner Modelle. Administratoren verwalten die Anbieter unter `/crew/providers`; im Menü „Workshop“, das nur die
+Administration sieht, solange `Ui:WorkshopForAdminsOnly` an ist (ausgeliefert), stehen „Runs“ und „Providers“. Teams,
+Profil-Editoren und die ältere Prüfschleife wurden in Stufe 8d entfernt (D-091); fertige Läufe und Aufträge aus dieser Zeit
+bleiben lesbar.
 
 ---
 
@@ -243,8 +235,8 @@ ATELIER_DOMAIN=<your-domain>
 
 LLM_OPENROUTER_API_KEY=<openrouter-api-key>
 
-# Tavily Web Search (https://tavily.com) — nötig für das Nachschlagen auf dem Standardweg (Research:Mode, ausgeliefert On) und für
-# die tavily-Grounding-Profile; ohne Schlüssel die Recherche mit Research__Mode=Off unter
+# Tavily Web Search (https://tavily.com) — nötig für das Nachschlagen auf dem Standardweg (Research:Mode, ausgeliefert On);
+# ohne Schlüssel die Recherche mit Research__Mode=Off unter
 # services.web.environment in docker-compose.override.yml ausschalten (diese .env-Datei allein erreicht den Webdienst nicht)
 TAVILY_API_KEY=
 ```
@@ -272,6 +264,8 @@ docker compose logs -f web
 | `https://<your-domain>/how-it-works` | Öffentliche Erklärseite; folgt den aktuellen Schaltern |
 | `https://<your-domain>/health` | Health-Check |
 | `https://<your-domain>/mcp` | MCP-Endpunkt (Bearer / OAuth 2.1) |
+| `https://<your-domain>/start`, `/work` | Neuer Auftrag und „My work“ |
+| `https://<your-domain>/crew/providers` | Anbieter (nur Admin) |
 | `https://<your-domain>/admin/users` | Benutzerverwaltung (nur Admin) |
 | `https://<your-domain>/admin/oauth-clients` | OAuth-Client-Verwaltung (nur Admin) |
 | `https://<your-domain>/.well-known/oauth-authorization-server` | OAuth Server Metadata |
@@ -315,23 +309,26 @@ curl https://<your-domain>/health
 ```
 src/
   Geef.Atelier.Core/           Domain-Entities, Interfaces — keine externen Abhängigkeiten
-  Geef.Atelier.Application/    IRunService, IOAuthService, IUserAdminService u.a.
-  Geef.Atelier.Infrastructure/ EF Core, Npgsql, LLM-Clients, Geef.Sdk-Provider-Impl.
-  Geef.Atelier.Web/            Blazor Server, BackgroundService, Endpoints, MCP-Server
+  Geef.Atelier.Application/    Aufträge, Klärung, Läufe, Konten, Anbieter (Dienste und Regeln)
+  Geef.Atelier.Infrastructure/ EF Core, Npgsql, LLM-Clients, Dateien, Recherche, die Pipeline des Direktwegs (Geef.Sdk)
+  Geef.Atelier.Web/            Blazor Server, Hintergrunddienste, Endpoints, Host des MCP-Servers
   Geef.Atelier.Mcp/            MCP-Tool-Definitionen (Class Library)
 tests/
-  Geef.Atelier.Tests/          xUnit + Testcontainers + bUnit
+  Geef.Atelier.Tests/          xUnit + Testcontainers + bUnit + Playwright
 tools/
   HashPassword/                BCrypt-Hash-Generator CLI
-docs/
-  reports/                     Abschlussberichte je Bau-Schritt
+  Eval/, IntakeEval/, FactCheckEval/, ResearchEval/   Messwerkzeuge
+docs/                          Leitfäden, Nachschlagedokumente, Entscheidungslog
 ```
+
+Wie die Teile zusammenarbeiten: [Leitfaden für Entwicklung und Betrieb](docs/15-developer-guide_de.md).
 
 ## Stack
 
 - .NET 10 / Blazor Server / Minimal API
-- PostgreSQL 16 + pgvector via `Npgsql.EntityFrameworkCore.PostgreSQL`
-- [Geef.Sdk 1.0.0-ci.1](https://www.nuget.org/packages/Geef.Sdk/) (prerelease)
+- PostgreSQL 16 über `Npgsql.EntityFrameworkCore.PostgreSQL`; die Compose-Dateien nutzen das `pgvector`-Image, weil ältere
+  Migrationen die Erweiterung `vector` anlegen (die Vektor-Wissensbasis selbst wurde entfernt, D-091)
+- [Geef.Sdk 1.5.0](https://www.nuget.org/packages/Geef.Sdk/)
 - Docker / Traefik
 
 ---
@@ -352,11 +349,11 @@ Die Liste hält fest, wie das Projekt gewachsen ist. Sie bleibt zur Nachvollzieh
 
 **Schritt 6 ✅** Application-Service-Layer — `IRunService` (Submit/Get/List/Cancel), `IRunRepository`, Cancellation-Watcher.
 
-**Schritt 7 ✅** Blazor-UI — drei Pages (`/new`, `/runs`, `/runs/{id}`), SignalR-Hub mit Live-Status, 9 UI-Komponenten, bUnit- und Playwright-Tests.
+**Schritt 7 ✅** Blazor-UI — drei Pages (`/new`, `/runs`, `/runs/{id}`), SignalR-Hub mit Live-Status, 9 UI-Komponenten, bUnit- und Playwright-Tests (`/new` und der SignalR-Hub in Stufe 8d entfernt, D-091).
 
 **Schritt 8 ✅** Cookie-Auth — Single-User-Login, `[Authorize]` auf Pages, Login/Logout, `TestAuthenticationHandler` für E2E-Tests.
 
-**Schritt 9+ ✅** Crew-System, Advisor-Pässe, Template Studio (mit vollständigem Edit-Flow, D-043; in Stufe 8c entfernt, D-089), Domain-Templates, Grounding-Provider-CRUD, Vector-Store-RAG, PDF-Support, Cost-Tracking.
+**Schritt 9+ ✅** Crew-System, Advisor-Pässe, Template Studio (mit vollständigem Edit-Flow, D-043; in Stufe 8c entfernt, D-089), Domain-Templates, Grounding-Provider-CRUD, Vector-Store-RAG, PDF-Support, Cost-Tracking (Crew-System, Advisor, Domain-Templates, Grounding-Profile und Vektorspeicher in Stufe 8d entfernt, D-091).
 
 **MCP-OAuth ✅** Self-hosted OAuth 2.1 Authorization Server (RFC 8414/7591/7636/7009/8252) — Authorization-Code-Flow mit Pflicht-PKCE/S256, Opaque Tokens, Refresh-Rotation, Reuse-Detection.
 
@@ -364,26 +361,33 @@ Die Liste hält fest, wie das Projekt gewachsen ist. Sie bleibt zur Nachvollzieh
 
 **Run-User-Isolation ✅** Jeder Nutzer sieht nur seine eigenen Runs; Admin-Override per expliziten Umschaltern. MCP-Runs werden dem autorisierenden OAuth-Nutzer zugeordnet, Claude-Code-CLI-Runs (statisches Token) dem Admin (D-042).
 
-**Finalizer-Pipeline ✅** 5. Profil-Typ — FinalizerProfile mit vier Typen (FileExport, MetadataEnrich, ExternalSink, Transform; ExternalSink in Stufe 8c entfernt, D-089). 17 System-Profile. RunArtifact-Entity (File mit Download, Url, Status). Download-Endpunkt mit Owner-Check. FinalizerPicker + RunFinalizersOnMaxAttempts im CrewTemplateEditor. RunDetail-Artefakt-Tabelle. Studio-Integration. 2 neue MCP-Tools (D-044, 19. Mai 2026).
+**Finalizer-Pipeline ✅** 5. Profil-Typ — FinalizerProfile mit vier Typen (FileExport, MetadataEnrich, ExternalSink, Transform; ExternalSink in Stufe 8c entfernt, D-089). 17 System-Profile. RunArtifact-Entity (File mit Download, Url, Status). Download-Endpunkt mit Owner-Check. FinalizerPicker + RunFinalizersOnMaxAttempts im CrewTemplateEditor. RunDetail-Artefakt-Tabelle. Studio-Integration. 2 neue MCP-Tools (D-044, 19. Mai 2026). Die ganze Abschluss-Pipeline, die Run-Artefakte und ihr Download-Endpunkt wurden in Stufe 8d entfernt, D-091.
 
-**Run-Resume ✅** Einen fehlgeschlagenen oder abgebrochenen Run dort fortsetzen, wo er aufgehört hat — Seed-Modus (weiter mit letztem Draft) oder Clean-Modus (neuer Start mit gleichem Briefing). „Fortsetzen"-Button in RunDetail, ResumeRunDialog mit MaxIterations-Override. ParentRunId-Link in RunDetail (PR #18, 19. Mai 2026).
+**Run-Resume ✅** Einen fehlgeschlagenen oder abgebrochenen Run dort fortsetzen, wo er aufgehört hat — Seed-Modus (weiter mit letztem Draft) oder Clean-Modus (neuer Start mit gleichem Briefing). „Fortsetzen"-Button in RunDetail, ResumeRunDialog mit MaxIterations-Override. ParentRunId-Link in RunDetail (PR #18, 19. Mai 2026). Seit Stufe 8d (D-091) lassen sich nur Läufe des Standardwegs fortsetzen.
 
-**Grounding-Refinement ✅** Optionaler KI-Filter-Pass nach jedem Grounding-Provider-Fetch — Filter-Modus (pro Quelle keep/drop mit Begründung) und Synthesize-Modus (alle Quellen zu einem kohärenten Text mit `[n]`-Zitaten zusammenfassen). Pro Provider via `LlmBinding` konfigurierbar (D-049/D-050, PR #22, 20. Mai 2026).
+**Grounding-Refinement ✅** Optionaler KI-Filter-Pass nach jedem Grounding-Provider-Fetch — Filter-Modus (pro Quelle keep/drop mit Begründung) und Synthesize-Modus (alle Quellen zu einem kohärenten Text mit `[n]`-Zitaten zusammenfassen). Pro Provider via `LlmBinding` konfigurierbar (D-049/D-050, PR #22, 20. Mai 2026; in Stufe 8d entfernt, D-091).
 
-**Grounding-Typen ✅** Drei neue Grounding-Provider-Typen neben den bestehenden `tavily` und `vector-store`: `static-context` (kuratierter Fixtext — Style-Guides, Glossare, Markenstimme), `url-fetch` (gezieltes URL-Fetching mit SSRF-Guard, der alle privaten/Cloud-Metadata-IPs blockiert) und `news-search` (Tavily-Newssuche mit Datumsfilter). Neues System-Profil `tavily-news` (`news-search` und `tavily-news` in Stufe 8c entfernt, D-089). Dashboard-Cost-Aggregation umfasst jetzt auch Grounding-Refiner-Kosten (D-051, PR #23, 20. Mai 2026).
+**Grounding-Typen ✅** Drei neue Grounding-Provider-Typen neben den bestehenden `tavily` und `vector-store`: `static-context` (kuratierter Fixtext — Style-Guides, Glossare, Markenstimme), `url-fetch` (gezieltes URL-Fetching mit SSRF-Guard, der alle privaten/Cloud-Metadata-IPs blockiert) und `news-search` (Tavily-Newssuche mit Datumsfilter). Neues System-Profil `tavily-news` (`news-search` und `tavily-news` in Stufe 8c entfernt, D-089). Dashboard-Cost-Aggregation umfasst jetzt auch Grounding-Refiner-Kosten (D-051, PR #23, 20. Mai 2026). Alle Grounding-Provider-Typen und das Dashboard wurden in Stufe 8d entfernt, D-091.
 
-**Tool-System ✅** Zentraler `ToolDefinition`-Katalog + agentic Tool-Use (Pull, `IToolUseRunner`) für Executor/Reviewer/Advisor, Grounding auf dieselben Tools neu aufgebaut (Push), Provider-Capability-Detection, `/tools`-CRUD + `ToolPicker`, `ToolInvocationsBlock`-Audit, Auto-Crew-Tool-Binding und ein MCP-Client (`/mcp-servers` Discovery/Import; in Stufe 8c entfernt, D-089). Siehe [docs/10-tool-system_de.md](docs/10-tool-system_de.md) (D-060).
+**Tool-System ✅** Zentraler `ToolDefinition`-Katalog + agentic Tool-Use (Pull, `IToolUseRunner`) für Executor/Reviewer/Advisor, Grounding auf dieselben Tools neu aufgebaut (Push), Provider-Capability-Detection, `/tools`-CRUD + `ToolPicker`, `ToolInvocationsBlock`-Audit, Auto-Crew-Tool-Binding und ein MCP-Client (`/mcp-servers` Discovery/Import; in Stufe 8c entfernt, D-089). Das ganze Tool-System wurde in Stufe 8d entfernt, D-091; siehe [docs/10-tool-system_de.md](docs/10-tool-system_de.md) (D-060).
 
-**Spezialisierungs-Packs ✅** Generische Akteure (Rollen-Prompt + `{specialization}`-Slot) + wiederverwendbare gescopte `SpecializationPack`s, pro Crew gebunden. Effektiver Prompt zur Snapshot-Bauzeit komponiert (CrewSnapshot v3 + Provenienz), in der Audit-UI sichtbar. Die sechs domänen-spezialisierten System-Reviewer wurden zu zwei generischen Rollen + sechs DomainScoped-Packs. `/packs`-CRUD, Scope-Durchsetzung, Composer-Integration (`pack_names`/`packs` + Pack-Katalog-Grounding), Lebenszyklus (Cascade-Delete, Promote/Demote/Clone mit LLM-Generalitäts-Review, Auto-GC). Siehe [docs/11-specialization-packs_de.md](docs/11-specialization-packs_de.md) (D-061).
+**Spezialisierungs-Packs ✅** Generische Akteure (Rollen-Prompt + `{specialization}`-Slot) + wiederverwendbare gescopte `SpecializationPack`s, pro Crew gebunden. Effektiver Prompt zur Snapshot-Bauzeit komponiert (CrewSnapshot v3 + Provenienz), in der Audit-UI sichtbar. Die sechs domänen-spezialisierten System-Reviewer wurden zu zwei generischen Rollen + sechs DomainScoped-Packs. `/packs`-CRUD, Scope-Durchsetzung, Composer-Integration (`pack_names`/`packs` + Pack-Katalog-Grounding), Lebenszyklus (Cascade-Delete, Promote/Demote/Clone mit LLM-Generalitäts-Review, Auto-GC). All das wurde in Stufe 8d entfernt, D-091; siehe [docs/11-specialization-packs_de.md](docs/11-specialization-packs_de.md) (D-061).
 
-**Modellmatrix ✅** Modellwahl nach Rolle (`ModelSlot`) und Crew-Gebiet aus einer recherchierten `ModelMatrix`; Claude/OpenAI nur über den Abo-cli-proxy; Zuweisung beim Snapshot-Bau mit Live-Verfügbarkeit, Executor-Ausschluss, Reviewern aus anderer Familie, Reviewer-Ring und Bezahlt-Deckel; der Composer wählt `model_slot`; Migration Step46 hat alle bestehenden eigenen Profile neu klassifiziert; Codex-Katalog des cli-proxy aus `models_cache.json` (D-066, 2026-11-22).
+**Modellmatrix ✅** Modellwahl nach Rolle (`ModelSlot`) und Crew-Gebiet aus einer recherchierten `ModelMatrix`; Claude/OpenAI nur über den Abo-cli-proxy; Zuweisung beim Snapshot-Bau mit Live-Verfügbarkeit, Executor-Ausschluss, Reviewern aus anderer Familie, Reviewer-Ring und Bezahlt-Deckel; der Composer wählt `model_slot`; Migration Step46 hat alle bestehenden eigenen Profile neu klassifiziert; Codex-Katalog des cli-proxy aus `models_cache.json` (D-066, 2026-11-22). Modellmatrix und Modellkatalog bleiben; Composer und eigene Profile wurden in Stufe 8d entfernt (D-091).
 
 **Etappe 1: Aufträge und Direktweg ✅** Der Auftrag ist die Einheit, die die Person sieht (`/start`, `/work`, `/orders/{id}`); Dateien werden einzeln mit Quittung hochgeladen und als Quellen gehalten; der Direktweg schreibt mit den Dateien im Volltext (ab 150.000 Zeichen mit Karte, ab 600.000 mit Seitenauswahl), prüft das Ergebnis ohne Modell und korrigiert einmal; MCP-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`; Migration Step48 verknüpft bestehende Läufe mit Aufträgen (D-069, D-070, 2026-11-24).
 
-**Etappen 2–6 ✅, Umbau abgeschlossen (D-077)** Rückfragen vor dem Lauf (D-071/D-072), ehrliches Schreiben mit Prüfungen (D-073), Recherche (D-074, nach Messung R3′ eingeschaltet), Ändern eines Ergebnisses (D-075, mit D-078 eingeschaltet) und der vollständige MCP-Auftragsvertrag, Dateien über ein Upload-Ticket (D-076). Etappe 8a: Die Werkstatt-Einstiege sehen nur Admins (`Ui:WorkshopForAdminsOnly`). Nicht gebaut, jeweils mit Auslöser: Etappe 1b (entschärfte Schleife und erster Rückbau), Etappe 7 (Gedächtnis), der Rückbau aus Etappe 8 und Etappe 9 (D-077).
+**Etappen 2–6 ✅, Umbau abgeschlossen (D-077)** Rückfragen vor dem Lauf (D-071/D-072), ehrliches Schreiben mit Prüfungen (D-073), Recherche (D-074, nach Messung R3′ eingeschaltet), Ändern eines Ergebnisses (D-075, mit D-078 eingeschaltet) und der vollständige MCP-Auftragsvertrag, Dateien über ein Upload-Ticket (D-076). Etappe 8a: Die Werkstatt-Einstiege sehen nur Admins (`Ui:WorkshopForAdminsOnly`). Nicht gebaut, jeweils mit Auslöser: Etappe 1b (entschärfte Schleife und erster Rückbau), Etappe 7 (Gedächtnis), der Rückbau aus Etappe 8 und Etappe 9 (D-077; der Rückbau folgte als Stufen 8c und 8d, unten).
 
 **Rückbau, Schnitt 1 (Stufe 8c, D-089) ✅** Entfernt, was niemand nutzte: Template Studio (seine zwei MCP-Werkzeuge bleiben als Stummel, die `submit_order` nennen), der MCP-Client mit `/mcp-servers` und dem Werkzeugtyp `mcp-tool`, die Grounding-Typen `rest-api`, `academic-search` und `news-search`, der Abschluss `ExternalSink`, der Editor für HTTP-Provider sowie die toten Felder `MaxQueriesPerRun` und `AdvisorRetryAttempted`. Keine Tabelle, Spalte oder Zeile wurde gelöscht; ältere Snapshots bleiben lesbar, Läufe überspringen entfernte Teile mit einer Warnung.
 
-Aktuell: **über 1800 Tests** (grün; vorbestehende Testcontainers-/E2E-Umgebungs-Flakes ausgenommen).
+**Rückbau, Schlussschnitt (Stufe 8d, D-091) ✅** Entfernt wurden die ältere Arbeitsweise und alles, was nur sie nutzte: Composer
+und Auto-Crew, das Tool-System, die Lernschleife, die Vektor-Wissensbasis mit Embeddings, die alten Grounding-Quellen,
+Abschlussschritte und Run-Artefakte, Advisor, Spezialisierungs-Packs, die ältere Prüfschleife mit ihren Vorlagen und
+Schutzschaltern, die Werkstatt mit ihren Editoren und dem Dashboard, der Live-Hub des Dashboards, das Formular `/new` und die
+älteren MCP-Werkzeuge (fünf bleiben für eine Version als Stummel). Der Standardweg bleibt; „Extra careful“ bleibt hinter
+`Orders:CarefulOutline`. Keine Tabelle oder Spalte wurde gelöscht: Alte Aufträge und Läufe bleiben lesbar, und ein Lauf mit einer
+entfernten Aufstellung scheitert mit einem klaren Satz, statt zu laufen. Die früheren Einträge oben beschreiben, was zu ihrer Zeit
+gebaut wurde.
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope_de.md)

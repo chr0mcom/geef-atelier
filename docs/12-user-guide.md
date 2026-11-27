@@ -2,7 +2,7 @@
 
 *[Deutsch](12-user-guide_de.md) · **English***
 
-*Last updated: 2026-11-27 (Tell Atelier once with its promise, addendum to D-083; looking things up on the web switched on for everyone, addendum to D-074; before that Tell Atelier once, D-083; before that after review: web search only on the standard way, storage, wording)*
+*Last updated: 2026-11-27 (D-091: stage 8d, one way of writing; “Extra careful” only where it is switched on; older requests; before that Tell Atelier once with its promise, addendum to D-083; looking things up on the web switched on for everyone, addendum to D-074)*
 
 This guide is for everyone who uses Atelier in the web browser. You need no technical knowledge. The page **How it works**
 (`/how-it-works`, also open without signing in) shows the same in short, with the features that are switched on for you right
@@ -43,8 +43,12 @@ a short receipt: what Atelier read, with pages, characters and how well it could
 - Scanned pages (photos of paper) cannot be read.
 - You cannot add files to a request later. Add everything before you press Start.
 
-**Extra careful** is a box below the files. It uses an older way of working with several review rounds. It takes longer, it does
-not look things up on the web, and its result does not show "What was checked". For most texts, leave it off.
+**Extra careful** is a box below the files. It appears only where the administrator has switched it on for you; as shipped it is
+off, and then there is no box. With it, Atelier first plans the text in sections with word budgets and then writes along that
+plan, with the same checks as always. After the first version a further check looks whether everything your request explicitly
+asks for is in the text; if something is missing, the writer gets one correction. That check is not listed in "What was checked",
+and the corrected text is not checked against your requirements again. If no usable plan comes back, the text is written in one
+go and the result says so. It is slower (up to about 10 minutes) and does not look things up on the web.
 
 ### 2. Answer a few questions (or skip them)
 
@@ -121,12 +125,19 @@ example your sign-off word for word, depends on the text: check the result as al
   files are never sent. Words from your About me details are held back unless you also wrote them in your request, but a
   translated or reworded detail can slip through. The result shows which search words were sent. A change of a finished
   text uses what was looked up the first time and does not search again. There is a daily limit; once it is reached, the text is
-  written without looking things up, and the result says so. "Extra careful" never searches the web. Teams that administrators
-  set up in the workshop can have their own web search.
+  written without looking things up, and the result says so. "Extra careful" never searches the web.
 - Only you and the administrators of this Atelier can see your requests.
 - Atelier keeps your request, your text and what it read from your files until you delete the request under My work. Deleting it
   also deletes the files that no other request uses. The original file is removed about 30 days after the last request that used it
   finished; the text read from it stays with the request.
+
+## Requests from earlier versions of Atelier
+
+Finished requests from earlier versions stay readable under **My work**, with their text and downloads. Atelier no longer has the
+older ways of working they may have been made with, so an unfinished one of those cannot run: it ends with "This task was set up
+for a way of working that no longer exists, so it cannot run. Please start it again." If you **Start again** an old "Extra
+careful" request while the box is not available to you, your request is filled in without it and a note says "Extra careful is not
+available now, so this request uses the standard way." Nothing runs until you press Start.
 
 ## What Atelier does around the writing
 

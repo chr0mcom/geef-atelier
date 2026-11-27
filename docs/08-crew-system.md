@@ -2,625 +2,174 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-11-26 (note on where the crew system fits today; D-076: files through the upload ticket, cleanup and evaluation of refusals; before that 2026-11-25, D-075 part B: change run on the direct path; D-074: research in the grounding step of the direct path; before that 2026-11-24, D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
+Last updated: 2026-11-27 (D-091: stage 8d, rewritten to what exists now: two setups in code, crew snapshot, model matrix, reviewers of the direct path, old runs; the removed parts are listed at the end; before that 2026-11-26 note on where the crew system fits, D-076: files through the upload ticket; 2026-11-25, D-075 part B: change run, D-074: research in the grounding step; 2026-11-24, D-067: strict snapshot reading; older notes are in the git history)
 
 ## Overview
 
-> **Where this fits today.** The crew system is the older way of working. Since the rebuild of November 2026 the default is the
-> order with the direct path (D-068 to D-077, [15-developer-guide.md](15-developer-guide.md)). Crews are still used by "Extra
-> careful", the older MCP tools and the workshop pages, whose menu only administrators see by default (`Ui:WorkshopForAdminsOnly`,
-> [14-admin-guide.md](14-admin-guide.md)).
+A "crew" is the setup of a run: one writer and its checks. Since stage 8d (D-091) there is **one way of working, the direct
+path** (D-068 to D-077, [15-developer-guide.md](15-developer-guide.md)), and its setups exist **only in code**. Nobody
+composes, edits or stores crews any more. What remains of the crew system is:
 
-The crew system replaces the three-member crew hard-coded in PS-2 (executor + BriefingTreueReviewer + KlarheitReviewer) with a configurable profile and template system. On submission every run receives a fully embedded **CrewSnapshot** that guarantees the run's reproducibility even if profiles are changed or deleted later.
+- two setups in `Geef.Atelier.Core.Domain.Crew.SystemCrew`,
+- the **crew snapshot** that every run stores, so that it records what it was run with,
+- the **model matrix**, which assigns the models when the snapshot is built.
+
+The earlier system (templates and profiles in the database, editors and further actors) is listed under
+[Removed parts](#removed-parts-stage-8d-d-091). Its full description is in the git history of this file.
 
 ## Core concepts
 
 | Term | Meaning |
 |---|---|
-| **ExecutorProfile** | The LLM actor that creates the draft. Carries system prompt, provider, model, MaxTokens. |
-| **ReviewerProfile** | The LLM actor that assesses the draft. Same fields. `Priority` for sequential strategies via `IReviewer.Priority`. |
-| **CrewTemplate** | Composes executor + reviewers + EvaluationStrategy + an optional ConvergenceOverride + advisor profiles. |
-| **CrewSnapshot** | A fully embedded copy of the CrewTemplate (incl. all profile data) at run-submission time. Persisted as JSONB in `Runs.CrewSnapshot`. |
-| **AdvisorProfile** | An LLM actor for consultative passes before or after execution. Carries `AdvisorMode` + `AdvisorTrigger`. Functional from PS-7. |
-| **FinalizerProfile** | A post-processing actor that runs after the GEEF convergence loop. Carries `FinalizerType` + typed settings. Produces `RunArtifact` records. Functional from Step22 (D-044). |
+| **ExecutorProfile** | The writer: name, display name, system prompt, provider, model, `MaxTokens`, optional `ModelSlot`. |
+| **ReviewerProfile** | A check of the draft, with the same fields. The implementation is injected when the pipeline is built. |
+| **CrewTemplate** | A setup in code: writer, checks, evaluation strategy, convergence override, domain. |
+| **CrewSnapshot** | The fully embedded copy of the setup, stored as JSONB in `Runs.CrewSnapshot`. |
+
+## The two setups
+
+`SystemCrew` has exactly two templates. `ResolveOrderSnapshotAsync` picks one from the order mode, and
+`CrewService.ResolveCodeTemplateSnapshotAsync` turns it into the snapshot (build, assign models, resolve model aliases).
+There is one production pipeline assembler, `DirectPipelineAssembler`, and it accepts only these two names.
+
+| Template | Used for | Writer | Checks |
+|---|---|---|---|
+| `direct` | every Direct order and every change run | `direct-writer` | `deterministic-checks`, `source-fact-check` |
+| `direct-outline` ("Extra careful") | a Careful order | `direct-writer`, after one planning call | the same two and `requirements-check` |
+
+| Profile | Shown as | Model |
+|---|---|---|
+| `direct-writer` | Writer | slot `Executor` |
+| `deterministic-checks` | Automatic checks | none |
+| `source-fact-check` | Fact check | slot `FactReviewer` |
+| `requirements-check` | Request check | no slot: fixed to the primary of `Intake` (today the Claude Sonnet alias), another model than the planned writer |
+
+Neither setup has advisors, tools or steps after the checks. The **only access to the web** is the research in the grounding
+step ([below](#research-in-the-grounding-step-d-074)).
+
+### "Extra careful" (`direct-outline`, D-087)
+
+- It is offered only when `Orders:CarefulOutline` is `On` for the person (`Orders:CarefulOutlineOverrides` per user name).
+  The default is `Off`.
+- While it is not offered, `/start` shows no such option. `submit_order` hides the parameter `extraCareful` from its schema
+  while it is offered to nobody, and refuses `extraCareful=true` with "Extra careful is not available. Please send the order
+  without it." An accepted Careful order never silently runs as something else. "Start again" of an old Careful order fills
+  in the request without the option, says "Extra careful is not available now, so this request uses the standard way.", and
+  nothing runs until the person sends it.
+- **Outline** (`WritingPlanner`): one call of the writer's model before the first writing pass splits the text into sections
+  with word budgets. It sees the request and the files as the writer does. A call that fails or gives no readable plan is not
+  repeated: the text is written without an outline and the run gets the warning `writer.no_plan`. The cost is recorded as
+  actor `direct-outline`.
+- **Request check** (`RequirementsCheckReviewer`): see [below](#request-check-of-direct-outline-d-087).
 
 ## EvaluationStrategies
 
-| Enum value | SDK class | Behaviour |
-|---|---|---|
-| `Parallel` | `ParallelEvaluationStrategy` | All reviewers in parallel, all findings collected. Default. |
-| `Sequential` | `SequentialEvaluationStrategy` | Reviewers one after another in list order, all awaited. |
-| `FailFast` | `FailFastEvaluationStrategy` | Like Sequential, aborts after the first critical finding. |
-| `Priority` | `PriorityOrderedEvaluationStrategy` | Reviewers in `Priority` order (not list order). |
+The enum `EvaluationStrategy` keeps `Parallel` (0), `Sequential` (1), `FailFast` (2) and `Priority` (3), because stored
+snapshots name them. Both setups use `Parallel`: all checks run and all findings are collected.
 
-**Note:** with `Parallel` the order in `ReviewerProfileNames` is only documentary. With `Sequential` and `Priority` it is significant.
+## CrewSnapshot format (SchemaVersion 3)
 
-## System profiles (code constants)
+The example shows the **structure**. Prompts are cut and model ids are placeholders. Enums are stored as numbers.
 
-Defined in `Geef.Atelier.Core.Domain.Crew.SystemCrew` (read-only, versioned with the code). Since D-066 `SystemCrew` holds no model literals: every LLM role carries a `ModelSlot`, and its displayed binding is the matrix primary. The actual model is assigned per run (see **Model matrix (D-066)**).
+```json
+{
+  "schemaVersion": 3,
+  "templateName": "direct",
+  "executor": {
+    "name": "direct-writer", "displayName": "Writer", "description": "...", "systemPrompt": "...",
+    "provider": "claude-cli", "model": "<concrete model id>", "maxTokens": 256000, "isSystem": true,
+    "modelSlot": 0, "modelDomain": null
+  },
+  "reviewers": [
+    { "name": "deterministic-checks", "provider": "", "model": "", "...": "..." },
+    { "name": "source-fact-check", "provider": "codex-cli", "model": "<concrete model id>", "modelSlot": 1, "...": "..." }
+  ],
+  "evaluationStrategy": 0,
+  "convergenceOverride": { "maxIterations": 2, "abortOnCritical": false, "detectRegression": false, "stagnationThreshold": 2 },
+  "advisors": [],
+  "crewDomain": 0
+}
+```
 
-| Name | Type | Role (`ModelSlot`) | Primary (General) |
-|---|---|---|---|
-| `default-executor` | Executor | Executor | `claude-cli` / `claude-opus-latest` (Technical: Fable) |
-| `briefing-fidelity` | Reviewer | FactReviewer | `codex-cli` / `gpt-astra-latest` |
-| `clarity` | Reviewer | StyleReviewer | `codex-cli` / `gpt-sol-latest` |
-| `domain-terminology-reviewer` | Reviewer | StyleReviewer | `codex-cli` / `gpt-sol-latest` |
-| `substantive-rigor-reviewer` | Reviewer | DomainReviewer | `codex-cli` / `gpt-astra-latest` (Legal/Academic: Gemini 4 Neon) |
-| `crew-composer-executor` | Executor | Composer | `claude-cli` / `claude-opus-latest` |
-| `crew-composer-completeness`, `crew-composer-tool-binding` | Reviewer | FactReviewer | ring: Astra, then Sonnet |
-| `crew-composer-fit`, `crew-composer-reuse-correctness` | Reviewer | DomainReviewer | ring: Astra, then Fable |
-| `crew-composer-prompt-quality` | Reviewer | StyleReviewer | `codex-cli` / `gpt-sol-latest` |
-| `crew-spec-validator` | Reviewer | — (deterministic) | — |
+- It is serialized with `JsonNamingPolicy.CamelCase`.
+- `advisors` is always empty for new runs. The list stays in the format because images before stage 8d refuse a snapshot
+  without it. Entries in old snapshots are kept as they are and never used.
+- Snapshots of removed ways of working name more fields (for example grounding sources, finishing steps or tool bindings).
+  They are read without those fields.
+- Aliases are resolved before the snapshot is stored (`CrewSnapshotModelResolver`): the snapshot holds the concrete model
+  ids, and a resumed run uses the same ones. If the catalog cannot be reached, the alias stays.
 
-**System templates** (four + composer), each with a crew domain (`CrewTemplate.Domain`):
-
-- `klassik`: General, `Parallel`, no advisors.
-- `juristisch`: Legal, `Sequential`, advisor `legal-domain-expert`.
-- `akademisch`: Academic, `Sequential`, advisor `academic-rigor-advisor`.
-- `marketing`: Marketing, `Parallel`.
-- `crew-composer`: General.
-
-All four standard templates ship with three default grounding providers (`tavily-refined`, `run-attachments`, `learning-retriever-default`) and one default finalizer (`learning-extractor`). The `learning-evaluation` template is the only exception — it carries no grounding providers and no `learning-extractor` (recursion stop). Since D-067 the learning parts run empty unless `Learning:Enabled` is set (see [Continuous Learning Loop](#continuous-learning-loop-d-054)).
+**Reading a snapshot for a run (D-067).** The orchestrator reads it strictly with `CrewSnapshot.DeserializeForRun`. A missing,
+unreadable or empty snapshot, a schema version outside 1 to 3, or a snapshot without writer, reviewer list or advisor list
+raises `InvalidCrewSnapshotException`, and the run ends `Failed` with a clear message. There is no fallback setup. The
+tolerant `CrewSnapshot.Deserialize` is for display only. A snapshot without any reviewer, or with a reviewer this version does
+not know, is refused as well when the pipeline is built: there is no text without checks.
 
 ## Model matrix (D-066)
 
-A profile states its **role**; the crew states its **domain**; the system picks the model from `Core/Domain/Crew/Models/ModelMatrix`. Claude always runs via `claude-cli`, OpenAI always via `codex-cli`; other routes are rewritten on save.
+A profile states its **role** (`ModelSlot`), the setup states its **domain** (`ModelDomain`; both setups are `General`), and
+`Core/Domain/Crew/Models/ModelMatrix` holds the ordered candidates. `SystemCrew` has no model literals: the binding shown on a
+profile is the primary of its slot. Claude runs through `claude-cli`, OpenAI through `codex-cli`.
 
-- **Managed vs manual:** `ModelSlot` set ⇒ managed (the stored binding is display only); `ModelSlot = null` ⇒ manual. Grounding refiners and Transform finalizers use a settings marker instead.
-- **Assignment at run start** (`IModelAssignmentService.ApplyAsync`):
-  - The candidate must be reported by the live catalog (the picker list merged with static ids does not count); an unreachable catalog counts as available, an HTTP provider without its API key as unavailable.
-  - Reviewers and advisors do not share the executor's model while a permitted alternative exists; otherwise only with a plurality warning.
-  - The crew domain comes explicitly from the composer's `model_domain` (no keyword heuristic); all rules live in one function (`ModelChooser`) with hard rules that are never relaxed, guarded by the exhaustive `ModelAssignmentInvariantTests`.
-  - Reviewers prefer another vendor family.
-  - Same-slot reviewers rotate through a ring of the first 3 eligible candidates.
-  - Paid candidates are used outside Legal/Academic only from 3 same-slot reviewers on, with at most 2 paid reviewers per crew.
-  - Warnings are logged on skipped primaries and fallbacks.
-
-- **Always current (D-066/10):** the matrix names family aliases (`claude-opus-latest`, `gpt-sol-latest`, `gpt-astra-latest`). The cli-proxy resolves the codex aliases to the newest listed model of the line, so a new release of an existing line needs no code change; run snapshots keep the concrete id. The nightly `scripts/cli-proxy-selfupdate.sh` keeps container and host CLIs current and moves the host codex default to the newest Sol.
-- **Intake slot (D-071):** `ModelSlot.Intake` (Sonnet → Sol) clarifies an order before writing; it is assigned with `AssignAsync(ModelSlot.Intake, General)` and no profile may carry it (`AllowedSlots` unchanged, not in the composer catalog).
-- **Composer settings** are whitelisted (`CrewPartSettingsPolicy`); inline grounding of an unregistered type is critical. Since stage 8c (D-089) the composer no longer knows `rest-api`, `academic-search`, `news-search` or `ExternalSink`.
-
-The table and rationale are in D-066 and `reports/2026-11-22-modellrecherche.md`.
-
-## Custom profiles
-
-- Stored in the DB (`ReviewerProfiles`, `ExecutorProfiles`, `CrewTemplates`).
-- The name automatically receives the prefix `"custom-"` (idempotent, no double prefix).
-- System profiles are read-only: update/delete throws `InvalidOperationException("System profile is read-only — copy it as a custom variant.")`.
-- API: `ICrewService.CreateCustomReviewerProfileAsync(profile)`.
-
-## CrewSnapshot format (SchemaVersion 1)
-
-> The following example shows the **structure**. The `provider`/`model` values are
-> illustrative — the currently valid system values are in the "System profiles"
-> table above; a real snapshot contains the values valid at submit time.
-
-```json
-{
-  "schemaVersion": 1,
-  "templateName": "klassik",
-  "executor": {
-    "name": "default-executor",
-    "displayName": "Default Executor",
-    "systemPrompt": "...",
-    "provider": "openrouter",
-    "model": "anthropic/claude-opus-4.8",
-    "maxTokens": null,
-    "isSystem": true
-  },
-  "reviewers": [
-    { "name": "briefing-fidelity", "provider": "openrouter", "model": "google/gemini-3.5-flash", ... },
-    { "name": "clarity",           "provider": "openrouter", "model": "openai/gpt-5.6-luna",    ... }
-  ],
-  "evaluationStrategy": "Parallel",
-  "convergenceOverride": null,
-  "advisors": []
-}
-```
-
-Serialized with `JsonNamingPolicy.CamelCase`. Stored in `Runs.CrewSnapshot` (JSONB).
-
-**Reading a snapshot for a run (D-067).** The orchestrator reads the snapshot strictly through
-`CrewSnapshot.DeserializeForRun`. A missing, unreadable or empty snapshot, an unknown schema version, or a
-snapshot without executor, reviewer or advisor list raises `InvalidCrewSnapshotException`, and the run ends
-`Failed` with a clear message. The former silent fallback to the `klassik` crew is removed. The tolerant
-`CrewSnapshot.Deserialize` remains for display only. A run with attachments is stored without a snapshot
-until its attachments are ready ([02-architecture](02-architecture.md#preparation-timeout-for-runs-with-attachments)).
-
-**At least one reviewer.** A crew without reviewers cannot run: `AtelierPipelineFactory` refuses to build
-the pipeline and the run ends `Failed` with a message. The former `AutoApproveReviewer` that silently
-approved every draft is removed. Creating or saving a crew template without a reviewer is refused
-(`CrewTemplateRules.EnsureHasReviewer`, used by `CrewService` and the template editor); the composer requires a
-reviewer as well.
-
-## Advisor passes (PS-7)
-
-Advisors are consultative LLM actors run at defined points in the pipeline. Their output flows as a marked context block into the run — the executor and subsequent reviewers see it without the Geef SDK core having to be modified.
-
-### AdvisorProfile schema
-
-```csharp
-public sealed record AdvisorProfile(
-    string Name, string DisplayName, string Description,
-    string SystemPrompt, string Provider, string Model, int? MaxTokens,
-    AdvisorMode Mode, AdvisorTrigger Trigger, bool IsSystem);
-
-public enum AdvisorMode    { Strategic, Critical, DevilsAdvocate, DomainExpert }
-public enum AdvisorTrigger { BeforeFirstExecution, BeforeEveryExecution, OnConvergenceFailure }
-```
-
-### Trigger types
-
-| Trigger | Meaning |
-|---|---|
-| `BeforeFirstExecution` | The advisor is consulted once before iteration 1. Suitable for strategic briefing analysis. |
-| `BeforeEveryExecution` | The advisor is consulted before every iteration. Suitable for critical counter-voices. |
-| `OnConvergenceFailure` | The advisor is consulted only on a convergence failure; a single retry run follows afterwards. |
-
-### System advisors
-
-Models since D-066 come from the model matrix: `briefing-clarifier` and `crew-design-advisor` are StrategicAdvisor (Fable), `devils-advocate` is CriticalAdvisor (Fable), `legal-domain-expert` is DomainExpertAdvisor/Legal (Opus, excluded as executor model, so Astra at run time), `academic-rigor-advisor` is DomainExpertAdvisor/Academic (Astra).
-
-| Name | Mode | Trigger | Purpose |
-|---|---|---|---|
-| `briefing-clarifier` | Strategic | BeforeFirstExecution | Analyzes the briefing before the first executor pass and delivers structured clarification hints. |
-| `devils-advocate` | DevilsAdvocate | BeforeEveryExecution | Critically questions the planned executor direction before every iteration, to avoid errors through blind progress. |
-| `legal-domain-expert` | DomainExpert | BeforeFirstExecution | Domain input for legal texts (template `juristisch`). |
-| `academic-rigor-advisor` | Critical | BeforeEveryExecution | Scientific rigor/argumentation quality (template `akademisch`). |
-
-### Pipeline integration via decorator
-
-The `AdvisorAwareExecutor` (in `Infrastructure/Pipeline/`) decorates `IExecutionStep` and slots transparently in front of every executor call:
-
-```
-AdvisorAwareExecutor.ExecuteAsync(context)
-  1. Filters advisors by the active trigger (BeforeFirst only at iteration 1, BeforeEvery always)
-  2. Calls ProfileBasedAdvisor sequentially for each matching advisor
-  3. Writes the output as "[ADVISOR: <name>]\n<text>" into context[AtelierContextKeys.AdvisorBlock]
-  4. Persists an AdvisorConsultation record (table AdvisorConsultations)
-  5. Delegates to the real IExecutionStep
-```
-
-`AtelierPipelineFactory.BuildWithAdvisorContext(snapshot, context)` wires the decorator and ensures the advisor block is propagated in the `IRunContext`.
-
-### Advisor-failure behaviour
-
-Advisor LLM calls are not best-effort. An exception in `ProfileBasedAdvisor` bubbles through `AdvisorAwareExecutor` and aborts the run with `Status=Failed` (D-031(c)). Silently continuing would mask a possibly corrupted context.
-
-### Convergence-failure retry mechanism
-
-The single retry with `OnConvergenceFailure` advisors planned in D-031(e) was never wired; `RunEntity.AdvisorRetryAttempted` was never written. Since stage 8c (D-089) the property is gone from the model; the column stays in the database with its default `false`.
-
-### DB tables (migration Step11AdvisorSystem)
-
-| Table | Content |
-|---|---|
-| `AdvisorProfiles` | Custom advisor profiles (system advisors live as code constants in `SystemCrew`). |
-| `AdvisorConsultations` | Persisted advisor outputs per iteration and advisor (RunId, IterationNumber, AdvisorName, OutputText, CreatedAt). |
-
-Column `AdvisorRetryAttempted` (bool, NOT NULL DEFAULT false) on the `Runs` table, never written and unmapped since D-089.
-
-### UI components (PS-7)
-
-| Component | Purpose |
-|---|---|
-| `AdvisorPicker` | Available/selected list analogous to `ReviewerPicker`, with a trigger indicator |
-| `AdvisorConsultationsBlock` | Collapsible section on the RunDetail page: shows all consultations per iteration |
-| `AdvisorProfilesIndex` | List of all advisor profiles (system + custom) at `/crew/profiles/advisors` |
-| `AdvisorProfileEditor` | CRUD editor for custom advisor profiles |
-
-`ProfileEditorForm` was extended with `ShowAdvisorFields` + mode/trigger radio groups (reusable for reviewer, executor and advisor).
-
-### MCP tool
-
-`list_advisor_profiles` — lists all advisor profiles (system + custom).
-
-## Finalizer Profiles (Step22 / D-044)
-
-Finalizers are post-processing actors that run **after** the GEEF convergence loop has completed (or, optionally, when it fails). They transform or export the final draft and produce `RunArtifact` records.
-
-### FinalizerProfile schema
-
-```csharp
-public sealed record FinalizerProfile(
-    string Name, string DisplayName, string Description,
-    FinalizerType FinalizerType, Dictionary<string, string> Settings,
-    bool IsSystem, DateTime CreatedAt, DateTime UpdatedAt);
-
-public enum FinalizerType
-{
-    FileExport    = 0,
-    MetadataEnrich = 1,
-    [Obsolete] ExternalSink = 2,   // retired in stage 8c (D-089)
-    Transform     = 3,
-}
-```
-
-`FinalizerType` is **immutable after creation**. Typed settings records (`FileExportSettings`, `MetadataEnrichSettings`, `TransformSettings`) wrap the `Dictionary<string,string> Settings` for type-safe access.
-
-### Pipeline position
-
-Finalizers run sequentially in the order defined by `CrewTemplate.FinalizerProfileNames` after the convergence loop exits. The flag `CrewTemplate.RunFinalizersOnMaxAttempts` controls whether finalizers also execute when convergence fails (max attempts exceeded).
-
-Since D-067:
-
-- `Runs.Outcome` is set only after the finalizers have finished and the (possibly transformed) final text is stored, so `Outcome` means "finished and stored, including all finalizers" ([02-architecture](02-architecture.md#run-outcome-and-runstatus)).
-- A finalizer that fails, is skipped, or is not run (best-effort run without `RunFinalizersOnMaxAttempts`) becomes a run warning (`finalizer.failed`, `finalizer.skipped`, `finalizer.not_run`) instead of passing silently.
-- A cancellation or service stop while the finalizers run is not a finalizer failure: the run ends with `Outcome = Aborted` and gets no `finalizer.failed` warning. The results of finalizers that finished before the stop are kept (changed text, artifacts, costs); the remaining ones do not run. The status of a converged run stays `Completed`; `Outcome` is what counts.
-- If the service is stopped hard while the finalizers run, the next start gives the run an outcome and the warning `run.restarted_while_finishing` (source `run`).
-- If the result cannot be stored completely, the run gets the warning `run.result_not_saved` (source `run`) and `Outcome = Failed`.
-
-### RunArtifact entity
-
-Each finalizer execution records its output as a `RunArtifact`:
-
-| Field | Type | Description |
+| Slot | Used by | Candidates in order (General) |
 |---|---|---|
-| `Id` | Guid | Primary key |
-| `RunId` | Guid | FK → `Runs` |
-| `FinalizerProfileName` | string | Name of the finalizer that produced this artifact |
-| `ArtifactType` | enum `{File, Url, Status}` | How the artifact is stored |
-| `Filename` | string? | File name (for `File` artifacts) |
-| `ContentType` | string? | MIME type |
-| `SizeBytes` | long? | File size in bytes |
-| `StorageUri` | string | Storage path or URL |
-| `StatusMessage` | string? | Human-readable status (for `Status` artifacts) |
-| `CreatedAt` | DateTime | Creation timestamp |
+| `Executor` | writer, planning call | Claude Opus, Codex Sol |
+| `FactReviewer` | fact check | Codex Astra, Claude Opus, Gemini 4 Neon (paid), Claude Sonnet |
+| `Intake` | questions before writing (D-071); the request check takes its primary as a fixed binding | Claude Sonnet, Codex Sol |
+| `GroundingRefiner` | picking passages in the research | Claude Sonnet, Codex Sol |
 
-### System finalizer profiles
+The enum and the matrix keep further slots and domains that no setup uses now; the numbers are stored in old snapshots, so
+members are only ever appended.
 
-`webhook-sink` and `email-sink` (`ExternalSink`) were removed in stage 8c (D-089); their rows stay in the database, listings leave them out and a run skips them with a warning.
+**Model assignment** (`IModelAssignmentService.ApplyAsync`, once per run, when the snapshot is built):
 
-| Name | Type | Description |
-|---|---|---|
-| `export-markdown` | FileExport | Exports the final draft as a Markdown file |
-| `export-html` | FileExport | Exports the final draft as an HTML file |
-| `export-pdf` | FileExport | Exports the final draft as a PDF file |
-| `export-docx` | FileExport | Exports the final draft as a DOCX file |
-| `export-txt` | FileExport | Exports the final draft as a plain-text file |
-| `export-json` | FileExport | Exports the run result as a structured JSON file |
-| `add-front-matter` | MetadataEnrich | Prepends YAML front-matter with run metadata |
-| `add-word-count-footer` | MetadataEnrich | Appends a word-count footer to the draft |
-| `add-reading-level` | MetadataEnrich | Appends a Flesch–Kincaid reading-level annotation |
-| `anti-ai-voice` | Transform | Rewrites the draft to reduce detectable AI phrasing |
-| `tone-formalization` | Transform | Elevates the draft's register to formal/academic tone |
-| `tone-casual` | Transform | Lowers the draft's register to conversational tone |
-| `executive-summary` | Transform | Produces a concise executive-summary prepended to the draft |
-| `key-takeaways` | Transform | Appends a bullet-point key-takeaways section |
-| `glossary` | Transform | Appends a glossary of domain-specific terms |
+- A candidate must be reported by the live catalog. An unreachable catalog counts as available, an HTTP provider without its
+  API key as unavailable.
+- All rules live in one function (`ModelChooser`), guarded by `ModelAssignmentInvariantTests`. Hard rules are never relaxed:
+  the provider is usable, and a paid candidate goes only to a reviewer, only in the Legal or Academic domain or from 3
+  reviewers of the same slot on, and to at most 2 reviewers per setup. With the two setups of today the fact check therefore
+  never gets a paid model.
+- Reviewers with a slot do not share the writer's model while a permitted alternative exists, and prefer another vendor
+  family.
+- A profile without a slot keeps its binding. If it is the writer's model, a warning says so.
+- A fallback or a missing plurality becomes the run warning `model.assignment`.
+- The matrix names family aliases (`claude-opus-latest`, `gpt-sol-latest`, `gpt-astra-latest`). The cli-proxy resolves them
+  to the newest model of the line, so a new release needs no code change (D-066/10).
 
-### LLM-Binding bei Transform-Finalizern
+The rationale for the matrix is in D-066 in the decisions log.
 
-Transform-Finalizer führen einen LLM-Call aus, um den finalen Draft zu transformieren. Das gebundene Modell kann pro Profil konfiguriert werden:
+## Convergence and delivery
 
-- **Anbieter:** Jeder aktive Custom- oder System-Provider (HTTP oder CLI)
-- **Modell:** Frei wählbar; für Tone-Transformationen reichen günstige Modelle (z.B. `gpt-5.6-luna`)
-- **MaxTokens:** Maximale Ausgabelänge (Mindest-Floor von 10000 gilt)
-- **Temperature** (optional): leer = Anbieter-Standard, 0.0 = deterministisch, 2.0 = sehr kreativ
+Both setups run with `MaxIterations: 2` (the writer writes once and corrects at most once), `AbortOnCritical: false`,
+`DetectRegression: false` and `StagnationThreshold: 2`. Values a setup does not override come from the section `Convergence`.
+Only findings of severity `Error` or higher block. A reviewer whose call fails is isolated and does not block; the run gets
+the warning `review.reviewer_failed`.
 
-**System-Transform-Finalizer** (`anti-ai-voice`, `tone-formalization`, `tone-casual`, `executive-summary`, `key-takeaways`, `glossary`) sind read-only. Ihre Binding-Einstellungen können durch Klonen als Custom-Profil überschrieben werden.
+- A converged run delivers its last version.
+- A run that does not converge delivers the version with the fewest rejecting reviews (the later one on a tie) with the
+  outcome "delivered with open points". Without any text it ends as failed.
+- `Runs.Outcome` is set after the report (`Runs.ReportJson`) has been written
+  ([02-architecture](02-architecture.md#run-outcome-and-runstatus)). If the result cannot be stored completely, the run gets
+  `run.result_not_saved` and fails. If the service stopped while a run was finishing, the next start records an outcome and
+  adds `run.restarted_while_finishing`.
+- The switches `Convergence:BestDraft`, `WriterBlockingOnly` and `StopWithoutProgress` (D-085) were removed with the old
+  review loop.
 
-Das `LlmBinding`-Konzept wird in Step 2 (Grounding-Refinement) und Step 3 (KI-Grounding-Typen) wiederverwendet.
+## Old runs and old snapshots (D-091)
 
-### DB tables (migration Step22)
+The database keeps every table and column of the removed parts (no `DROP`), so the previous image stays compatible. A later,
+separate database cleanup may drop them.
 
-| Table | Content |
+| Case | Behaviour |
 |---|---|
-| `FinalizerProfiles` | Custom finalizer profiles (system profiles live as code constants in `SystemCrew`). |
-| `RunArtifacts` | One row per finalizer output per run (see RunArtifact entity above). |
-| `FinalizationActorCosts` | Per-run, per-finalizer cost records for LLM-backed transforms. |
-
-New columns added to existing tables:
-
-| Table | Column | Type | Description |
-|---|---|---|---|
-| `CrewTemplates` | `FinalizerProfileNames` | JSONB | Ordered list of finalizer profile names |
-| `CrewTemplates` | `RunFinalizersOnMaxAttempts` | boolean | Run finalizers even when convergence fails |
-| `Runs` | `FinalizerCostEur` | numeric | Total finalizer LLM cost for this run |
-| `Runs` | `FinalizerErrorMessage` | text | Error message if any finalizer failed |
-
-### UI components (Step22)
-
-| Component | Purpose |
-|---|---|
-| `FinalizerPicker` | Available/selected list for finalizer profiles in `CrewTemplateEditor` |
-| `FinalizerProfilesIndex` | List of all finalizer profiles (system + custom) at `/crew/profiles/finalizers` |
-| `FinalizerProfileEditor` | CRUD editor for custom finalizer profiles |
-| `FinalizerProfileView` | Read-only view for system finalizer profiles |
-| `RunArtifactsTable` | Collapsible artifacts section on the RunDetail page |
-
-`CrewTemplateEditor` was extended with a `FinalizerPicker` and the `RunFinalizersOnMaxAttempts` toggle.
-
-### MCP tools (Step22)
-
-- `list_run_artifacts` — lists all artifacts produced for a given run.
-- `download_run_artifact` — downloads a specific artifact (owner-check + path-containment enforced).
-
-## API paths
-
-### Template-based submit (default)
-
-```csharp
-await runService.SubmitRunAsync(
-    briefingText: "...",
-    configJson:   "{}",
-    crewTemplateName: "klassik");  // null → default "klassik"
-```
-
-### Custom-crew submit
-
-```csharp
-var spec = new CrewSpec(
-    ExecutorProfileName:  "custom-my-executor",
-    ReviewerProfileNames: ["briefing-fidelity", "custom-my-reviewer"],
-    EvaluationStrategy:   EvaluationStrategy.Sequential,
-    ConvergenceOverride:  new ConvergencePolicyOverride(MaxIterations: 3, null, null, null));
-
-await runService.SubmitRunAsync("...", "{}", customCrew: spec);
-```
-
-### MCP tools
-
-- `list_crew_templates` — lists all templates (system + custom).
-- `list_reviewer_profiles` — lists all reviewer profiles (system + custom).
-- `list_advisor_profiles` — lists all advisor profiles (system + custom).
-- `list_grounding_provider_profiles` — lists all grounding-provider profiles.
-- `list_run_artifacts` — lists all artifacts produced for a given run.
-- `download_run_artifact` — downloads a specific run artifact (owner-check + path-containment enforced).
-- `submit_request` — extended with `crew_template` and `custom_crew` (JSON string).
-
-Full tool list (15 tools): see [09-endpoint-reference.md](09-endpoint-reference.md) and the [project README](../README.md).
-
-## Grounding Provider Profiles (D-036 / D-040 / D-051)
-
-Grounding providers enrich the briefing with external context before the GEEF execution loop.
-
-**Actual state (D-067):**
-
-- The five system profiles `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` and `academic-default` (retired in stage 8c, D-089; kept in the rule for older snapshots) run through their type-specific provider listed below, not through the tool path, also for older snapshots that still carry a `ToolName`. Only custom profiles with a `ToolName` use the tool-backed provider ([10-tool-system](10-tool-system.md#a-t9--grounding-rebuild-on-central-tools)).
-- A provider that is skipped or fails (missing key, unknown type, error) becomes a run warning (`grounding.provider_skipped`) instead of silently empty context. The code `grounding.tool_failed` is reserved and currently never written; failures of tool-backed sources also use `grounding.provider_skipped`.
-- **No outside search for default orders (D-079):** a run of an order with the default crew ("Extra careful" on the web or over MCP, `submit_request` without `crewTemplate`/`customCrew`) keeps only the sources that stay inside Atelier (`vector-store`, `order-sources`, `learning-retrieval`, `static-context` and the catalogs, never through the tool path); web, news, academic, REST, URL and tool sources are dropped before the pipeline is built, also when the run resumes with a stored snapshot that still names them. A template named on purpose (workshop, `submit_request` with `crewTemplate`), an own crew and a composed crew keep their sources.
-- **Search query fails closed (D-079):** with `ExtractQuery` (on for every system profile) the `tavily` provider searches only with the query the `GroundingQueryExtractor` formed; when the call fails or returns no query, nothing is searched and the source becomes `grounding.provider_skipped`. The request text is never the fallback query. Only a profile with `ExtractQuery=false`, and the `news-search`, `academic-search` and `rest-api` types, send the request part of the briefing as it is.
-- Since stage 8c (D-089) no remaining grounding type reads a key or header from the environment (`authHeaderEnv`/`apiKeyEnv` belonged to `rest-api`/`academic-search`); the grounding editor is admin-only.
-
-### Provider Types
-
-| Type | Implementation | Description | Settings |
-|---|---|---|---|
-| `tavily` | `TavilyGroundingProvider` | Web search via Tavily API (basic or advanced). API key per profile. | `Tier` (basic/advanced), `MaxResults`, `IncludeAnswer` |
-| `vector-store` | `VectorStoreGroundingProvider` | Semantic search in a pgvector collection. Scope: `global` (shared documents only), `run-local` (attachments of the run and of the runs it continues, never those of other runs) or `both` (shared documents plus those attachments). A missing scope means `global`; an unknown value is also treated as `global` (fail-closed, never other runs' attachments) and the run gets the warning `grounding.scope_unknown` (D-067). `TagFilter` narrows the shared documents only; attachments have no tags and are never hidden by it. | `TopK`, `Scope`, `TagFilter` |
-| `static-context` | `StaticContextGroundingProvider` | Curated fixed text injected unchanged at every run. No external API. Ideal for style guides, glossaries, brand voice. | `label`, `content` (max 200,000 chars, soft limit 50,000) |
-| `url-fetch` | `UrlFetchGroundingProvider` | Fetches specific URLs, cleans HTML via HtmlAgilityPack, returns text content. SSRF guard blocks private IPs. | `urls` (newline-separated), `maxContentPerUrl` (default 8000), `stripBoilerplate` (bool, default true) |
-| `news-search`, `academic-search`, `rest-api` | — | Retired in stage 8c (D-089). Stored profiles and older snapshots stay readable; a run skips them with a warning; they can no longer be saved. | — |
-
-### SSRF Protection (`url-fetch`)
-
-The `UrlSafetyValidator` component runs before every HTTP request for the `url-fetch` provider:
-
-- **Schema check:** Only `http` and `https`. All others (`file://`, `ftp://`, custom schemes) → blocked.
-- **DNS resolution:** Every hostname is resolved via `Dns.GetHostAddressesAsync`; **all** resulting IPs are checked (not just the first).
-- **IPv4 blocklist:** `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `169.254.0.0/16` (link-local + cloud metadata), `0.0.0.0/8`, `100.64.0.0/10`, `224.0.0.0/4`
-- **IPv6 blocklist:** `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, `64:ff9b::/96`, IPv4-mapped IPv6 (unwrapped and re-checked)
-- **Redirect chain:** Max 3 hops; each redirect target IP is re-validated against the full blocklist.
-- **Timeout:** 10 seconds hard cap per request; response body capped at 5 MB.
-
-Blocked or failed URLs are skipped (warning logged, noted in the source citation); the run itself is not aborted.
-
-### AI Refinement
-
-Every grounding provider can optionally be configured with an AI refinement pass. After the fetch, an LLM processes the raw results — if configured.
-
-**Configuration** (flat keys in `ProviderSettings`):
-
-| Key | Type | Description |
-|---|---|---|
-| `refinementProvider` | string | LLM provider (e.g. `openrouter`) |
-| `refinementModel` | string | Model (e.g. `google/gemini-2.0-flash-lite`) |
-| `refinementMaxTokens` | int | Max tokens for the refinement response |
-| `refinementTemperature` | double? | Optional; empty = provider default |
-| `refinementMode` | int | `0` = Filter, `1` = Synthesize |
-| `refinementInstructions` | string? | Optional additional instructions |
-
-**Modes:**
-- **Filter** (default): Each source is kept or discarded individually. Attribution remains 1:1.
-- **Synthesize:** All sources are merged into a coherent text (`[n]` references). Original sources are preserved as a reference appendix.
-
-**Graceful degradation:** If the refinement provider is inactive or the LLM call fails, raw results are passed through unchanged. The run is not aborted. The grounding visualization shows a notice.
-
-**System profile `tavily-refined`:** Ready-to-use demo profile — Tavily Advanced with filter refinement via `google/gemini-2.0-flash-lite`.
-
-## Reviewer-name migration
-
-| Old (pre-PS-5) | New (PS-5) |
-|---|---|
-| `BriefingTreueReviewer` | `briefing-fidelity` |
-| `KlarheitReviewer` | `clarity` |
-
-Migration Step10 renames historical `Findings.ReviewerName` values. `ReviewerDisplay.ToDisplay()` contains both variants as a fallback.
-
-## System separation (namespace)
-
-- `Core/Domain/Crew/` — all domain records (no infrastructure dependency).
-- `Core/Domain/Crew/SystemPrompts.cs` — system-prompt texts (long, semantically belong to the system profiles).
-- `Infrastructure/Pipeline/ProfileBasedReviewer.cs` / `ProfileBasedExecutor.cs` — Geef SDK adapters.
-- `Application/Crew/CrewService.cs` + `CrewSnapshotBuilder.cs` — orchestrates repo lookups + snapshot construction.
-
-## PS-6 — UI paths and conventions
-
-### Routing map
-
-| URL | Component | Description |
-|---|---|---|
-| `/crew` | `CrewIndex` | Landing page with an overview of templates + profiles |
-| `/crew/templates` | `CrewTemplatesIndex` | List of all templates (system + custom) |
-| `/crew/templates/new` | `CrewTemplateEditor` | Create a new template |
-| `/crew/templates/{name}` | `CrewTemplateEditor` | Edit a template / duplicate a system template |
-| `/crew/profiles/reviewers` | `ReviewerProfilesIndex` | List of all reviewer profiles |
-| `/crew/profiles/reviewers/new` | `ReviewerProfileEditor` | Create a new reviewer profile |
-| `/crew/profiles/reviewers/{name}` | `ReviewerProfileEditor` | Edit a reviewer profile |
-| `/crew/profiles/executors` | `ExecutorProfilesIndex` | List of all executor profiles |
-| `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Create a new executor profile |
-| `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Edit an executor profile |
-| `/crew/profiles/advisors` | `AdvisorProfilesIndex` | List of all advisor profiles (system + custom) |
-| `/crew/profiles/advisors/new` | `AdvisorProfileEditor` | Create a new advisor profile |
-| `/crew/profiles/advisors/{name}` | `AdvisorProfileEditor` | Edit an advisor profile |
-| `/crew/profiles/grounding-providers` | `GroundingProviderIndex` | List of all grounding-provider profiles |
-| `/crew/profiles/finalizers` | `FinalizerProfilesIndex` | List of all finalizer profiles (system + custom) |
-| `/crew/profiles/finalizers/create` | `FinalizerProfileEditor` | Create a custom finalizer profile |
-| `/crew/profiles/finalizers/edit/{name}` | `FinalizerProfileEditor` | Edit a custom finalizer profile |
-| `/crew/profiles/finalizers/view/{name}` | `FinalizerProfileView` | View a system finalizer profile (read-only) |
-
-### UI components
-
-| Component | Location | Purpose |
-|---|---|---|
-| `CrewBadge` | `Components/UI/` | Subtle text badge with the template name in RunRow |
-| `CrewSelector` | `Components/UI/` | Dropdown for template selection on the NewRun page |
-| `CrewSummary` | `Components/UI/` | Click-to-expand crew overview on the RunDetail page |
-| `ReviewerPicker` | `Components/UI/` | Available/selected list with up/down reordering |
-| `ProfileEditorForm` | `Components/UI/` | Generic form for reviewer and executor profiles |
-| `Modal` | `Components/UI/` | Generic modal component with a backdrop |
-| `DeleteConfirmationModal` | `Components/UI/` | Confirmation modal: the user must type the name |
-
-### Name constraints
-
-Pattern `^[a-z0-9\-]+$`, max 64 characters — applies to all profile and template names (custom prefix excluded). Form validation via `DataAnnotations.RegularExpression`. The service layer is idempotent regarding the `custom-` prefix.
-
-## Template Studio (D-043, removed)
-
-The AI-assisted template wizard at `/crew/studio` was removed in stage 8c (D-089), together with its standalone start of a composition run. Auto-Crew stays reachable through `/new` and `submit_auto_crew_request`. The MCP tools `analyze_template_proposal` and `materialize_template_proposal` remain as stubs that return an error naming `submit_order`. The tables `TemplateStudioAnalyses` and `StudioSettings` stay in the database. The transaction factory the materializer uses (`IAtomicTransactionFactory`) now lives under `Infrastructure/Persistence`.
-
-## Continuous Learning Loop (D-054)
-
-> **Paused since D-067.** The loop runs only when `Learning:Enabled` is `true` (default `false`). While it
-> is off, `learning-extractor` and `learning-publisher` return immediately (no LLM call, no entry, no
-> `learning-evaluation` run, no embedding), `learning-retrieval` returns empty context, and
-> `/crew/learnings` shows that learning is paused. Crews that contain these parts stay valid. The loop is
-> to be replaced by a per-user memory (D-068).
-
-### Architecture
-
-```
-NORMAL RUN  →  Finalizer "learning-extractor" (opt-in)
-   ├─ Guard: run.Kind == Learning → return          (recursion stop #1)
-   ├─ Threshold: iterationCount ≥ 2 OR Major+ finding
-   ├─ Assembles structured facts → LearningEntry (Proposed)
-   └─ FIRE-AND-FORGET: SubmitRunAsync(crew=learning-evaluation, Kind=Learning)
-
-LEARNING-RUN  (Kind=Learning, crew "learning-evaluation")
-   ├─ Executor condenses candidate
-   ├─ 3 strict reviewers (AbortOnCritical=true, MaxIterations=2)
-   └─ Finalizer "learning-publisher" (RunFinalizersOnMaxAttempts=true)
-        ├─ Guard: run.Kind != Learning → return      (recursion stop #2)
-        ├─ Convergence  → compute embedding, Approved, written to store
-        └─ Non-conv.    → Rejected, nothing written
-
-LATER RUN  →  Grounding "learning-retrieval"
-   ├─ Embedding search over Approved learnings
-   ├─ Domain-boost: finalScore = similarity × (sameDomain ? boost : penalty)
-   ├─ Curated knowledge (vector-store) outranks learnings by provider order
-   └─ SourceCitation: learning://{id}
-```
-
-### RunKind enum
-
-`Standard = 0` (default) / `Learning = 1` / `CrewComposition = 2`. Carried in `RunEntity.Kind`, passed through `SubmitRunRequest.Kind` and `IRunPersistenceService.CreateRunAsync`. The orchestrator dispatches all three kinds identically; the kind gates finalizer guards and recursion stops.
-
-### LearningEntry lifecycle
-
-`Proposed` (extractor wrote it) → `Approved` (publisher + embedding) or `Rejected` (publisher, nothing stored). Manual override possible via `/crew/learnings` UI (owner-checked).
-
-### System profiles added (Step30 migration)
-
-| Name | Type | Notes |
-|---|---|---|
-| `learning-extractor` | Finalizer (LearningExtract) | Default in all four standard templates (D-057); not in `learning-evaluation` (recursion stop) |
-| `learning-publisher` | Finalizer (LearningPublish) | Attached to `learning-evaluation` crew |
-| `learning-evaluation` | CrewTemplate | AbortOnCritical=true, MaxIterations=2, 3 strict reviewers |
-| `learning-retriever-default` | GroundingProvider (LearningRetrieval) | sameDomainBoost=1.0, crossDomainPenalty=0.5, maxLearnings=4 |
-| `learning-factual-grounding` | Reviewer | codex-cli/gpt-5.6-sol |
-| `learning-value` | Reviewer | openrouter/gemini-3.1-pro-preview |
-| `learning-generalizability` | Reviewer | claude-cli/claude-opus-4.8 |
-
-## Auto-Crew: Composition-Run
-
-A Composition-Run (`RunKind.CrewComposition = 2`) is a full GEEF-Run that uses the GEEF evaluation loop to compose a new crew. GEEF-on-GEEF: the meta-crew `crew-composer` goes through draft → critique → refine → converge, then materializes the result via the `crew-materializer` finalizer. See D-059 in the [decisions log](05-decisions-log.md).
-
-### What a Composition-Run is
-
-The Template Studio's single-pass meta-LLM call (D-038) produced crews without self-correction. A Composition-Run replaces that call with a proper GEEF pipeline: the `crew-composer` crew iteratively refines a `CrewSpecArtifact` JSON until convergence, then the `CrewMaterializeFinalizerExecutor` turns the converged spec into real DB records.
-
-Entry points: the advanced form `/new` with Auto-Crew and the MCP tool `submit_auto_crew_request` (both chain a task run). The standalone start from `/crew/studio` went with Template Studio in stage 8c (D-089).
-
-### The 5 reviewers of crew-composer
-
-| Name | Type | Provider / Model | Role |
-|---|---|---|---|
-| `crew-spec-validator` | **Deterministic** (no LLM) | — | Validates the `CrewSpecArtifact` JSON schema in-loop; missing required fields or invalid structure → Critical finding, no LLM call needed |
-| `crew-diversity-reviewer` | LLM | codex-cli / gpt-5.6-sol | Checks model pluralism: executor and reviewers must span ≥ 2 different providers |
-| `crew-prompt-quality-reviewer` | LLM | claude-cli / claude-opus-4-8 | Evaluates the quality, specificity and role-clarity of every system prompt |
-| `crew-grounding-fit-reviewer` | LLM | codex-cli / gpt-5.6-sol | Assesses whether the chosen grounding providers match the task domain |
-| `crew-finalizer-fit-reviewer` | LLM | codex-cli / gpt-5.6-sol | Checks whether the selected finalizers suit the task's output requirements |
-
-The deterministic `CrewSpecValidatorReviewer` produces findings without any LLM call and is the primary structural gate. The four LLM reviewers run in `Parallel` strategy.
-
-**ConvergenceOverride:** `MaxIterations = 4`, `AbortOnCritical = false` (so validator Critical findings are correctable, not fatal), `StagnationThreshold = 3`.
-
-### CrewSpecArtifact schema
-
-The `CrewComposerExecutor` forces the `submit_crew_spec` tool-call — no free-text output. The resulting JSON follows this schema:
-
-```json
-{
-  "mode": "existing-template | composed | new",
-  "reuse": "<template-name or null>",
-  "executor": {
-    "name": "...", "provider": "...", "model": "...",
-    "systemPrompt": "...", "maxTokens": null
-  },
-  "reviewers": [
-    { "name": "...", "provider": "...", "model": "...",
-      "systemPrompt": "...", "focus": "..." }
-  ],
-  "advisors": [
-    { "name": "...", "mode": "Strategic|Critical|DevilsAdvocate|DomainExpert",
-      "trigger": "BeforeFirstExecution|BeforeEveryExecution|OnConvergenceFailure",
-      "systemPrompt": "..." }
-  ],
-  "grounding": ["<profile-name>", "..."],
-  "finalizers": ["<profile-name>", "..."],
-  "evaluationStrategy": "Parallel | Sequential | FailFast | Priority",
-  "convergenceOverride": null
-}
-```
-
-**Mode semantics:**
-- `existing-template` — reuse an existing template by name (`reuse` field); no DB writes.
-- `composed` — assemble a new template from the `reuse` template as a base, with modifications.
-- `new` — create a fully new template from the spec fields; all profiles must be fully specified.
-
-The `reuse` field encodes the **dedup result**: when `CrewMaterializeFinalizerExecutor` finds a template with cosine similarity ≥ 0.90 in `CrewTemplateEmbeddings`, it downgrades the mode to `existing-template` and sets `reuse` to the matched template name.
-
-### CrewMaterializeFinalizerExecutor steps
-
-Runs after convergence of the composition-run (`FinalizerType.CrewMaterialize = 6`):
-
-1. **Parse** — reads the `CrewSpecArtifact` JSON from the final iteration's `ArtifactText`.
-2. **Validate** — structural check: required fields present, `reviewers` count ≥ 1, provider names are active in the system.
-3. **Dedup** — computes an embedding of the spec, queries `CrewTemplateEmbeddings` for cosine similarity; if any existing template exceeds the 0.90 threshold, downgrades mode to `existing-template` (no new DB records).
-4. **Materialize** — for `composed` / `new` modes: creates profiles (Executor, Reviewer × N, Advisor × N, GroundingProvider × N, Finalizer × N) and the crew template in a single EF Core transaction (`IAtomicTransactionFactory`).
-5. **Embed** — computes an embedding of the new template and inserts it into `CrewTemplateEmbeddings` for future dedup.
-6. **Chain task-run** — if `ChainToTaskRun = true` and the composition-run carries a seed briefing, submits a new `RunKind.Standard` run using the materialized crew and the original briefing text.
-
-### ParentCompositionRunId audit link
-
-When a task-run is chained from a composition-run, `Runs.ParentCompositionRunId` is set to the composition-run's ID. This provides a full audit trail: given any task-run, you can follow `ParentCompositionRunId` to inspect which composition-run created its crew and why.
-
-### Guards
-
-- `LearningExtractFinalizerExecutor`: `if (run.Kind == RunKind.CrewComposition) return Ok;` — no learnings extracted from composition-runs.
-- `CrewMaterializeFinalizerExecutor`: the chained run is always `RunKind.Standard`; no nested composition is possible.
-- `CrewComposerExecutor`: only active for `Kind == CrewComposition`; rejects other run kinds.
+| Finished run or order of a removed setup | Stays readable: lists, "My work", order page, result, export and the technical run page. That page shows the setup name and says "This setup belongs to a way of working that no longer exists; further details are no longer available." |
+| Pending or resumed run of a removed setup (old review loop, composed team, learning run) | Fails with "This task was set up for a way of working that no longer exists, so it cannot run. Please start it again." |
+| "Resume" ("continue") on such a run | Refused with "This task was set up for a way of working that no longer exists, so it cannot be continued. Please start it again." |
+| Stored setup that names a check that no longer exists | Fails with "The saved setup of this task names a check that no longer exists, so it cannot run. Please start it again." |
+
+Crash recovery and cleanup treat old runs as before. `RunKind.Learning` and `RunKind.CrewComposition` stay in the enum only
+for old rows. Findings of old runs keep their reviewer names; `ReviewerDisplay` still shows the oldest ones under their short
+names. Old warning rows keep their text and are still shown.
 
 ## Uploaded files: safe reading (D-069 addendum)
 
@@ -729,14 +278,14 @@ The rate of false blocks is measured on synthetic, independently labelled reques
 
 ## Template `direct`: two reviewers (D-073)
 
-The code-only template `direct` (`SystemCrew.DirectTemplate`, not in template lists) runs the writer once and corrects at
-most once (`MaxIterations: 2`). Since stage 3 it has two reviewers, both injected at pipeline build time by
-`DirectPipelineAssembler`:
+The template `direct` (`SystemCrew.DirectTemplate`) runs the writer once and corrects at most once (`MaxIterations: 2`).
+It has two reviewers, both injected at pipeline build time by `DirectPipelineAssembler`; `direct-outline` has the same two and
+the request check described at the end of this section.
 
 | Reviewer | Profile | Model | What it does |
 |---|---|---|---|
 | Automatic checks | `deterministic-checks` | none | `DraftCheckEvaluator`: not empty, no remark before the text, length, language, placeholders (in square brackets, up to 300 characters on one line; the fact check drops a flagged passage inside a placeholder only up to 200 characters, so a claim in a longer bracket is kept), forbidden patterns and words, required words, written calculations. Blocking failures → `Error`, the rest `Info`. |
-| Fact check | `source-fact-check` | slot `FactReviewer` (today Codex Astra, never the writer's family) | `SourceFactCheckReviewer`: compares the facts of the text with the request, the answers, the profile and the files (`FactCheckPrompts`, version `fact-check-1`). |
+| Fact check | `source-fact-check` | slot `FactReviewer` (today Codex Astra; not the writer's model, another vendor family preferred) | `SourceFactCheckReviewer`: compares the facts of the text with the request, the answers, the profile and the files (`FactCheckPrompts`, version `fact-check-1`). |
 
 The fact check runs for every order of the direct path; only `Direct:FactCheckMode = Off`, `Shadow` or a failure of the
 model and its one fallback leave the facts unchecked, and "What was checked" says so.
@@ -770,7 +319,8 @@ model and its one fallback leave the facts unchecked, and "What was checked" say
   `Error` and `Rejected`, the writer gets fixed sentences; `Shadow` → `Info` with metadata `shadow`, nothing shown.
 - **Fallback:** when the model cannot be reached, one more attempt with the next candidate of `FactReviewer` that is neither
   the writer's model nor from the provider that failed nor paid per token (`FactCheckModelFallback`, today Sonnet). The
-  gateway's own failover stays off. Calls, model and fallback are in the report (`factCheck`), never shown as a warning.
+  gateway's own failover is limited to the same model (D-090). Calls, model and fallback are in the report (`factCheck`),
+  never shown as a warning.
 - **Persistence:** findings keep `Category = fact-check`, `Code` (`fact.unsupported`, `fact.instruction`, `fact.superseded`,
   `fact.source_conflict`) and `Quote`; `Runs.FactCheckMode` holds the mode of the run (migration Step50). When an account is
   deleted or renamed, its runs lose every copy of the About me details: the block in the briefing, the briefing in the stored
@@ -781,9 +331,25 @@ model and its one fallback leave the facts unchecked, and "What was checked" say
   what looks clearly wrong and asks the person to check it; otherwise "What was checked" says at most that nothing clearly
   wrong was found and that not every calculation can be checked this way. Earlier reports read the same way.
 
+### Request check of `direct-outline` (D-087)
+
+The third reviewer of `direct-outline` checks the **first** version only. One call of another model than the writer gets only
+the person's own words (the request, the person's own answers and the changes asked for, never assumptions, profile or files)
+and the text. It lists every explicit requirement word for word and says whether the text meets it. The length is left out,
+because the automatic checks cover it.
+
+- A requirement blocks only when it is marked as not met and its quote is long enough (at least 3 words or 12 characters) and
+  really stands in the person's words. At most 10 findings.
+- The writer gets a fixed sentence with that verified quote; nothing the check phrased itself reaches the writer, the report
+  or the page.
+- The call is not repeated and never changes to another model. If it fails, it does not block, and the run gets the warning
+  `writer.requirements_unchecked`.
+
 ## Research in the grounding step (D-074)
 
-Since stage 4 the grounding step of the direct path (`OrderGroundingStep`) can add passages looked up on the web. It asks
+The grounding step of the direct path (`OrderGroundingStep`) loads the order's files in full text and can add passages looked
+up on the web. This research (Tavily, section `Tavily` with `Endpoint` and `ApiKey`; without a key nothing is sent) is the
+only access to the web. The step asks
 `IOrderResearchService.EnsureAsync` before it renders the files, with the version of the run (from the assembler), whether the
 run revises a text, whether the order has attached files and the About me details of the briefing. An order with any file
 (whatever its role) never searches: the service stores the status `FilesAttached` once and nothing reaches the search or the
@@ -905,9 +471,30 @@ when a later version of the order has a text (`RevisionLines.ResumeLaterVersion`
   the new one does not repeat word for word in the same kind (`SameAssumptionKey`) go to `RunReport.EarlierOpenPoints` with their
   version and `EarlierPointKind` (including those the earlier version had carried over), together with a fixed sentence
   (`EarlierPointKind.Note`) for its notes and flagged passages that could not be shown. When the earlier version has no report (for
-  example "Extra careful"), the fixed sentence `ChecksNotTakenOverFormat` says that its checks were not taken over and not checked
+  example a run of the removed review loop), the fixed sentence `ChecksNotTakenOverFormat` says that its checks were not taken over and not checked
   again. When the earlier report cannot be read, the report says so in one sentence and the run goes on. When an earlier version
   without a readable report was itself shown as "Ready – please check" (`DirectRevision.NeedsCheck`, resolved with
   `OrderStateResolver`), the report sets `RunReport.EarlierNeedsCheck`; a later version inherits it from the report of its base.
   `OrderStateResolver.ToRunState` reads it in every fact-check mode as a carried blocking point. Reports of all other runs stay
   bit-identical (`null` is not written).
+
+## Removed parts (stage 8d, D-091)
+
+The code of the following parts is gone; their database tables and columns stay untouched.
+
+- The old review loop with the templates `klassik`, `juristisch`, `akademisch`, `marketing` and every own team; the workshop
+  pages and editors for teams and profiles (the provider pages stay) and the workshop dashboard.
+- Own profiles and templates in the database, and the API to create or submit own crews.
+- Advisors, their profiles, consultations and costs.
+- The grounding source profiles and their provider types, including URL fetching with its address check, vector search, run
+  attachments as a source and static context.
+- All finishing steps (rewrites, file export, metadata) and the run files with their download endpoint. Export of an order's
+  result (`export_order`) is a separate function and stays.
+- Composer and Auto-Crew, including composition runs and materialising, and what was left of Template Studio.
+- The learning loop, the vector knowledge base and embeddings, the agentic tool path
+  ([10-tool-system.md](10-tool-system.md)) and specialization packs ([11-specialization-packs.md](11-specialization-packs.md)).
+- The older MCP tools of these parts. The current tools are described in
+  [13-ai-assistant-guide.md](13-ai-assistant-guide.md); five old names answer for one more version with an error that names
+  the successor.
+
+Parts removed earlier, in stage 8c, are recorded in D-089.

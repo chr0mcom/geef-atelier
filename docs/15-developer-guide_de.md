@@ -2,18 +2,18 @@
 
 ***Deutsch** · [English](15-developer-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-27 (Recherche für alle eingeschaltet und ihre Sperren, Zusatz zu D-074; davor About me am Ergebnis, D-083; davor nach Prüfung: Websuche, Darstellung unter `/docs`, Einstellungstabelle nur für Admins)*
+*Letzte Aktualisierung: 2026-11-27 (D-091: Stufe 8d, ein Pipeline-Assembler, zwei Aufstellungen nur im Code, zehn MCP-Werkzeuge und fünf Stummel, Altdaten und spätere Datenbankbereinigung; davor Recherche für alle eingeschaltet und ihre Sperren, Zusatz zu D-074; About me am Ergebnis, D-083)*
 
 Dieser Leitfaden ist für Entwicklerinnen und Entwickler und für alle, die Atelier selbst betreiben. Er gibt die Karte des heutigen
 Systems und verweist auf die ausführlichen Dokumente. Die Einrichtungsbefehle stehen im [README](../README_de.md); die Gründe
-hinter jeder Regel im [Entscheidungslog](05-decisions-log_de.md) (zuletzt D-067 bis D-077).
+hinter jeder Regel im [Entscheidungslog](05-decisions-log_de.md) (zuletzt D-091, Stufe 8d).
 
 ## Das System in einem Bild
 
 Seit dem Umbau im November 2026 (D-068) ist der **Auftrag** die Einheit, die eine Person sieht. Läufe bleiben darunter das
 technische Protokoll (ein Lauf je Version). Standard ist der **Direktweg**: klären, nachschlagen (`Research:Mode`, ausgeliefert `On`), ein
-Schreibaufruf mit den Dateien im Volltext, Prüfungen, höchstens eine Korrektur. Die ältere Prüfschleife („Crews“) gibt es weiter
-für „Extra careful“ und die älteren Werkzeuge.
+Schreibaufruf mit den Dateien im Volltext, Prüfungen, höchstens eine Korrektur. Das ist die einzige Art zu schreiben; die ältere
+Prüfschleife und alles, was nur sie nutzte, wurden in Stufe 8d entfernt (D-091).
 
 ```mermaid
 flowchart TB
@@ -29,7 +29,7 @@ flowchart TB
     IW -->|"keine Fragen"| R["Lauf (Pending)"]
     OS -->|"ohne Klärung"| R
     R --> O["RunOrchestratorService"]
-    O --> PA["IPipelineAssembler<br/>direct 90 · composition 100 · resume 50 · classic 0"]
+    O --> PA["IPipelineAssemblerSelector<br/>DirectPipelineAssembler (der einzige)"]
     PA --> G["OrderGroundingStep<br/>Dateien im Volltext, Recherche W1, Briefing"]
     G --> X["Schreiber (Dokumentmodus,<br/>ohne Failover)"]
     X --> C["DeterministicChecksReviewer<br/>SourceFactCheckReviewer"]
@@ -46,6 +46,10 @@ flowchart TB
 | Fragen vor dem Start | `Infrastructure/Intake/LlmClarifier.cs`, `Core/Domain/Intake/QuestionGate.cs`, `Application/Intake/OrderIntakeService.cs` |
 | Dateien | `Infrastructure/Sources/SourceIntakeService.cs` (Extraktion im Kindprozess), `Infrastructure/Sources/UploadTicketService.cs` |
 | Direktweg | `Infrastructure/Pipeline/Assembly/DirectPipelineAssembler.cs`, `Infrastructure/Pipeline/Direct/` |
+| Die zwei Aufstellungen und die Modelle | `Core/Domain/Crew/SystemCrew.cs`, `Core/Domain/Crew/Models/ModelMatrix.cs`, `Application/Crew/Models/ModelAssignmentService.cs`, `Infrastructure/Crew/ModelCatalog.cs` |
+| „Extra careful“ (Gliederung, Vorgabenprüfung) | `Infrastructure/Pipeline/Direct/WritingPlanner.cs`, `Infrastructure/Pipeline/Direct/RequirementsCheckReviewer.cs`, `Application/Orders/OrderRunExtensions.cs` |
+| Läufe ausführen | `Web/Services/RunOrchestratorService.cs` |
+| Export | `Application/Orders/IOrderExportService.cs`, `Infrastructure/Orders/` |
 | Prüfungen ohne Modell | `Core/Domain/Checks/RequestConstraintExtractor.cs`, `Infrastructure/Pipeline/Direct/DeterministicChecksReviewer.cs` |
 | Faktenprüfung | `Infrastructure/Pipeline/Direct/FactCheck/SourceFactCheckReviewer.cs` |
 | Recherche | `Infrastructure/Research/OrderResearchService.cs`, `Core/Domain/Research/DossierBuilder.cs` |
@@ -56,6 +60,49 @@ flowchart TB
 | Schalter | `Core/Configuration/*Options.cs`, `Web/appsettings.json` |
 
 Alle Pfade liegen unter `src/Geef.Atelier.*`.
+
+## Eine Art zu schreiben, zwei Aufstellungen
+
+`SystemCrew` enthält zwei Aufstellungen, die nur im Code stehen: `direct` (Schreiber, `DeterministicChecksReviewer`,
+`SourceFactCheckReviewer`, höchstens eine Korrektur) und `direct-outline` („Extra careful“: `WritingPlanner` plant in einem Aufruf
+Abschnitte mit Wortbudgets, danach derselbe Schreiber und dieselben Prüfungen, dazu nach der ersten Fassung
+`RequirementsCheckReviewer`). Jede LLM-Rolle trägt einen `ModelSlot`; das konkrete Modell wird je Lauf aus `ModelMatrix` und dem
+Live-Katalog zugewiesen (D-066) und im Snapshot des Laufs eingefroren. Das Grounding eines Laufs ist nur `OrderGroundingStep` (die
+Dateien des Auftrags und, falls nachgeschlagen wurde, die Stellen) und die Web-Recherche (`OrderResearchService` mit dem
+Tavily-Client; `Research:*`, `Tavily:Endpoint`, `Tavily:ApiKey`). Ein Start ohne Suchschlüssel schreibt eine Warnung ins Log, und die
+Recherche endet dann ohne Suche.
+
+„Extra careful“ wird nur angeboten, solange `Orders:CarefulOutline` (oder ein Eintrag in `Orders:CarefulOutlineOverrides`) für die
+Person `On` ist. Sonst lehnt `OrderService` einen solchen Auftrag ab, `submit_order` lässt `extraCareful` aus seinem Schema weg,
+solange es niemandem angeboten wird, und ein angenommener solcher Auftrag läuft immer als `direct-outline`
+(`OrderRunExtensions.ResolveOrderSnapshotAsync`); eine Änderung daran läuft als `direct`. Wer die Funktion entfernen will, entfernt
+den Schalter, diese Zuordnung, die Vorlage in `SystemCrew` und den Planer.
+
+`PipelineAssemblerSelector` fragt die registrierten Assembler; der einzige produktive, `DirectPipelineAssembler`, nimmt die zwei
+Aufstellungen an. Ein Lauf, den keiner annimmt, scheitert mit „This task was set up for a way of working that no longer exists, so it
+cannot run. Please start it again.“
+
+## MCP-Werkzeuge
+
+Der Server bietet `submit_order`, `answer_order`, `get_order_status`, `get_order_result`, `list_orders`, `cancel_order`,
+`revise_order`, `export_order` und `profile` an sowie `prepare_attachment`, solange `Uploads:Tickets` `On` ist (`McpToolCatalog`).
+`Mcp/Tools/RetiredTools.cs` behält `submit_request`, `submit_auto_crew_request`, `get_run_status`, `get_run_result` und
+`get_run_details` für eine Version: optionale Parameter, eine Beschreibung, die mit „Removed: use … instead.“ beginnt, und jeder
+Aufruf scheitert mit einer Fehlermeldung, die den Nachfolger nennt.
+
+## Altdaten
+
+Stufe 8d hat Code entfernt, keine Daten. Keine Migration löscht etwas, das vorige Image bleibt also mit der Datenbank verträglich;
+Snapshots behalten die Liste `advisors`, damit es sie weiter lesen kann. Fertige alte Aufträge und Läufe bleiben lesbar (Listen,
+Auftragsseite, Ergebnis, Export, Lauf-Seite). Ein wartender oder fortgesetzter Lauf mit einer entfernten Aufstellung scheitert wie oben;
+„Resume“ lehnt ihn ab (`ResumeRules`), und Wiederherstellung nach Abstürzen und Aufräumen behandeln alte Läufe wie bisher. Eine
+spätere, eigene Datenbankbereinigung darf die Tabellen `AdvisorConsultations`, `AdvisorProfiles`, `CrewTemplateEmbeddings`,
+`CrewTemplates`, `ExecutorProfiles`, `FinalizationActorCosts`, `FinalizerProfiles`, `GroundingActorCosts`,
+`GroundingConsultations`, `GroundingProviderProfiles`, `KnowledgeDocumentChunks`, `KnowledgeDocuments`, `LearningEntries`,
+`ReviewerProfiles`, `RunArtifacts`, `StudioSettings`, `TemplateStudioAnalyses`, `mcp_server_configs`, `specialization_packs`,
+`tool_definitions` und `tool_invocations` löschen, dazu die Spalten `Runs.GroundingCostEur`, `Runs.FinalizerCostEur`,
+`Runs.FinalizerErrorMessage` und `Iterations.AdvisorsTotalCostEur` (später möglicherweise `Orders.CrewTemplateName` und
+`Runs.ParentCompositionRunId`), alte Composer- und Lernläufe und das Export-Volume.
 
 ## Die Erklärseite folgt den Schaltern
 
@@ -68,10 +115,9 @@ Faktenprüfung. Getestete Regeln (`tests/…/Web/HowItWorks`):
   hat;
 - abgemeldet zeigt die Seite die Werte für alle; die Tabelle mit Einstellungsnamen und Rohwerten erscheint nur für Administratoren
   und zeigt nie eine Ausnahme;
-- Recherche gilt nur zusammen mit `Orders:IntakeMode = On` als verfügbar, und nur für den Standardweg: Die Vorlage `direct` hat keine
-  Grounding-Quelle, ihr einziger Webzugang ist `OrderResearchService`, der seinerseits jeden Auftrag ablehnt, der nicht
-  `OrderMode.Direct` ist. „Extra careful“ sucht nicht im Web; ausdrücklich gewählte Werkstatt-Teams (auch über die älteren
-  Werkzeuge) nutzen ihre eigenen Quellen, und dazu kann eine Websuche gehören;
+- Recherche gilt nur zusammen mit `Orders:IntakeMode = On` als verfügbar, und nur für den Standardweg: Die Aufstellungen haben keine
+  eigene Grounding-Quelle, der einzige Webzugang ist `OrderResearchService`, der jeden Auftrag ablehnt, der nicht
+  `OrderMode.Direct` ist. „Extra careful“ sucht nicht im Web;
 - Suchthemen prüft `ResearchQueryGate` zweimal: beim Lesen des Auftrags gegen die About-me-Angaben, die der Klärer sah (dort
   zurückgehaltene Themen zählt `IntakeRecord.ResearchWithheld`), und im Lauf gegen die Angaben des Briefings;
 - einen unbekannten Modus der Faktenprüfung beschreibt die Seite als „meldet“, nie als „korrigiert“;
@@ -87,14 +133,15 @@ die Seite auf.
 - **xUnit + Testcontainers:** `dotnet test` braucht einen Docker-Daemon. Für alles, was EF-Abfragen oder Migrationen berührt,
   echtes Postgres bevorzugen.
 - **Ende-zu-Ende über die echte Verdrahtung:** `tests/Geef.Atelier.Tests/EndToEnd` startet die Anwendung gegen Postgres und
-  ersetzt nur die HTTP-Gegenstellen (D-067). Jeder neue Pipeline-Weg bekommt hier einen Test.
+  ersetzt nur die HTTP-Gegenstellen (D-067). Jeder neue Pipeline-Weg bekommt hier einen Test; von älteren Versionen geschriebene
+  Daten haben eigene Tests (`LegacyDataEndToEndTests`).
 - **Browser:** Playwright-Tests in `tests/Geef.Atelier.Tests/Web/E2E` (`WebTestHost`); mit `ATELIER_SCREENSHOT_DIR` legen einige
   davon Bildschirmfotos ab.
 - **Messwerkzeuge:** `tools/Eval` (blinder Paarvergleich), `tools/IntakeEval` (Klärer), `tools/FactCheckEval` (Faktenprüfung),
   `tools/ResearchEval` (Recherche). Eine Änderung an Prompt oder Schema von Klärer, Faktenprüfer oder Stellenauswahl macht die
   gespeicherte Messung ungültig; für Klärer und Faktenprüfer werden Tests mit Eingabe-Hashes rot, bis neu gemessen ist.
 - **Drift-Schutz für die Doku:** Die Werkzeugtabelle in [13-ai-assistant-guide_de.md](13-ai-assistant-guide_de.md) und ihrer
-  englischen Fassung wird mit dem Werkzeugkatalog verglichen; jeder Leitfaden muss in beiden Sprachen existieren und für `/docs`
+  englischen Fassung wird mit den Werkzeugen verglichen, die der Server anbietet, ohne die Stummel; jeder Leitfaden muss in beiden Sprachen existieren und für `/docs`
   eingetragen sein. Jedes unter `/docs` ausgelieferte Dokument wird in einem Test gerendert: Mermaid-Blöcke und HTML-Kommentare
   fallen weg (GitHub zeichnet die Diagramme), Links auf freigegebene Dokumente führen nach `/docs/…`, Links auf andere Dateien des
   Repositorys zu GitHub, und Links in die nicht veröffentlichten Arbeitsordner werden zu reinem Text.
@@ -120,8 +167,8 @@ die Seite auf.
 
 ## Betrieb
 
-- Docker Compose mit Webdienst, Postgres (pgvector) und dem CLI-Gateway `cli-proxy`; Ersteinrichtung, Sicherung und Wiederherstellung
-  im README.
+- Docker Compose mit Webdienst, Postgres, Backup-Container und dem CLI-Gateway `cli-proxy`; Ersteinrichtung, Sicherung und
+  Wiederherstellung im README. Das Postgres-Image ist weiter `pgvector`, weil ältere Migrationen die Erweiterung `vector` anlegen.
 - Ändern sich beide, gilt die Reihenfolge: erst `cli-proxy`, dann `web` (D-064, D-066).
 - Nur ausliefern, wenn kein Lauf `Pending` oder `Running` ist (D-077).
 - Nach jedem Deploy `scripts/atelier-smoke.sh` ausführen ([ops/atelier-smoke.md](ops/atelier-smoke.md)); `scripts/atelier-watch.sh`

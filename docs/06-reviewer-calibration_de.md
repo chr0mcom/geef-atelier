@@ -2,13 +2,19 @@
 
 *[English](06-reviewer-calibration.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-24 (D-058: Pflicht-Findings-Regel ergänzt; Tool-Call-Retry im cli-proxy)*
+*Letzte Aktualisierung: 2026-11-27 (D-091: Stufe 8d, die Prüfschleife, für die dieser Standard geschrieben wurde, ist entfernt; Abschnitte als historisch markiert, Abschnitt zur Convergence aktualisiert; zuvor 2026-05-24, D-058: Pflicht-Findings-Regel ergänzt; Tool-Call-Retry im cli-proxy)*
 
-Dieses Dokument beschreibt den **Atelier-Standard für Reviewer-Severity** und die **Convergence-Policy-Strategie**. Es ist normatives Referenzdokument für alle, die Reviewer-Prompts anpassen oder neue Reviewer hinzufügen.
+Dieses Dokument beschreibt den **Atelier-Standard für Reviewer-Severity** und die **Convergence-Policy-Strategie**.
+
+> **In Stufe 8d entfernt (D-091).** Die alte Prüfschleife, in der KI-Reviewer mit eigenen Prompts den Schweregrad jedes
+> Befunds wählten, gibt es nicht mehr. Severity-Taxonomie, Tool-Schema, Pflicht-Findings-Regel und der Weg, neue Reviewer
+> hinzuzufügen, sind unten **historisch**. Die Prüfer des Direktwegs beschreibt
+> [08-crew-system_de.md](08-crew-system_de.md#vorlage-direct-zwei-prüfer-d-073); dort legt der Code den Schweregrad eines
+> Befunds fest, und nur `Error` oder höher blockiert.
 
 ## Severity-Taxonomie (Atelier-Standard)
 
-Die Atelier-Pipeline nutzt vier Severity-Stufen für Reviewer-Findings. Die Definitionen sind verbindlich — abweichende Interpretationen in Reviewer-Prompts sind ein Bug.
+*Historisch (in Stufe 8d entfernt, D-091).* Die Prüfschleife nutzte vier Severity-Stufen für Reviewer-Findings. Die Definitionen waren für ihre Reviewer-Prompts verbindlich.
 
 | Severity | Bedeutung | Beispiele |
 |---|---|---|
@@ -40,92 +46,44 @@ Das Hadwiger-Nelson-Problem hat diese Fehlklassifikation ausgelöst:
 
 **Analyse:** Der Reviewer schreibt selbst "zufällig korrekt". Die Zahl 7 stimmt. Die Kritik ist eine Präzisierungs-Anfrage (graph-theoretische Terminologie "Knoten/Kanten" vs. "Punkte"). Das ist **minor**, nicht critical.
 
-Die Hadwiger-Nelson-Taxonomie ist als `[InlineData]` in `SeverityClassificationTests` verankert.
+Die Tests, die dieses Beispiel verankerten, wurden mit der Prüfschleife entfernt.
 
 ## Tool-Schema
 
-Das `submit_review`-Tool akzeptiert:
-```json
-"severity": { "enum": ["critical", "major", "minor", "info"] }
-```
-
-**Backwards-Kompat:** `ProfileBasedReviewer.MapSeverity()` (in `src/Geef.Atelier.Infrastructure/Pipeline/ProfileBasedReviewer.cs`) akzeptiert weiterhin `"error"` (→ `SdkSeverity.Error`) und `"warning"` (→ `SdkSeverity.Warning`) als Fallback für den Fall, dass das LLM vom Schema abweicht.
+*Historisch (in Stufe 8d entfernt, D-091).* Die Reviewer antworteten über das Tool `submit_review` mit
+`"severity": { "enum": ["critical", "major", "minor", "info"] }`.
 
 ### Pflicht-Findings-Regel (D-058)
 
-Jeder Reviewer **muss** mindestens ein Finding zurückgeben. Bei Text, der alle Anforderungen vollständig erfüllt, verwendet der Reviewer `"info"`-Severity für eine kleine Beobachtung oder Verbesserungsmöglichkeit. Ein leeres `findings`-Array ist nie akzeptabel.
-
-Die Regel wird auf zwei Ebenen durchgesetzt:
-1. **System-Prompt** — alle System-Reviewer-Prompts enthalten die explizite Anweisung: *„You MUST always provide at least one finding — even on fully compliant text, use 'info' severity for a minor observation or improvement suggestion."*
-2. **Code-Guard** (`ProfileBasedReviewer.ReviewAsync`) — liefert ein Reviewer `approved=true` mit leerem Findings-Array, wird der Call einmalig mit einem expliziten Hinweis wiederholt. Nach dem Retry wird das Ergebnis so verwendet wie es kommt.
-
-Das `approved`-Boolean bleibt unabhängig von der Findings-Anzahl: `approved=true` mit einem oder mehreren `info`-Findings ist eine normale Freigabe, die zur Konvergenz beiträgt.
+*Historisch (in Stufe 8d entfernt, D-091).* Jeder Reviewer der Prüfschleife musste mindestens ein Finding zurückgeben,
+durchgesetzt vom System-Prompt und von einer Wiederholung im Code.
 
 ## Convergence-Policy
 
-Die Policy wird via `ConvergenceOptions` (`src/Geef.Atelier.Infrastructure/Configuration/`) konfiguriert und aus `appsettings.json` gelesen:
+Die Policy wird via `ConvergenceOptions` (`src/Geef.Atelier.Infrastructure/Configuration/`) konfiguriert und aus dem Abschnitt `Convergence` der `appsettings.json` gelesen. Eine Aufstellung im Code darf die Werte überschreiben:
 
-```json
-{
-  "Convergence": {
-    "MaxIterations": 3,
-    "AbortOnCritical": false,
-    "DetectRegression": true,
-    "StagnationThreshold": 3
-  }
-}
-```
+| Wert | `appsettings.json` | Override von `direct` und `direct-outline` |
+|---|---|---|
+| `MaxIterations` | 6 | 2 |
+| `AbortOnCritical` | false | false |
+| `DetectRegression` | true | false |
+| `StagnationThreshold` | 3 | 2 |
+
+Jeder Lauf schreibt also einmal und korrigiert höchstens einmal. Was ein Lauf ausliefert, der nicht konvergiert, beschreibt
+[08-crew-system_de.md](08-crew-system_de.md#konvergenz-und-auslieferung).
 
 ### Begründung: AbortOnCritical=false als Default
 
-Mit `AbortOnCritical=true` (alter Default aus D-012) bricht ein einziger überzogener Critical-Finding die gesamte Pipeline ab. Das macht das System fragil gegen Reviewer-Kalibrierungsfehler.
-
-Mit `AbortOnCritical=false`:
-- Die Pipeline iteriert bis zu `MaxIterations=3` Mal.
-- Jede Iteration sieht die Findings der vorherigen und kann sie adressieren.
-- Erst bei Stagnation (identische Findings über `StagnationThreshold=3` Iterationen) bricht die Pipeline ab — was dann ein legitimer Abort wäre.
-
-### Wann AbortOnCritical=true sinnvoll ist
-
-Wenn ein Deployment absolute Qualitätssicherheit erfordert und Reviewer-Kalibrierung als verlässlich gilt — z.B. domänen-spezialisierte Reviewer mit geprüften Prompts (Roadmap-Schritt 8: Domänen-Spezialisierung).
-
-## Neue Reviewer hinzufügen
-
-Seit dem Crew-System (D-028) sind Reviewer **datengetriebene Profile**, keine Code-Klassen
-mehr (`LlmReviewer`/`AtelierSystemPrompts` wurden entfernt). Ein neuer System-Reviewer:
-
-1. System-Prompt als `public const string` in `src/Geef.Atelier.Core/Domain/Crew/SystemPrompts.cs` anlegen.
-2. Den **vollständigen Severity-Taxonomie-Block** aus einem bestehenden System-Reviewer (z.B. `briefing-fidelity` oder `clarity`) übernehmen — kein eigenes Schema erfinden.
-3. Den Anti-Pattern-Abschnitt und das Hadwiger-Nelson-Beispiel mitkopieren.
-4. Den Reviewer als `ReviewerProfile`-Konstante in `SystemCrew` (`src/Geef.Atelier.Core/Domain/Crew/SystemCrew.cs`) registrieren — mit Provider/Modell gemäß Modell-Pluralismus-Konvention (Fremd-Modell relativ zum Executor).
-5. Bei Bedarf einem System-`CrewTemplate` in `SystemCrew` zur Reviewer-Liste hinzufügen. Custom-Reviewer entstehen stattdessen über `ICrewService` / die `/crew/profiles/reviewers`-UI — kein Code nötig.
-6. `SeverityClassificationTests` um den neuen Reviewer-Namen erweitern (falls reviewer-spezifisch getestet).
+*Für die Prüfschleife geschrieben; der Default gilt weiter.* Mit `AbortOnCritical=true` (alter Default aus D-012) bricht ein einziger überzogener Critical-Finding die gesamte Pipeline ab. Das macht das System fragil gegen Reviewer-Kalibrierungsfehler. Mit `AbortOnCritical=false` sieht die nächste Iteration die Findings und kann sie adressieren.
 
 D-025 dokumentiert die Entscheidungspunkte hinter dieser Kalibrierung.
 
+## Neue Reviewer hinzufügen
+
+*In Stufe 8d entfernt (D-091).* Es gibt keine Reviewer-Profile in der Datenbank und keine Seiten, um welche anzulegen. Die
+Prüfungen des Direktwegs sind Profile in `SystemCrew`, deren Implementierungen `DirectPipelineAssembler` einsetzt; eine neue
+Prüfung braucht Code.
+
 ## Learning-Evaluation-Crew — strenge Kalibrierung (D-054)
 
-Die `learning-evaluation`-Crew verwendet `AbortOnCritical=true` mit `MaxIterations=2`. Das ist eine bewusste Umkehrung des Standard-Defaults (`AbortOnCritical=false`): Die Crew ist ein **Qualitäts-Gate**, keine Text-Verbesserungs-Schleife. Ein einzelnes Critical-Finding muss das Learning vom Store fernhalten.
-
-### Drei Reviewer, drei Modellfamilien (Multi-Modell-Pluralismus)
-
-| Profil | Modell | Zuständigkeit | Critical = |
-|---|---|---|---|
-| `learning-factual-grounding` | openrouter / gpt-4.1 | Jede Behauptung muss auf strukturierten Run-Fakten basieren. Halluzinierte oder nicht abgesicherte Aussagen = Critical | Erfundene Behauptung ohne Grundlage in den Run-Fakten |
-| `learning-value` | openrouter / gemini-2.5-pro | Das Learning muss nicht-offensichtlich und generalisierbar sein. Trivial, banal = Critical | „Das weiß jede Praktikerin bereits" |
-| `learning-generalizability` | anthropic / claude-opus-4-7 | Muss ein wiederholbares Muster sein, kein Einzel-Run-Artefakt. Nur-ein-Fall = Critical | „Kein Grund, diese Verallgemeinerung zu erwarten" |
-
-Drei verschiedene Modellfamilien werden bewusst eingesetzt, um korrelierte blinde Flecken im Gate zu reduzieren.
-
-### Anti-Pattern für Learning-Reviewer
-
-Die Standard-Anti-Pattern-Regeln gelten (siehe oben). Zusätzlich:
-
-- Ein Learning, das in der Fachliteratur bekannt ist, aber **als praktische Erinnerung genuinen Wert hat** → höchstens `minor`
-- Eine domänenspezifische Erkenntnis, die **innerhalb ihrer Domäne offensichtlich, domänenübergreifend aber nicht trivial ist** → `info`
-- Ein probabilistisches statt deterministisches Muster → höchstens `minor` bei Generalisierbarkeit
-- Ein Learning mit **engem Sub-Domänen-Scope** — enger Scope ist in Ordnung, wenn er konsistent ist
-
-### Rekursions-Guard
-
-`LearningExtractFinalizerExecutor` prüft `run.Kind == RunKind.Learning` und kehrt sofort zurück — der Extraktor löst niemals innerhalb eines Learning-Runs aus. `LearningPublishFinalizerExecutor` prüft `run.Kind != RunKind.Learning` und kehrt für Standard-Runs sofort zurück. Diese Zwei-Guard-Invariante ist durch eine eigene Testklasse abgedeckt.
+*In Stufe 8d entfernt (D-091)*, zusammen mit dem Lernzyklus. Die frühere Beschreibung steht in der Git-Historie.

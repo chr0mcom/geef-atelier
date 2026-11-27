@@ -2,7 +2,12 @@
 
 *[Deutsch](03-walking-skeleton-plan_de.md) · **English***
 
-*Last updated: 2026-05-17 (documentation cleanup: removed a duplicated Step-1 status field and an accidentally appended prompt fragment; added a pointer to the post-skeleton history. Substantively a historical build plan — dated status/PS blocks are deliberately not back-dated.)*
+*Last updated: 2026-11-27 (D-091: stage 8d, note that parts named in this plan and its history were removed; before that 2026-05-17, documentation cleanup: removed a duplicated Step-1 status field and an accidentally appended prompt fragment; added a pointer to the post-skeleton history. Substantively a historical build plan — dated status/PS blocks are deliberately not back-dated.)*
+
+> **Historical plan.** This page does not describe the current system. Many parts that it or its post-skeleton history names
+> (among them the review loop with its own crews and reviewer profiles, advisors, grounding provider types, the vector store,
+> run attachments in it and Template Studio) were removed, most of them in stage 8d (D-091). What exists now is described in
+> [08-crew-system.md](08-crew-system.md) and [15-developer-guide.md](15-developer-guide.md).
 
 The walking skeleton is the smallest end-to-end functional version of Geef.Atelier: a job is submitted via the UI or via MCP, a real Geef pipeline runs (with real LLM calls), live status is visible, the result is displayed and persisted. Source upload, classifier, dynamic crew, advisor, multi-format export — everything else comes later.
 

@@ -2,74 +2,80 @@
 
 *[Deutsch](01-vision-and-scope_de.md) · **English***
 
-*Last updated: 2026-11-26 (guides per audience and the page "How it works"; export button on the order page corrected; D-077: per-user memory not built, learning loop stays paused; D-068: at most three short questions with click answers before the run, never during it; D-067: learning loop paused by default; before that 22 May 2026, D-054: continuous learning loop added to scope; learning-retrieval provider type)*
+*Last updated: 2026-11-27 (D-091: stage 8d, scope matches the current product: standard way only, no team building, no learning, no knowledge base; before that 2026-11-26: guides per audience and the page "How it works"; D-077; D-068: at most three short questions with click answers before the run, never during it; 22 May 2026, D-054)*
 
 ## Vision
 
-> **Current state (since the rebuild of November 2026, D-068 to D-077).** The vision below was written for the crew-based way of
-> working. What a person uses by default today is simpler: one request becomes an **order**; at most three questions before the
-> start; one writing call with the files in full text; checks with a fixed account of what was checked; at most one correction.
-> The crew system stays available as "Workshop" and "Extra careful". The guides [12](12-user-guide.md) to
-> [15](15-developer-guide.md) describe the current state for each audience.
+**Geef.Atelier** is a text manufactory: it turns a person's request and files into a finished text and says honestly what was
+checked and what is still open. A request becomes an **order**; at most three short questions come before the start; one
+writing call gets the files in full text; automatic checks and a fact check by another model follow, with at most one
+correction. "Extra careful", offered only where it is switched on, adds a plan before the writing and a check of every
+explicit requirement of the request. The guides [12](12-user-guide.md) to [15](15-developer-guide.md) describe the product
+for each audience.
 
-**Geef.Atelier** is a text manufactory: an atelier of specialized AI roles (executor, reviewer, optionally advisor) staffed differently depending on the piece of work. The difference from a classic "GPT wrapper" is not the UX or the price, but that the machine *decides how it works before it works* (adaptive crew composition) and *makes transparent what it does while it works* (process visibility via an iteration and findings trail).
+The original vision was a machine that composes a crew of AI roles for each piece of work. That way of working, together with
+the learning loop and the knowledge base, was removed in stage 8d (D-091); the git history and the
+[decisions log](05-decisions-log.md) keep its description.
 
-The project is the productive application of the [Geef SDK](https://github.com/chr0mcom/geef): it uses the GEEF pipeline pattern (Grounding / Execution / Evaluation / Finalize) and the extensions (convergence policies, evaluation strategies, advisor pattern, event sink, middleware) to produce texts of the highest quality.
+The project is the productive application of the [Geef SDK](https://github.com/chr0mcom/geef): it uses the GEEF pipeline
+pattern (Grounding / Execution / Evaluation / Finalize), its convergence policies, evaluation strategies, event sink and
+middleware.
 
 ## Guiding principles
 
-1. **Adaptive crew composition** — the classifier recognizes the text type and assembles the matching crew from a tagged reviewer/advisor pool. Specialization happens through data (reviewer profiles, crew templates), not code branches.
-2. **Process transparency** — every run leaves a complete trail: all iterations, all findings, all advisor consultations. Trust comes from traceability.
-3. **Model pluralism** — reviewers deliberately use models other than the executor's, to create a genuine outside perspective instead of self-confirmation.
+1. **One clear way** — every order goes the same way. There are no teams, profiles or pipelines to set up.
+2. **Honest transparency** — every result comes with a fixed account of what was checked, the open points and the
+   assumptions; every run keeps its passes and findings.
+3. **Model pluralism** — the checks deliberately use other models than the writer, to get a real outside view instead of
+   self-confirmation.
 
 ## In scope
 
-- Generic pipeline for arbitrary text types (legal briefs, technical articles, marketing, academic texts, letters, poems, …)
-- Multi-user hosting on a self-owned Docker server: DB-based user management (BCrypt), per-user isolated run visibility, admin override via explicit toggles
-- Web UI (Blazor Server) for submitting jobs, live status, picking up results
-- MCP server interface so external AI clients (Claude Desktop, Claude Code, custom agents) can submit jobs and fetch results — auth via static bearer token or self-hosted OAuth 2.1
-- Multi-provider LLM support: OpenRouter (pay-per-token) plus subscription CLIs (Claude Code, Codex) via a local proxy; reviewers/advisors deliberately on foreign models
-- Source ingestion in several forms: file upload (PDF, DOCX, TXT, MD), URLs, free-text briefing, style reference texts; semantic knowledge base (vector-store RAG) and run-local attachments
-- Fire-and-forget workflow: start a job, check status later, fetch the result at the end — no human-in-the-loop interventions during the run. **Before** the run, at most three short questions with ready-made answers to click are allowed, always skippable (D-068)
-- Persistent run history with a complete iteration trail
-- Run resumption: continue a failed or aborted run from its last draft text (seed mode) or with a fresh pipeline (clean mode) — D-046
-- Download of every order's text as Word, PDF or Markdown on the order page and over MCP (`export_order`, D-070, D-075); in the older crew system also file export in md / html / pdf / docx / txt / json via the Finalizer pipeline (D-044; finalizer types FileExport, MetadataEnrich, Transform; ExternalSink was removed in stage 8c, D-089)
-- Grounding enrichment in multiple forms: Tavily web search (`tavily`), semantic vector-store RAG (`vector-store`), curated fixed text for style guides and glossaries (`static-context`), and specific URL fetching with SSRF protection (`url-fetch`) (the types `news-search`, `academic-search` and `rest-api` were removed in stage 8c, D-089); each provider supports an optional AI refinement pass (D-050–D-052); domain-aware retrieval from the learning store (`learning-retrieval`, D-054)
-- **Continuous learning loop (D-054):** an opt-in `learning-extractor` finalizer extracts structured facts from completed runs and fires a dedicated quality-gate run (`learning-evaluation` crew) fire-and-forget. Only learnings that converge through the gate (three strict reviewers, `AbortOnCritical=true`, multi-model pluralism) are stored as `Approved` in the learning store (`LearningEntries` table, separate namespace from the curated knowledge base). The `learning-retrieval` grounding provider re-injects them into later runs weighted by domain similarity. Management UI at `/crew/learnings`; MCP tool `list_learnings`. Three protective mechanisms against model collapse: (1) separate namespace, (2) auditable gate, (3) structured facts only. **Paused since D-067** (`Learning:Enabled`, default `false`); a per-user memory (D-068) was meant to replace it; stage 7 is dropped until its trigger (D-077), so the loop stays paused
+- Texts people need written: letters, emails, articles, summaries, reports and the like, from the request and the files
+- Multi-user hosting on a self-owned Docker server: DB-based user management (BCrypt), per-user isolation of orders and runs, admin override via explicit toggles
+- Web UI (Blazor Server) for orders: start page, "My work", order page, "About me"
+- MCP server interface so that AI assistants (Claude Desktop, Claude Code, custom agents) can place orders and fetch results, with a static bearer token or the self-hosted OAuth 2.1
+- LLM providers: subscription CLIs (Claude Code, Codex) through a local proxy and OpenRouter (pay per token); the checks deliberately run on other models than the writer
+- Files as sources: upload of PDF, Word, Markdown or plain text, also through an upload ticket from an AI assistant; the writer gets them in full text
+- Web research for orders without files, where switched on (Tavily), shown as passages of other websites, not as checked facts
+- Fire-and-forget workflow: place an order, check later, fetch the result. **Before** the writing, at most three short questions with ready-made answers to click are allowed, always skippable (D-068); no intervention while the text is written
+- Changing a finished text as a new version of the same order, with comparison of the versions
+- Download of every order's text as Word, PDF or Markdown, on the order page and over MCP (`export_order`, D-070, D-075)
+- Persistent order and run history; continuing a failed or aborted run of the standard way (D-046)
 
 ## Out of scope (for now)
 
-- True multi-tenancy / tenant isolation (the system is multi-user but single-tenant: one admin, shared configuration; only run visibility is isolated per user)
+- True multi-tenancy / tenant isolation (the system is multi-user but single-tenant: one admin, shared configuration; only orders and runs are isolated per user)
 - Public access without auth
-- Human-in-the-loop between iterations (deliberately not implemented; fire-and-forget remains the model: no questions or interventions while the run is in progress). Only **before** the run may the Atelier ask at most three short questions with click answers, and only when the answer cannot be taken from the job, the files, the profile or memory, cannot be researched and cannot reasonably be assumed, the user can know it, and it changes the result substantially (D-068)
+- Human-in-the-loop while the text is written. Only **before** the writing may the Atelier ask at most three short questions with click answers, and only when the answer cannot be taken from the request, the files or the profile, cannot be researched and cannot reasonably be assumed, the user can know it, and it changes the result substantially (D-068)
+- Building teams of AI roles, custom pipelines or tool use by models
+- Learning across orders, a per-user memory beyond "About me", and a knowledge base (vector search)
+- Finishing steps that transform a text or send it somewhere else
 - Mobile apps or native clients
 - Commercial hosting, billing, invoicing
-- Unfiltered cross-run self-RAG (deliberately rejected; the continuous learning loop above provides gated cross-run learning with three protective mechanisms against model collapse)
-- Domain-specific database connectors (e.g. legal databases such as dejure.org or Beck-Online) — optional later
+- Domain-specific database connectors (for example legal databases)
 
 ## Target users
 
-Several named user accounts, managed by an admin. The application is not multi-tenant (no tenant separation of configuration or crew data), but each user sees only their own runs; the admin can optionally view everything. Authentication is mandatory because the app is reachable over the public internet (server hosting).
+Several named user accounts, managed by an admin. The application is not multi-tenant (no separation of configuration between tenants), but each user sees only their own orders and runs; the admin can optionally view everything. Authentication is mandatory because the app is reachable over the public internet (server hosting).
 
 ## Hosting environment
 
-- Docker container on a self-owned server
-- Postgres is already present as a database service on the server — the project uses this existing Postgres instance, no separate DB container needed (except for local development)
+- Docker containers on a self-owned server (Docker Compose): web app, cli-proxy, Postgres and a backup service
 - A reverse proxy (Traefik / Nginx) handles TLS termination
 - API keys, connection strings, auth secrets via environment variables / Docker secrets
-- Persistent data storage in Postgres (incl. pgvector for the semantic knowledge base); uploaded sources are kept indexed in the database
+- Persistent data in Postgres; uploaded files on a volume
 
 ## Success criterion for the skeleton
 
-> **Status:** This skeleton success criterion has been fully met since May 2026; the app runs in production. The extensions listed below as "afterwards" (source upload/RAG, crew composition, advisor passes) have since been shipped. The following list is retained as the original definition of the minimal goal.
+> **Historical.** This was the definition of the minimal goal at the start of the project; it was met in May 2026. It names
+> two fixed reviewers, which is not how the product works today (see [Vision](#vision)).
 
-The walking skeleton (see [03-walking-skeleton-plan.md](03-walking-skeleton-plan.md)) is successful when:
+The walking skeleton (see [03-walking-skeleton-plan.md](03-walking-skeleton-plan.md)) was successful when:
 
-1. A job with a plain text briefing can be started via the web UI.
-2. The pipeline runs with Anthropic as executor and two fixed reviewers (e.g. with an OpenAI model) without the user having to intervene.
-3. A live status is visible in the UI during the run (current phase, iteration, findings).
-4. After completion the final text is shown in the UI.
-5. The same workflow also works via the MCP server (submit a job, query status, fetch the result via MCP tools).
-6. The whole application is deployable as a Docker container and connects to the existing Postgres instance.
-
-Everything else (source upload, classifier, dynamic crew, advisor, multi-format export) are extensions *after* the skeleton.
+1. A job with a plain text briefing could be started via the web UI.
+2. The pipeline ran with Anthropic as executor and two fixed reviewers (e.g. with an OpenAI model) without the user having to intervene.
+3. A live status was visible in the UI during the run (current phase, iteration, findings).
+4. After completion the final text was shown in the UI.
+5. The same workflow also worked via the MCP server (submit a job, query status, fetch the result via MCP tools).
+6. The whole application was deployable as a Docker container and connected to Postgres.

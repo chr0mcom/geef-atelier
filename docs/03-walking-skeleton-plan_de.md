@@ -2,7 +2,13 @@
 
 *[English](03-walking-skeleton-plan.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-17 (Doku-Bereinigung: dupliziertes Schritt-1-Statusfeld und versehentlich angehängtes Prompt-Fragment entfernt; Verweis auf Post-Skeleton-Verlauf ergänzt. Inhaltlich ein historischer Bauplan — dated Status-/PS-Blöcke werden bewusst nicht rückdatiert.)*
+*Letzte Aktualisierung: 2026-11-27 (D-091: Stufe 8d, Hinweis, dass in diesem Plan und seinem Verlauf genannte Teile entfernt sind; zuvor 2026-05-17, Doku-Bereinigung: dupliziertes Schritt-1-Statusfeld und versehentlich angehängtes Prompt-Fragment entfernt; Verweis auf Post-Skeleton-Verlauf ergänzt. Inhaltlich ein historischer Bauplan — dated Status-/PS-Blöcke werden bewusst nicht rückdatiert.)*
+
+> **Historischer Plan.** Diese Seite beschreibt nicht das heutige System. Viele Teile, die sie oder ihr Verlauf nach dem
+> Skeleton nennt (darunter die Prüfschleife mit eigenen Crews und Reviewer-Profilen, Advisors, die Typen der
+> Grounding-Provider, der Vektor-Speicher, Lauf-Anhänge darin und das Template Studio), wurden entfernt, die meisten in
+> Stufe 8d (D-091). Den heutigen Stand beschreiben [08-crew-system_de.md](08-crew-system_de.md) und
+> [15-developer-guide_de.md](15-developer-guide_de.md).
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 

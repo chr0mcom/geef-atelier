@@ -2,7 +2,7 @@
 
 *[Deutsch](13-ai-assistant-guide_de.md) · **English***
 
-*Last updated: 2026-11-27 (web search switched on for everyone, addendum to D-074; before that `profile` saves four About me details, `aboutMeMissing`/`fromAboutMe`, D-083; before that after review: what is tested, OAuth clients, web search)*
+*Last updated: 2026-11-27 (D-091: stage 8d, older tools removed, five stubs for one version, `extraCareful` only where offered; before that web search switched on for everyone, addendum to D-074; `profile` saves four About me details, D-083)*
 
 This guide is for people who want to use Atelier from an AI assistant such as Claude Code.
 Assistants connect through **MCP** (Model Context Protocol), a common way for assistants to use outside tools. The technical
@@ -67,14 +67,14 @@ question. Using Atelier from the claude.ai chat window itself and from Claude De
 
 ## The tools
 
-The list below is what the server offers while the upload ticket is switched on (`Uploads:Tickets = On`) and the older tools are
-switched off. A test compares this table with the tool catalogue of the server, so it cannot silently go out of date.
+The list below is what the server offers while the upload ticket is switched on (`Uploads:Tickets = On`). A test compares this
+table with the tool catalogue of the server, so it cannot silently go out of date.
 
 <!-- tools:start -->
 | Tool | What it is for |
 |---|---|
 | `prepare_attachment` | Prepares the upload of one file: a one-time upload command (valid 15 minutes) and an upload page (24 hours, after signing in). Only while `Uploads:Tickets` is `On`. |
-| `submit_order` | Places an order with the person's request word for word, optional `uploadIds` and `extraCareful`. |
+| `submit_order` | Places an order with the person's request word for word and optional `uploadIds`; `extraCareful` only where "Extra careful" is offered. |
 | `answer_order` | Sends the answers to the questions (or `skip=true`). |
 | `get_order_status` | Waits up to 50 seconds for a change; `done` says when the result is ready. |
 | `get_order_result` | The text with `checks`, open points, assumptions and, if research ran, `lookedUp`. |
@@ -85,9 +85,23 @@ switched off. A test compares this table with the tool catalogue of the server, 
 | `profile` | Shows the About me details. Saves the name, sign-off, form of address and language when the person asks, only into empty fields (read only while `Orders:TellOnce` is `Off`). |
 <!-- tools:end -->
 
-While `Mcp:LegacyTools` is `true` (shipped), the older tools of the workshop are offered as well (for example `submit_request`,
-`get_run_status`, `list_crew_templates`); five of them name their successor in their description. Without the upload ticket,
-files go as Base64 in `attachments`, which only works for small files.
+Without the upload ticket, files go as Base64 in `attachments`, which only works for small files.
+
+**Older tools.** The tools of the older way of working were removed in stage 8d (D-091). For one version five names stay listed
+as stubs, because clients keep tool lists cached: `submit_request`, `submit_auto_crew_request`, `get_run_status`,
+`get_run_result` and `get_run_details`. All their parameters are optional, their description starts with "Removed: use … instead.",
+and every call fails with an error that names the successor (`submit_order`, `get_order_status`, `get_order_result`). All other
+old tool names are gone. Orders from earlier versions stay available through `list_orders` and `get_order_result`.
+
+## Extra careful
+
+"Extra careful" is offered only where the server setting `Orders:CarefulOutline` is `On`, for everyone or for single people
+(shipped `Off`). Then `submit_order` with `extraCareful=true` first plans the text in sections with word budgets, writes along the
+plan with the same checks as usual and checks after the first version whether every explicit requirement of the request is met
+(otherwise one correction). It can take up to about 10 minutes and never searches the web. While it is offered to nobody,
+`submit_order` does not list the parameter `extraCareful` at all. Because the tool list is the same for everyone, it lists it as
+soon as it is offered to anybody. A call with `extraCareful=true` for a person it is not offered to is refused with "Extra careful
+is not available. Please send the order without it." Such an order never silently runs as something else.
 
 ## Files
 
@@ -123,9 +137,6 @@ files go as Base64 in `attachments`, which only works for small files.
   own order, also without a text). `revise_order` does not search again.
   When the daily limit is reached, the text is written without it and `lookedUp` says so; the order does not fail.
 - `submit_order` with `extraCareful` never searches the web.
-- The older tools are different: `submit_request` with a workshop template or an own team (`crewTemplate`, `customCrew`) and
-  `submit_auto_crew_request` use the sources of that team, and these can include a web search, whatever the switch for the
-  standard way says.
 
 ## Limits
 

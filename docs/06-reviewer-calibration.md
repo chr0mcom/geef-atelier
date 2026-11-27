@@ -2,13 +2,19 @@
 
 *[Deutsch](06-reviewer-calibration_de.md) · **English***
 
-*Last updated: 2026-05-24 (D-058: mandatory findings rule added; tool-call retry in cli-proxy)*
+*Last updated: 2026-11-27 (D-091: stage 8d, the review loop this standard was written for was removed; sections marked as historical, convergence section updated; before that 2026-05-24, D-058: mandatory findings rule added; tool-call retry in cli-proxy)*
 
-This document describes the **Atelier standard for reviewer severity** and the **convergence-policy strategy**. It is the normative reference for anyone adjusting reviewer prompts or adding new reviewers.
+This document describes the **Atelier standard for reviewer severity** and the **convergence-policy strategy**.
+
+> **Removed in stage 8d (D-091).** The old review loop, in which AI reviewers with their own prompts chose the severity of
+> each finding, no longer exists. The severity taxonomy, the tool schema, the mandatory findings rule and the way to add
+> reviewers below are **historical**. The reviewers of the direct path are described in
+> [08-crew-system.md](08-crew-system.md#template-direct-two-reviewers-d-073); there the code decides the severity of a
+> finding, and only `Error` or higher blocks.
 
 ## Severity taxonomy (Atelier standard)
 
-The Atelier pipeline uses four severity levels for reviewer findings. The definitions are binding — diverging interpretations in reviewer prompts are a bug.
+*Historical (removed in stage 8d, D-091).* The review loop used four severity levels for reviewer findings. The definitions were binding for its reviewer prompts.
 
 | Severity | Meaning | Examples |
 |---|---|---|
@@ -40,91 +46,43 @@ The Hadwiger–Nelson problem triggered this misclassification:
 
 **Analysis:** the reviewer themselves writes "accidentally correct". The number 7 is right. The criticism is a request for precision (graph-theoretical terminology "vertices/edges" vs. "points"). That is **minor**, not critical.
 
-The Hadwiger–Nelson taxonomy is anchored as `[InlineData]` in `SeverityClassificationTests`.
+The tests that anchored this example were removed with the review loop.
 
 ## Tool schema
 
-The `submit_review` tool accepts:
-```json
-"severity": { "enum": ["critical", "major", "minor", "info"] }
-```
-
-**Backwards compatibility:** `ProfileBasedReviewer.MapSeverity()` (in `src/Geef.Atelier.Infrastructure/Pipeline/ProfileBasedReviewer.cs`) still accepts `"error"` (→ `SdkSeverity.Error`) and `"warning"` (→ `SdkSeverity.Warning`) as a fallback in case the LLM deviates from the schema.
+*Historical (removed in stage 8d, D-091).* The reviewers answered through the tool `submit_review` with
+`"severity": { "enum": ["critical", "major", "minor", "info"] }`.
 
 ### Mandatory findings rule (D-058)
 
-Every reviewer **must** return at least one finding. On text that fully meets all requirements, the reviewer uses `"info"` severity for a minor observation or improvement suggestion. An empty `findings` array is never acceptable.
-
-This is enforced at two levels:
-1. **System prompt** — all system reviewer prompts contain the explicit instruction: *"You MUST always provide at least one finding — even on fully compliant text, use 'info' severity for a minor observation or improvement suggestion."*
-2. **Code guard** (`ProfileBasedReviewer.ReviewAsync`) — if a reviewer submits `approved=true` with an empty findings array, the proxy retries once with an explicit reminder. After the retry, the result is used as-is regardless of whether findings were provided.
-
-The `approved` boolean remains independent of the findings count: `approved=true` with one or more `info` findings is a normal approval that counts toward convergence.
+*Historical (removed in stage 8d, D-091).* Every reviewer of the review loop had to return at least one finding, enforced by
+its system prompt and by one retry in code.
 
 ## Convergence policy
 
-The policy is configured via `ConvergenceOptions` (`src/Geef.Atelier.Infrastructure/Configuration/`) and read from `appsettings.json`:
+The policy is configured via `ConvergenceOptions` (`src/Geef.Atelier.Infrastructure/Configuration/`) and read from the section `Convergence` in `appsettings.json`. A setup in code may override the values:
 
-```json
-{
-  "Convergence": {
-    "MaxIterations": 3,
-    "AbortOnCritical": false,
-    "DetectRegression": true,
-    "StagnationThreshold": 3
-  }
-}
-```
+| Value | `appsettings.json` | Override of `direct` and `direct-outline` |
+|---|---|---|
+| `MaxIterations` | 6 | 2 |
+| `AbortOnCritical` | false | false |
+| `DetectRegression` | true | false |
+| `StagnationThreshold` | 3 | 2 |
+
+So every run writes once and corrects at most once. Delivery of a run that does not converge is described in
+[08-crew-system.md](08-crew-system.md#convergence-and-delivery).
 
 ### Rationale: AbortOnCritical=false as default
 
-With `AbortOnCritical=true` (the old default from D-012) a single over-eager critical finding aborts the entire pipeline. That makes the system fragile against reviewer calibration errors.
-
-With `AbortOnCritical=false`:
-- The pipeline iterates up to `MaxIterations=3` times.
-- Each iteration sees the previous one's findings and can address them.
-- Only on stagnation (identical findings across `StagnationThreshold=3` iterations) does the pipeline abort — which then is a legitimate abort.
-
-### When AbortOnCritical=true makes sense
-
-When a deployment requires absolute quality assurance and reviewer calibration is considered reliable — e.g. domain-specialized reviewers with vetted prompts (roadmap step 8: domain specialization).
-
-## Adding new reviewers
-
-Since the crew system (D-028) reviewers are **data-driven profiles**, no longer code classes (`LlmReviewer`/`AtelierSystemPrompts` were removed). A new system reviewer:
-
-1. Add the system prompt as a `public const string` in `src/Geef.Atelier.Core/Domain/Crew/SystemPrompts.cs`.
-2. Reuse the **complete severity-taxonomy block** from an existing system reviewer (e.g. `briefing-fidelity` or `clarity`) — do not invent a separate schema.
-3. Copy the anti-pattern section and the Hadwiger–Nelson example along with it.
-4. Register the reviewer as a `ReviewerProfile` constant in `SystemCrew` (`src/Geef.Atelier.Core/Domain/Crew/SystemCrew.cs`) — with provider/model per the model-pluralism convention (foreign model relative to the executor).
-5. If needed, add it to the reviewer list of a system `CrewTemplate` in `SystemCrew`. Custom reviewers are instead created via `ICrewService` / the `/crew/profiles/reviewers` UI — no code needed.
-6. Extend `SeverityClassificationTests` with the new reviewer name (if tested reviewer-specifically).
+*Written for the review loop; the default still applies.* With `AbortOnCritical=true` (the old default from D-012) a single over-eager critical finding aborts the entire pipeline. That makes the system fragile against reviewer calibration errors. With `AbortOnCritical=false` the next iteration sees the findings and can address them.
 
 D-025 documents the decision points behind this calibration.
 
+## Adding new reviewers
+
+*Removed in stage 8d (D-091).* There are no reviewer profiles in the database and no pages to create them. The checks of the
+direct path are profiles in `SystemCrew` whose implementations `DirectPipelineAssembler` injects; a new check needs code.
+
 ## Learning-evaluation crew — strict calibration (D-054)
 
-The `learning-evaluation` crew uses `AbortOnCritical=true` with `MaxIterations=2`. This is a deliberate inversion of the standard default (`AbortOnCritical=false`): the crew is a **quality gate**, not a text-improvement loop. A single critical finding must block the learning from reaching the store.
-
-### Three reviewers, three model families (multi-model pluralism)
-
-| Profile | Model | Responsibility | Critical = |
-|---|---|---|---|
-| `learning-factual-grounding` | openrouter / gpt-4.1 | Every claim must be traceable to the structured run facts. Hallucinated or unsupported statements = Critical | Fabricated claim with no support in the run facts |
-| `learning-value` | openrouter / gemini-2.5-pro | The learning must be non-obvious and generalisable. Trivial, banal = Critical | "Any practitioner already knows this" |
-| `learning-generalizability` | anthropic / claude-opus-4-7 | Must be a repeatable pattern, not a one-run artefact. Single-case-only = Critical | "No reason to expect this to generalise" |
-
-Three different model families are used deliberately to reduce correlated blind spots in the gate.
-
-### Anti-patterns for learning reviewers
-
-The standard anti-pattern rules apply (see above). In addition:
-
-- A learning that is well-known in academic literature but **genuinely useful as a practical reminder** → at most `minor`
-- A domain-specific insight that is obvious **within its domain but not across domains** → `info`
-- A probabilistic rather than deterministic pattern → at most `minor` for generalizability
-- A learning that covers a **narrow sub-domain** — narrow scope is fine if it is consistent
-
-### Recursion guard
-
-`LearningExtractFinalizerExecutor` checks `run.Kind == RunKind.Learning` and returns immediately — the extractor never fires inside a Learning-Run. `LearningPublishFinalizerExecutor` checks `run.Kind != RunKind.Learning` and returns immediately for Standard-Runs. This two-guard invariant is covered by a dedicated test class.
+*Removed in stage 8d (D-091)* together with the learning loop. The earlier description is in the git history.

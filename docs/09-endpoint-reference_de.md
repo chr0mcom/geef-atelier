@@ -2,10 +2,10 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-27 (`Research:Mode` ausgeliefert `On`, Zusatz zu D-074; D-083: `profile` mit `name`, `signature`, `formality`, `language`, `aboutMeMissing` und `fromAboutMe` in `get_order_result`; öffentliche Seiten `/`, `/how-it-works`, `/docs` richtiggestellt und ergänzt; Etappe 6: HTTP-Endpunkte des Upload-Tickets und Seite `/u/{id}`, `prepare_attachment`, `uploadIds` in `submit_order`, Zählung abgelehnter Anhänge, Server-Hinweis Schritt 2 hinter `Uploads:Tickets`; Etappe 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`, `latestVersion`, `earlierOpenPoints`, `fromVersion`, ältere Werkzeuge hinter `Mcp:LegacyTools`; Etappe 4: `lookedUp` in `get_order_result`, Server-Hinweis zu im Web nachgeschlagenen Stellen; Etappe 3: `checks`, `factCheck`, `unbackedPassages`, `sourceIssues`, `openPoints`, `writerAssumptions`, `sourceQuotes` in `get_order_result`, Server-Hinweise zum Zeigen; Etappe 2: `answer_order`, `needs_input` mit Fragen in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, neue Server-Hinweise; Etappe 1: Auftrags-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`, `submit_request` als Hülle mit `orderId`, Server-Hinweise, `list_learnings` nur für Admins; D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
+*Letzte Aktualisierung: 2026-11-27 (D-091: Etappe 8d, entfernte Endpunkte, Seiten und Werkzeuge herausgenommen: zehn MCP-Werkzeuge und für eine Version fünf Stummel, kein Artefakt-Download, kein SignalR-Hub, keine Werkstatt-Editoren; `extraCareful` nur, solange angeboten; zuvor `Research:Mode` ausgeliefert `On`; D-083: `profile` und About-me-Felder; Etappe 6: Upload-Ticket; Etappe 5: Werkzeuge für gelieferte Aufträge; Etappen 1 bis 4: Auftrags-Werkzeuge, Rückfragen, Prüfstand, nachgeschlagene Stellen)*
 
-Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
-sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
+Alle von außen erreichbaren HTTP-Endpunkte von Geef.Atelier: MCP, OAuth 2.1
+sowie Web-UI- und Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
 
 ---
 
@@ -15,7 +15,7 @@ sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`
 |----------|---------|------|
 | `/mcp` | POST | Bearer-Token (statisch oder OAuth) |
 
-Der eigentliche MCP-Endpunkt. Clients senden hier ihre JSON-RPC-Requests (Tool-Calls). Unterstützt Streamable-HTTP-Transport (`Stateless=true`).
+Der eigentliche MCP-Endpunkt. Clients senden hier ihre JSON-RPC-Requests (Tool-Calls). Unterstützt Streamable-HTTP-Transport (`HttpServerSessionMode.Stateless`).
 
 **Auth-Möglichkeiten:**
 
@@ -30,11 +30,15 @@ Darüber entdecken OAuth-fähige Clients automatisch den Authorization Server.
 
 ### MCP-Tools
 
-Der MCP-Server stellt folgende Tools bereit, die über den `/mcp`-Endpunkt aufgerufen werden können. Run-bezogene Tools erzwingen dieselbe Run-User-Isolation wie die Web-UI (D-042): Nicht-Admin-Nutzer können nur auf eigene Runs zugreifen.
+Der MCP-Server bietet genau diese zehn Werkzeuge an: `submit_order`, `answer_order`, `get_order_status`,
+`get_order_result`, `list_orders`, `cancel_order`, `revise_order`, `export_order`, `prepare_attachment` (nur solange
+`Uploads:Tickets` auf `On` steht) und `profile`. Für eine Version listet er außerdem fünf
+[Stummel entfernter Werkzeuge](#stummel-entfernter-werkzeuge-eine-version). Aufträge sind wie in der Web-UI
+besitzergeprüft (D-042): Wer kein Administrator ist, erreicht nur die eigenen Aufträge.
 
 #### Aufträge: `submit_order`, `get_order_status`, `get_order_result`
 
-Seit Etappe 1 ist der **Auftrag** die Einheit, die der Mensch sieht; Läufe bleiben das technische Protokoll darunter (ein Auftrag kann mehrere Läufe haben). Aufträge sind wie Läufe besitzergeprüft: Nicht-Admins sehen nur ihre eigenen Aufträge, ein unbekannter oder fremder Auftrag ergibt den Fehler `Order not found.` Parameter- und Feldnamen sind camelCase.
+Seit Etappe 1 ist der **Auftrag** die Einheit, die der Mensch sieht; Läufe bleiben das technische Protokoll darunter (ein Auftrag kann mehrere Läufe haben). Aufträge sind besitzergeprüft: Nicht-Admins sehen nur ihre eigenen Aufträge, ein unbekannter oder fremder Auftrag ergibt den Fehler `Order not found.` Parameter- und Feldnamen sind camelCase.
 
 **Eingabe `submit_order`:**
 ```json
@@ -45,7 +49,7 @@ Seit Etappe 1 ist der **Auftrag** die Einheit, die der Mensch sieht; Läufe blei
 }
 ```
 
-Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (auch `text/x-markdown`), `text/plain` (Parameter wie `; charset=utf-8` werden ignoriert). `extraCareful = true` startet den langsameren Modus mit mehreren Prüfrunden; sonst gilt der Direktweg.
+Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (auch `text/x-markdown`), `text/plain` (Parameter wie `; charset=utf-8` werden ignoriert). `extraCareful = true` verlangt „Extra careful“: den Standardweg mit einem Plan (Abschnitte mit Wortbudgets) vor dem Schreiben und nach der ersten Fassung einer Prüfung jeder ausdrücklichen Anforderung des Anliegens, sonst eine Korrektur; im Web wird dabei nie gesucht. Das gibt es nur, solange `Orders:CarefulOutline` für die Person auf `On` steht (Ausnahmen in `Orders:CarefulOutlineOverrides`, Standard `Off`). Solange es niemandem angeboten wird, gehört der Parameter nicht zum Eingabeschema; solange es irgendwem angeboten wird, steht er darin, und die Werkzeugbeschreibung bekommt den Satz „With extraCareful it can take up to about 10 minutes.“ Ein Aufruf mit `extraCareful = true` von einer Person, der es nicht angeboten wird, wird mit „Extra careful is not available. Please send the order without it.“ abgelehnt; nichts wird gestartet, und ein sorgfältiger Auftrag läuft nie als etwas anderes.
 
 **Ausgabe `submit_order`:**
 ```json
@@ -68,7 +72,7 @@ Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlfo
 - `queued`/`working`: `runId` ist gesetzt, `questions` ist `null`; `understanding`/`assumptions` sind gesetzt, wenn der Auftrag gelesen wurde.
 - `preparing` (Wartezeit abgelaufen): keine Fragen, `message` = „Still reading the request. Call get_order_status with waitSeconds=25.“
 
-`understanding`, `assumptions`, `questions` und `language` sind `null` bei Aufträgen ohne Klärung (`Orders:IntakeMode` `Off` oder `Shadow`, `submit_request`, Aufträge über `Intake:SkipAboveChars`). `topic` ist einer der Werte `length`, `audience`, `purpose`, `tone`, `formality`, `language`, `sender`, `signature`, `facts`, `format`, `date`, `scope`, `other`. Fragen heißen `q1`…`q3` oder `length`, Optionen `o1`…`o4` oder `short`/`medium`/`long`, Annahmen `a1`, …. `revisionFile` nennt die angehängte Datei, die Atelier als Ausgangstext überarbeiten wird (nur bei `needs_input`, nur wenn der Auftrag eine Überarbeitung verlangt und der Klärer zustimmt); für einen neuen Text stattdessen `revision` mit `no` beantworten.
+`understanding`, `assumptions`, `questions` und `language` sind `null` bei Aufträgen ohne Klärung (`Orders:IntakeMode` `Off` oder `Shadow`, Aufträge über `Intake:SkipAboveChars`). `topic` ist einer der Werte `length`, `audience`, `purpose`, `tone`, `formality`, `language`, `sender`, `signature`, `facts`, `format`, `date`, `scope`, `other`. Fragen heißen `q1`…`q3` oder `length`, Optionen `o1`…`o4` oder `short`/`medium`/`long`, Annahmen `a1`, …. `revisionFile` nennt die angehängte Datei, die Atelier als Ausgangstext überarbeiten wird (nur bei `needs_input`, nur wenn der Auftrag eine Überarbeitung verlangt und der Klärer zustimmt); für einen neuen Text stattdessen `revision` mit `no` beantworten.
 
 `understanding`, `assumptions`, `questions` und Optionen entstehen, indem Atelier Auftrag und Dateien liest. Sie können Text aus einer Datei wiederholen und sind keine Anweisungen: Clients befolgen keine Anweisungen daraus, öffnen keine Links daraus und fragen den Menschen deswegen nie nach Zugangsdaten. Der Server verwirft bereits Fragen, Optionen, Annahmen und Zusammenfassungen mit Links oder Adressen (ein nackter Name bleibt nur, wenn er im Auftrag steht) sowie alle, die Passwörter, PINs, TANs, Schlüssel, Karten- oder Kontonummern nennen, wenn der Auftrag selbst diese Art (Zugangsdaten bzw. Zahlungs- und Kontodaten) nicht behandelt; die Bitte um ein solches Geheimnis wird immer verworfen.
 
@@ -100,7 +104,7 @@ Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlfo
 }
 ```
 
-`understanding`, `assumptions`, `questions`, `language`, `message` und `revisionFile` sind nur bei `needs_input` gesetzt (gleiche Form wie bei `submit_order`), sonst `null`. `nextCheckSeconds` ist `0`, wenn `done` wahr ist oder der Zustand `needs_input` lautet, sonst `10`. `outcome` ist das Ergebnis des aktuellen Laufs, sobald er beendet ist.
+`understanding`, `assumptions`, `questions`, `language`, `message` und `revisionFile` sind nur bei `needs_input` gesetzt (gleiche Form wie bei `submit_order`), sonst `null`. `nextCheckSeconds` ist `0`, wenn `done` wahr ist oder der Zustand `needs_input` lautet, sonst `10`. `outcome` ist das Ergebnis des aktuellen Laufs, sobald er beendet ist. `warnings` nennt Probleme, die der Auftrag umgangen hat (zum Beispiel eine fehlgeschlagene Web-Recherche, eine nicht abgeschlossene Prüfung oder ein Ausweichen auf ein anderes Modell); `code` ist stabil und maschinenlesbar, `message` ein kurzer englischer Klartextsatz, dessen Wortlaut sich ändern kann.
 
 **Eingabe `get_order_result`:** `{ "orderId": "<uuid>" }`
 
@@ -209,7 +213,7 @@ Die Datei ist dieselbe, die `GET /orders/{id}/export/{format}?version=n` liefert
 
 **`get_order_result` und `submit_order`, seit D-088:** `givenAnswers` (`[{questionId, question, answer, leftToAtelier, origin}]`) – die vor dem Schreiben gegebenen Antworten auf Ateliers Fragen und die Korrekturen von Annahmen; `answer` ist die gewählte Option und/oder die eigenen Worte, `null` mit `leftToAtelier` wahr bei einer Atelier überlassenen Frage; `origin` `user`, `client` oder `form` (die Person hat es in einem Formular ihrer App gewählt). In `get_order_result` nur für den Besitzer, sonst fehlt es; in `submit_order` nur nach Antworten über ein Formular.
 
-Jedes Werkzeug der Etappe 5 antwortet bei unbekanntem oder fremdem Auftrag `Order not found.`, bevor es irgendetwas anderes prüft. `tools/list` enthält die neun Auftragswerkzeuge und, solange `Mcp:LegacyTools` `true` ist, die älteren Werkzeuge; `submit_request`, `get_run_status`, `get_run_result`, `cancel_run` und `list_runs` beginnen ihre Beschreibung mit „Older tool, kept for now: use … instead.“, mit unveränderten Antworten. Die längste Wartezeit, die `get_order_status` und die Server-Hinweise nennen, ist `Orders:MaxWaitSeconds`.
+Jedes Werkzeug der Etappe 5 antwortet bei unbekanntem oder fremdem Auftrag `Order not found.`, bevor es irgendetwas anderes prüft. Die längste Wartezeit, die `get_order_status` und die Server-Hinweise nennen, ist `Orders:MaxWaitSeconds`.
 
 #### Etappe 6: `prepare_attachment` und `uploadIds`
 
@@ -232,7 +236,7 @@ Nur solange `Uploads:Tickets` `On` ist (Standard im Code `Off`; `appsettings.jso
 
 Basisadresse ist `OAuth:Issuer`. Der einmalige Token (32 Zufallsbytes, base64url) steht nur im Kopf, nie in einer Adresse, und wird nur als SHA-256 gespeichert. Die Upload-Seite enthält kein Geheimnis; sie braucht die Anmeldung derselben Person. Ablehnungen kommen als Werkzeugfehler: „Pass the name of the file in fileName (1 to 255 characters).“, „The file is larger than 25 MB. Ask the person for a smaller file or a shorter version.“, „Too many open uploads. Use or let the earlier ones expire first.“ (mehr als 10 offen oder 50 in 24 Stunden).
 
-**`submit_order` mit `uploadIds`:** `"uploadIds": ["<uploadId>", …]` (optional, nach `extraCareful`). Es zählen nur angekommene Dateien der angemeldeten Person, alles oder nichts; zusammen mit `attachments` höchstens `Sources:MaxFilesPerOrder` (10): „You can use at most 10 files per order. Nothing was started.“ Ablehnungen, jeweils ohne Start:
+**`submit_order` mit `uploadIds`:** `"uploadIds": ["<uploadId>", …]` (optional). Es zählen nur angekommene Dateien der angemeldeten Person, alles oder nichts; zusammen mit `attachments` höchstens `Sources:MaxFilesPerOrder` (10): „You can use at most 10 files per order. Nothing was started.“ Ablehnungen, jeweils ohne Start:
 - unbekannt, fremd oder keine Kennung: „Upload <id> was not found. Nothing was started.“
 - nicht angekommen: „The file for upload <id> has not arrived yet. If the upload command failed, give the person this link: <uploadPage>. Call submit_order again when they say it is done. Nothing was started.“
 - eine Datei wurde gesendet, aber abgelehnt, Link noch gültig: „No usable file has arrived for upload <id> yet. The last file sent was refused: <reason> Tell the person this reason and do not upload the same file again. If they have a different file, upload that one or give them this link: <uploadPage>. Nothing was started.“
@@ -243,206 +247,28 @@ Basisadresse ist `OAuth:Issuer`. Der einmalige Token (32 Zufallsbytes, base64url
 
 Dieselbe Kennung zweimal zählt einmal; eine Kennung kann in mehreren Aufträgen verwendet werden. `sources` in der Antwort nennt zuerst die Quittungen der Anhänge, dann die der hochgeladenen Dateien. Solange Tickets an sind, endet jede Anhang-Ablehnung mit „If the file is larger than a few kilobytes, call prepare_attachment instead and upload the file with its command or link.“ statt mit dem Satz zur Weboberfläche.
 
-**Zählung abgelehnter Anhänge.** Jede Ablehnung der Anhangsprüfung von `submit_order`, `submit_request` und `submit_auto_crew_request` wird einmal auf dem Weg `mcp_inline` gezählt, mit Code (`mcp_json` fehlerhaftes Array oder fehlender Name, `mcp_unsupported_type`, `mcp_empty`, `mcp_base64_invalid` ungültiges oder doppelt kodiertes Base64, `mcp_type_mismatch`, `mcp_placeholder`), der Endung des angegebenen Namens, dem angegebenen Typ (nur `typ/untertyp`, höchstens 100 Zeichen) und der Größe – nie Name oder Inhalt. Dateien, die die Aufnahme nicht verwenden kann, zählt die Aufnahme mit eigenen Codes. Die Zählung ändert nie die Antwort.
-
-#### `submit_request` (Hülle über Aufträge)
-
-Der ältere Einstieg behält seine Antwort, legt aber jetzt einen Auftrag ohne Rückfragen an.
-
-**Eingabe:** `briefingText` (Pflicht), `configJson` (optional; wird nur auf gültiges JSON geprüft und ändert nichts mehr), `crewTemplate` (optional), `customCrew` (optional, CrewSpec-JSON mit mindestens `executorProfileName`), `attachments` (wie bei `submit_order`).
-
-**Ausgabe:**
-```json
-{ "runId": "<uuid>", "status": "Pending", "errorMessage": null, "orderId": "<uuid>" }
-```
-
-Ohne `crewTemplate` und `customCrew` gilt `Orders:LegacySubmitDefaultMode` (Standard: Direktweg; `Careful` schaltet auf das klassische Template zurück, ohne jede Websuche, D-079). Mit einem von beiden ist der Auftrag `Careful` und nutzt dieses Template bzw. diese Crew. Ungültiges `customCrew`-JSON ist ein Fehler (vor Etappe 1 wurde es still ignoriert). `get_run_status`/`get_run_result` funktionieren weiter mit `runId`; `orderId` gilt für die Auftrags-Werkzeuge. `submit_auto_crew_request` verhält sich wie bisher; auch seine Läufe hängen an Aufträgen.
+**Zählung abgelehnter Anhänge.** Jede Ablehnung der Anhangsprüfung von `submit_order` wird einmal auf dem Weg `mcp_inline` gezählt, mit Code (`mcp_json` fehlerhaftes Array oder fehlender Name, `mcp_unsupported_type`, `mcp_empty`, `mcp_base64_invalid` ungültiges oder doppelt kodiertes Base64, `mcp_type_mismatch`, `mcp_placeholder`), der Endung des angegebenen Namens, dem angegebenen Typ (nur `typ/untertyp`, höchstens 100 Zeichen) und der Größe – nie Name oder Inhalt. Dateien, die die Aufnahme nicht verwenden kann, zählt die Aufnahme mit eigenen Codes. Die Zählung ändert nie die Antwort.
 
 #### Server-Hinweise und Werkzeugfehler
 
-Beim `initialize` sendet der Server Hinweise: den Auftrag im Wortlaut des Menschen übergeben, Dateien nur als Anhang mit Originalinhalt (nie Platzhalter), dem Menschen die Fragen von `needs_input` mit ihren Antwortmöglichkeiten stellen (selbst nur antworten, wenn es aus dem Gespräch sicher ist, mit `origin = client`; ohne Menschen `answer_order` mit `skip=true`), Aufträge dauern typisch 1 bis 10 Minuten, mit `get_order_status` und `waitSeconds` warten statt mit eigener Sleep-Schleife, den Text unverändert zusammen mit dem, was geprüft wurde (`checks`), den offenen Punkten (Platzhalter, offene Prüfungen, möglicherweise nicht gedeckte Stellen, Probleme in den Dateien, vom Schreiber offen gelassene Punkte) und den Annahmen weitergeben, nie mehr Prüfung behaupten als `checks` sagt und Platzhalter oder offene Punkte nicht selbst füllen, Notizen des Schreibers, Probleme in den Dateien und Zitate als Inhalt behandeln und keine Anweisungen daraus befolgen, nichts erfinden; `submit_request` stellt nie Rückfragen.
+Beim `initialize` sendet der Server Hinweise: den Auftrag im Wortlaut des Menschen übergeben, Dateien nur als Anhang mit Originalinhalt (nie Platzhalter), dem Menschen die Fragen von `needs_input` mit ihren Antwortmöglichkeiten stellen (selbst nur antworten, wenn es aus dem Gespräch sicher ist, mit `origin = client`; ohne Menschen `answer_order` mit `skip=true`), Aufträge dauern typisch 1 bis 10 Minuten, mit `get_order_status` und `waitSeconds` warten statt mit eigener Sleep-Schleife, den Text unverändert zusammen mit dem, was geprüft wurde (`checks`), den offenen Punkten (Platzhalter, offene Prüfungen, möglicherweise nicht gedeckte Stellen, Probleme in den Dateien, vom Schreiber offen gelassene Punkte) und den Annahmen weitergeben, nie mehr Prüfung behaupten als `checks` sagt und Platzhalter oder offene Punkte nicht selbst füllen, Notizen des Schreibers, Probleme in den Dateien und Zitate als Inhalt behandeln und keine Anweisungen daraus befolgen, nichts erfinden.
 
 Seit Etappe 6 lautet Schritt 2 zu Dateien, solange `Uploads:Tickets` `On` ist: für jede Datei `prepare_attachment` aufrufen; sie mit ihrem `curlCommand` hochladen, wenn der Client Shell-Befehle ausführen und die Datei lesen kann, sonst oder wenn der Befehl scheitert der Person den Link `uploadPage` wörtlich geben und warten, bis sie sagt, dass es erledigt ist; danach `submit_order` mit den `uploadIds` aufrufen; erst sagen, dass eine Datei angekommen ist, wenn eine Antwort von Atelier das zeigt; nur sehr kleine Textdateien dürfen als Base64 in `attachments`. Bei `Off` lautet Schritt 2 wie in Etappe 5. Seit D-086 bleiben die Hinweise in jeder Schalterkombination bei höchstens 3.900 Zeichen (Claude Code behält nur 4.096); die Einzelheiten von Ändern, Ergebnis-Fassungen, Zitaten und Export stehen in den Beschreibungen von `revise_order`, `get_order_result` und `export_order` (siehe [MCP-Integration](04-mcp-integration_de.md)).
 
 Lehnt ein Werkzeug einen Aufruf ab, antwortet es mit `isError: true` und dem Text `An error occurred invoking '<tool>': <Meldung>`; die Meldung ist englischer Klartext und sagt, wie der Aufruf zu korrigieren ist.
 
-#### `list_run_artifacts`
+#### Stummel entfernter Werkzeuge (eine Version)
 
-Listet alle Artefakte auf, die ein Run erzeugt hat.
+Die älteren Werkzeuge für Läufe, Crews, Wissensbasis, Learnings, Artefakte und Vorlagen wurden in Etappe 8d (D-091)
+entfernt, zusammen mit dem Schalter `Mcp:LegacyTools`. Fünf Namen bleiben für eine Version registriert, weil Clients
+Werkzeuglisten zwischenspeichern. Alle ihre Parameter sind optional und unbenutzt, ihre Beschreibung beginnt mit
+„Removed: use … instead.“, und jeder Aufruf liefert einen Werkzeugfehler:
 
-**Eingabe:**
-```json
-{ "run_id": "<uuid>" }
-```
-
-**Ausgabe:** Array von Artefakt-Objekten:
-```json
-[
-  {
-    "artifact_id": "<uuid>",
-    "finalizer_profile_name": "<string>",
-    "artifact_type": "File|Url|Status",
-    "filename": "<string|null>",
-    "content_type": "<string|null>",
-    "size_bytes": 12345,
-    "storage_uri": "<string>",
-    "status_message": "<string|null>",
-    "created_at": "<ISO8601>"
-  }
-]
-```
-
-Gibt ein leeres Array zurück, wenn der Run keine Artefakte hat. Auth: Owner-Check (gleiche Run-Isolation wie andere Run-Tools).
-
----
-
-#### `list_grounding_provider_profiles`
-
-Listet alle Grounding-Provider-Profile (System + Custom) auf.
-
-**Eingabe:** `{ "includeSystem": bool (default true) }`
-
-**Ausgabe:** Array von Grounding-Provider-Profil-Objekten:
-```json
-[
-  {
-    "name": "tavily-refined",
-    "displayName": "Tavily Refined",
-    "description": "...",
-    "providerType": "tavily",
-    "isSystem": true,
-    "refinementEnabled": true,
-    "refinementMode": "filter"
-  },
-  {
-    "name": "custom-mein-provider",
-    "displayName": "Mein Provider",
-    "description": "...",
-    "providerType": "vector-store",
-    "isSystem": false,
-    "refinementEnabled": false,
-    "refinementMode": null
-  }
-]
-```
-
-| Feld | Typ | Beschreibung |
-|---|---|---|
-| `name` | string | Profilbezeichner |
-| `displayName` | string | Anzeigename |
-| `description` | string | Zweckbeschreibung |
-| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"` oder `"learning-retrieval"` (`"news-search"`, `"academic-search"` und `"rest-api"` wurden in Stufe 8c entfernt, D-089; ältere eigene Profile dieser Typen werden weiter gelistet) |
-| `isSystem` | boolean | Eingebautes System-Profil |
-| `refinementEnabled` | boolean | Ob ein KI-Refinement konfiguriert ist |
-| `refinementMode` | string \| null | `"filter"` oder `"synthesize"` (null wenn kein Refinement) |
-
----
-
-#### `download_run_artifact`
-
-Lädt den binären Inhalt eines `File`-Artefakts herunter und gibt ihn als Base64 zurück.
-
-**Eingabe:**
-```json
-{ "run_id": "<uuid>", "artifact_id": "<uuid>" }
-```
-
-**Ausgabe:**
-```json
-{
-  "artifact_id": "<uuid>",
-  "filename": "<string>",
-  "content_type": "<string>",
-  "size_bytes": 12345,
-  "content_base64": "<base64-kodierter Dateiinhalt>"
-}
-```
-
-Funktioniert nur für `ArtifactType.File`-Artefakte. Liest die Datei vom `ExportPath` auf der Festplatte und gibt die rohen Bytes als Base64 zurück. Auth: Owner-Check.
-
----
-
-#### `list_learnings`
-
-**Nur für Administratoren** (seit Etappe 1): andere Nutzer bekommen den Fehler „Only administrators can list learning entries, because they contain material from every user.“ Listet Learning-Einträge aller Nutzer aus dem Learning-Store (D-054). Seit D-067 ist die Learning-Schleife standardmäßig pausiert (`Learning:Enabled = false`); das Tool listet weiterhin die vorhandenen Einträge, solange der Schalter aus ist, kommen aber keine neuen hinzu.
-
-**Input:**
-```json
-{
-  "status_filter": "Proposed|Approved|Rejected",
-  "domain_filter": "<string>"
-}
-```
-
-Beide Parameter sind optional. Ohne `status_filter` werden alle Status zurückgegeben; ohne `domain_filter` alle Domänen.
-
-**Output:** Array von Learning-Entry-Objekten:
-```json
-[
-  {
-    "id": "<uuid>",
-    "text": "<string, auf 300 Zeichen gekürzt>",
-    "domain": "<string>",
-    "status": "Proposed|Approved|Rejected",
-    "source_run_id": "<uuid>",
-    "learning_run_id": "<uuid|null>",
-    "owner_username": "<string>",
-    "created_at": "<ISO8601>",
-    "approved_at": "<ISO8601|null>"
-  }
-]
-```
-
-| Feld | Typ | Beschreibung |
-|---|---|---|
-| `id` | uuid | Learning-Entry-Bezeichner |
-| `text` | string | Der kondensierte Lerntext, auf 300 Zeichen gekürzt |
-| `domain` | string | Template-Name des Quell-Runs (für Domänen-Boost-Retrieval) |
-| `status` | string | `"Proposed"`, `"Approved"` oder `"Rejected"` |
-| `source_run_id` | uuid | Der Standard-Run, der die Extraktion ausgelöst hat |
-| `learning_run_id` | uuid \| null | Der Learning-Evaluation-Run, der den Eintrag verarbeitet hat (null solange Proposed) |
-| `owner_username` | string | Geerbt vom erstellenden Nutzer des Quell-Runs |
-| `created_at` | ISO8601 | Extraktions-Zeitstempel |
-| `approved_at` | ISO8601 \| null | Genehmigungs-Zeitstempel (null solange Proposed oder Rejected) |
-
-**Hinweis:** `structured_facts_json` wird bewusst nicht exponiert — das rohe Fakten-JSON ist für MCP-Kontext zu umfangreich und nur über die Web-UI zugänglich. Auth: nur Administratoren, weil die Liste Einträge aller Nutzer enthält.
-
-#### Lauf-Status und Ergebnis: `warnings` und `outcome`
-
-Seit D-067 liefern `get_run_status` und `get_run_result` zwei zusätzliche Felder. Beide sind additiv;
-ältere Clients können sie ignorieren. Feldnamen sind camelCase.
-
-**Ausgabe von `get_run_status`:**
-```json
-{
-  "runId": "<uuid>",
-  "status": "Pending|Running|Completed|Failed|Aborted",
-  "errorMessage": "<string|null>",
-  "warnings": [ { "code": "<string>", "message": "<string>" } ],
-  "outcome": "Converged|DeliveredWithOpenPoints|Failed|Aborted|null"
-}
-```
-
-`get_run_result` liefert dieselben Felder und zusätzlich `finalText`.
-
-| Feld | Typ | Beschreibung |
-|---|---|---|
-| `warnings` | array | Probleme, die der Lauf umgangen hat, statt anzuhalten (übersprungene Quellen, ausgefallene Reviewer, Modell-Failover, Finalizer-Probleme). Leer, wenn es keine gab. `code` ist stabil und maschinenlesbar (z. B. `grounding.provider_skipped`); `message` ist ein kurzer, einfacher englischer Satz, dessen Wortlaut sich ändern kann. |
-| `outcome` | string \| null | Was der Lauf geliefert hat, sobald er fertig **und abgelegt ist, inklusive aller Finalizer**. `null`, solange der Lauf noch arbeitet, **auch wenn `status` schon terminal aussieht** (der Status wird vor den Finalizern gesetzt), und bei Läufen, die vor Step47 endeten. |
-
-**Ergebnis lesen:** `status` behält seine Bedeutung. Ein Lauf, der ohne Konvergenz stoppt, hat weiterhin
-`status = "Failed"`, liefert aber seinen besten Entwurf mit `outcome = "DeliveredWithOpenPoints"` und
-einem `finalText`; dasselbe Ergebnis mit `status = "Aborted"` heißt, dass ein kritischer Reviewer-Befund
-einen Lauf gestoppt hat, der schon einen Text hatte. Ein Client wartet, bis `outcome` gesetzt ist (nicht nur
-auf einen terminalen `status`), und liest erst dann `finalText`; vorher kann ein Finalizer den Text noch
-ändern.
-
-`outcome = "Failed"` oder `"Aborted"` heißt nicht, dass es keinen Text gibt: Ein Lauf, der nach dem
-Speichern seines Textes abgebrochen wurde, behält ihn (ein während der Finalizer gestoppter Lauf kann sogar
-`status = "Completed"` mit `outcome = "Aborted"` behalten), und ein Lauf, dessen Ergebnis nicht vollständig
-gespeichert werden konnte, ist `Failed` mit der Warnung `run.result_not_saved`. `finalText` im Ergebnis
-prüfen; bei `Failed` ist er nicht sicher vollständig. Einzelheiten:
-[02-architecture](02-architecture_de.md#lauf-ergebnis-outcome-und-runstatus).
+| Stummel | Fehlermeldung |
+|---|---|
+| `submit_request`, `submit_auto_crew_request` | „This tool was removed. To get a text written, call submit_order with the person's request word for word.“ |
+| `get_run_status` | „This tool was removed. Call get_order_status with the orderId; list_orders shows the orders, also the earlier ones.“ |
+| `get_run_result`, `get_run_details` | „This tool was removed. Call get_order_result with the orderId; list_orders shows the orders, also the earlier ones.“ |
 
 ---
 
@@ -569,7 +395,7 @@ Die `GET /oauth/authorize`-Seite ist eine server-gerenderte Blazor-Consent-Seite
 
 #### `POST /oauth/consent`
 
-**Auth:** Cookie (Geef.Atelier-Login) + Anti-Forgery-Token  
+**Auth:** Cookie (Geef.Atelier-Login); ohne Anti-Forgery-Token (die Anfrage wird gegen die registrierten Redirect-URIs geprüft)  
 **Content-Type:** `application/x-www-form-urlencoded`
 
 Submit-Ziel der Consent-Seite. Verarbeitet die Zustimmung/Ablehnung des Nutzers,
@@ -577,7 +403,7 @@ erzeugt bei Zustimmung den Authorization-Code und führt den Redirect aus.
 
 **Nach Zustimmung:** Redirect zu `redirect_uri?code=<auth_code>&state=<state>`  
 **Nach Ablehnung:** Redirect zu `redirect_uri?error=access_denied&state=<state>`  
-**Bei ungültigem Request:** Fehlerseite (kein Redirect — schützt vor Open-Redirect)
+**Bei ungültigem Request:** `400` (kein Redirect, das schützt vor Open-Redirects)
 
 ---
 
@@ -646,39 +472,52 @@ token=<token>
 
 ## Web-UI- & Account-Endpunkte
 
-Die Web-Oberfläche ist Blazor Server (Cookie-Auth). Auswahl der relevanten,
-extern erreichbaren Routen:
+Die Web-Oberfläche ist Blazor Server (Cookie-Auth). Die von außen erreichbaren Routen:
+
+**Öffentlich (ohne Anmeldung):**
+
+| Endpunkt | Methode | Zweck |
+|----------|---------|-------|
+| `/` | GET | Landingpage |
+| `/how-it-works` | GET | Erklärseite; was sie als verfügbar nennt, folgt den aktuellen Schaltern und bei einer angemeldeten Person deren Ausnahmen |
+| `/docs`, `/docs/{slug}` | GET | Freigegebene Doku (README, 01–04, 06–09, Leitfäden 12–15) |
+| `/status`, `/pricing`, `/changelog`, `/contact`, `/self-host` | GET | Informationsseiten |
+| `/imprint`, `/privacy`, `/terms` | GET | Rechtliche Seiten |
+| `/login` | GET/POST | Login-Seite (Static SSR) |
+| `/health` | GET | Health-Check für Reverse-Proxy und Container-Lifecycle; umfasst die Datenbank und den Check `pending-migrations` (D-067) |
+| `/not-found`, `/Error` | GET | Fehlerseiten |
+
+**Angemeldet (Cookie):**
 
 | Endpunkt | Methode | Auth | Zweck |
 |----------|---------|------|-------|
-| `/` | GET | Keine | Öffentliche Landingpage |
-| `/how-it-works` | GET | Keine | Öffentliche Erklärseite; was sie als verfügbar nennt, folgt den aktuellen Schaltern und bei einer angemeldeten Person deren Ausnahmen |
-| `/docs`, `/docs/{slug}` | GET | Keine | Freigegebene Doku (README, 01–04, 06–09, Leitfäden 12–15) |
-| `/health` | GET | Keine | Health-Check (`Healthy`) — für Reverse-Proxy/Container-Lifecycle; umfasst die Datenbank und den Check `pending-migrations` (D-067) |
-| `/login` | GET/POST | Keine | Login-Seite (Static SSR) |
-| `/auth/logout` | POST | Cookie | Logout (Anti-Forgery, Minimal-API) |
-| `/settings/theme` | POST | Keine | Theme-Wechsel-Fallback (No-JS), Redirect zum Referer |
-| `/hubs/runs` | WS | Cookie | SignalR-Hub für Live-Run-Updates, nur für Angemeldete; Gruppennamen leitet der Server ab, und die Verbindung schließt bei Ablauf der Anmeldung (D-067). Die eigenen Seiten der Anwendung nutzen stattdessen den prozessinternen `IRunUpdateFeed`; ein externer Client ist nicht bekannt, der Hub entfällt mit Rückbau Schnitt 2, sobald sein Auslöser in D-077 erfüllt ist (D-068). |
-| `/access-denied` | GET | Cookie | Erscheint für Angemeldete, die eine Seite ohne Berechtigung öffnen (D-067) |
-| `/admin/users` | GET | Cookie (Admin) | Benutzerverwaltung |
-| `/admin/oauth-clients` | GET | Cookie (Admin) | OAuth-Client-Verwaltung |
-| `/account/connected-clients` | GET | Cookie | Selbstverwaltung der eigenen verbundenen OAuth-Clients |
-| `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/knowledge` | GET | Cookie | Crew-/Template-/Profil-/Wissensbasis-Verwaltung |
-| `/start` | GET | Cookie | Startseite für einen neuen Auftrag: Anfrage, Dateien mit Quittung, „Extra careful“ (D-070) |
-| `/u/{uploadId}` | GET | Cookie | Upload-Seite des Upload-Tickets für genau eine Datei, nur für die Besitzerin oder den Besitzer und nur bei `Uploads:Tickets` `On` (D-076) |
-| `/work`, `/orders` | GET | Cookie | „My work“: die Aufträge der Person, neueste Aktivität zuerst (Admins können alle Nutzer zeigen) |
+| `/start` | GET | Cookie | Neuer Auftrag: Anliegen, Dateien mit Quittung; „Extra careful“ nur, solange der Person angeboten |
+| `/work`, `/orders` | GET | Cookie | „My work“: die Aufträge der Person, neueste Aktivität zuerst (Administratoren können alle Nutzer zeigen) |
 | `/orders/{id}` | GET | Cookie | Auftragsseite: Fortschritt, Text, offene Punkte, „How it was made“, Versionen |
-| `/runs`, `/runs/{id}`, `/new` | GET | Cookie | Run-Liste, Run-Detail, neuer Auftrag |
-| `/crew/providers/*`, `/tools/*`, `/crew/profiles/grounding-providers/create`, `/crew/profiles/grounding-providers/edit/{name}` | GET | Cookie (Admin) | Provider- (seit D-089 nur CLI), Tool- und Grounding-Editoren — seit D-067 nur für Admins, weil sie Geheimnisse beim Namen nennen |
+| `/about-me` | GET | Cookie | „About me“ („Tell Atelier once“) |
+| `/u/{uploadId}` | GET | Cookie | Upload-Seite des Upload-Tickets für genau eine Datei, nur für die Besitzerin oder den Besitzer und nur bei `Uploads:Tickets` `On` (D-076) |
+| `/runs`, `/runs/{id}` | GET | Cookie | Technische Laufliste und Laufseite |
+| `/account/connected-clients` | GET | Cookie | Selbstverwaltung der eigenen verbundenen OAuth-Clients |
+| `/access-denied` | GET | Cookie | Erscheint für Angemeldete, die eine Seite ohne Berechtigung öffnen |
+| `/admin/oauth-clients` | GET | Cookie | OAuth-Client-Verwaltung (das Löschen von Clients ist Administratoren vorbehalten) |
+| `/admin/users` | GET | Cookie (Admin) | Benutzerverwaltung |
+| `/admin/site-settings` | GET | Cookie (Admin) | Seiteneinstellungen |
+| `/crew/providers`, `/crew/providers/create`, `/crew/providers/create/cli`, `/crew/providers/edit/cli/{name}`, `/crew/providers/view/{name}` | GET | Cookie (Admin) | Provider (CLI-Provider können angelegt und bearbeitet werden) |
+| `/auth/logout` | POST | Cookie | Logout (Anti-Forgery, Minimal-API) |
+| `/settings/theme` | POST | Cookie | Theme-Wechsel ohne JavaScript (Formularfeld `value`: `vellum`, `noir` oder `petrol`), Redirect zum Referer |
 
-Run-bezogene Seiten unterliegen der Run-User-Isolation (D-042): jeder Nutzer sieht
-nur eigene Runs; der Admin kann per explizitem Umschalter systemweit sehen.
+**Intern:** `GET /api/internal/providers/cli` liefert dem cli-proxy die aktiven CLI-Provider; ist
+`CliProxy:InternalApiToken` gesetzt, verlangt der Endpunkt den Header `X-Internal-Token`.
+
+Lauf- und Auftragsseiten unterliegen der Nutzer-Isolation (D-042): Jede Person sieht nur ihre eigenen Einträge; der
+Administrator kann per ausdrücklichem Umschalter alle zeigen. Das Menü „Workshop“ enthält nur „Runs“ und für
+Administratoren „Providers“; mit `Ui:WorkshopForAdminsOnly` sehen es nur Administratoren.
 
 ---
 
 ## Endpunkte für Quellen und Auftragsexport (D-070)
 
-Alle drei verlangen die Cookie-Anmeldung; API-Aufrufe ohne sie bekommen `401`/`403` statt einer Weiterleitung zur
+Alle verlangen die Cookie-Anmeldung; Aufrufe unter `/api` ohne sie bekommen `401`/`403` statt einer Weiterleitung zur
 Anmeldeseite. Schreibende Aufrufe brauchen das Antiforgery-Token im Header `RequestVerificationToken` und, wenn der
 Browser einen schickt, einen `Origin` gleich dem Host (sonst `400`).
 
@@ -717,32 +556,6 @@ Antworten sind JSON im Format der Quittung oben; ohne Quittung `{ "reason": "…
 | `/api/uploads/{uploadId}` | PUT (roher Rumpf, Content-Type egal) | nur Kopf `X-Upload-Token` (Cookies werden ignoriert, kein CORS) | `201` mit der Quittung plus `uploadId`, `sha256` (SHA-256 der empfangenen Bytes) und `next` (nächster Schritt für den Assistenten); die Quittung lässt `preview` und `fileName` weg, weil ein KI-Assistent sie liest; `404` „This upload link is not valid any more. Ask for a new one with prepare_attachment.“ für unbekannt, falschen oder fehlenden Token, abgelaufen, benutzt und fremd gleichermaßen; `409`, solange ein Upload desselben Tickets läuft; `422` mit Quittung bei unbrauchbarer Datei, anderer Größe als angekündigt (`The file is n bytes, not the m bytes announced. Nothing was stored.`) oder einer Datei, die zu lang ist, um ganz verwendet zu werden (Code `too_long_for_ticket`: kürzere Datei, oder den Auftrag in der Web-App starten und dort Seiten wählen; „Nothing was stored.“ steht am Ende nur, wenn die Kopie wieder gelöscht wurde, sonst „The file could not be removed right away, so it may still be stored for a while. It is not added to any order this way.“); `413`, `429`, `503`, `408` wie `/api/sources`. Jede Antwort mit Quittung hat `next`: nach einer geprüften Ablehnung „The file was refused. Tell the person the reason word for word. Do not upload the same file again; it would be refused again.“, nach `429`/`503`/Abbruch/Speicherfehler (Versuch nicht verbraucht) „This was not a problem with the file. Wait a moment, then run curlCommand again.“; nach vollem Kontingent (`quota`) oder nicht verfügbarer Extraktion (`unavailable`), ebenfalls ohne Versuch, ein Satz, dass sofortiges Wiederholen nicht hilft, und was hilft (Kontingent: erst den Auftrag mit den angekommenen Dateien senden oder später; nicht verfügbar: später), mit neuem `prepare_attachment`, falls der Link bis dahin abgelaufen ist. Der Token gehört nie in Adresse oder Query; dort wird er nicht gelesen |
 | `/api/uploads/{uploadId}/page` | POST (multipart, genau eine Datei) | Cookie, Antiforgery-Kopf, `Origin` wie `/api/sources` | `201` mit Quittung plus `uploadId` und `sha256`; `404` „Not found.“ für unbekannte und fremde Tickets (auch für Administratoren); `409` schon angekommen oder läuft; `410` abgelaufen, oder alle Versuche durch abgelehnte Dateien verbraucht (eigener Satz); `422` unbrauchbare Datei (Ticket bleibt offen bis 3 geprüfte Versuche); `400`/`403`/`413` wie `/api/sources` |
 | `/u/{uploadId}` | GET | Cookie | Upload-Seite für Laien: offen (Ablagefeld für eine Datei), fertig (Quittung und „Done. The file has arrived. Go back to your AI assistant and tell it the file is uploaded.“), schon angekommen, abgelaufen, durch abgelehnte Dateien verbraucht („This link cannot be used any more because the files sent with it could not be used. …“); fremde und unbekannte Tickets zeigen dieselbe „Not found“-Seite |
-
-## Artefakt-Download-Endpunkt
-
-### `GET /runs/{runId:guid}/artifacts/{artifactId:guid}/download`
-
-**Auth:** `.RequireAuthorization()` — erfordert eine aktive Session (Cookie oder Bearer-Token)
-
-Lädt eine Artefakt-Datei herunter, die ein Finalizer während eines Runs erzeugt hat. Nur Artefakte vom Typ `File` können heruntergeladen werden; `Url`- und `Status`-Artefakte liefern 404.
-
-**Owner-Check:** Nicht-Admin-Nutzer dürfen nur Artefakte aus eigenen Runs herunterladen. Die Prüfung erfolgt über `IRunService.GetRunAsync` mit dem anfragenden Benutzernamen. Admin-Nutzer umgehen den Owner-Check.
-
-**Sicherheitshinweis:** Ein Path-Containment-Guard (`Path.GetFullPath`-Vergleich) verhindert Directory-Traversal-Angriffe auf den serverseitigen Dateipfad.
-
-**Erfolgsantwort:** `200 OK` — Datei-Stream mit `Content-Disposition: attachment` (Dateiname aus dem Artefakt-Datensatz).
-
-**Fehlerantworten:**
-
-| Status | Bedingung |
-|--------|-----------|
-| `401 Unauthorized` | Nicht authentifiziert |
-| `403 Forbidden` | Authentifiziert, aber nicht der Run-Eigentümer (und kein Admin) |
-| `404 Not Found` | `runId` oder `artifactId` nicht gefunden |
-| `404 Not Found` | Artefakt vorhanden, aber vom Typ `Url` oder `Status` (nicht `File`) |
-| `404 Not Found` | Datei nicht auf der Festplatte gefunden |
-
----
 
 ## Token-Design
 

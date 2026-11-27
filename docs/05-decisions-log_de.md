@@ -4,7 +4,7 @@
 
 *Letzte Aktualisierung: 2026-11-27 (D-085: ältere Prüfschleife, drei Schutzschalter, ausgeliefert aus; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
-*Letzte Aktualisierung: 2026-11-27 (D-087: „Extra careful“ mit Gliederung hinter Schalter, Schleifen-Schalter je Konto, Messung vorbereitet; zuvor D-086: MCP-Server-Hinweise unter der Kürzungsgrenze, SDK exakt 2.4.0; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-27 (D-091: Rückbau, Schnitt 2, nur der Standardweg bleibt; zuvor D-090: Gateway-Failover nur auf dasselbe Modell; D-087: „Extra careful“ mit Gliederung hinter Schalter, Schleifen-Schalter je Konto, Messung vorbereitet; zuvor D-086: MCP-Server-Hinweise unter der Kürzungsgrenze, SDK exakt 2.4.0; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -3911,3 +3911,83 @@ Differenztest gegen `main` über die Szenario-Matrix für alle übrigen Kopfwert
 
 **Rückweg.** Gateway-Image zurück genügt nicht allein, solange `web` `same-model` schickt (dann wieder volles Failover); also zuerst
 `web` zurück, dann das Gateway.
+
+## D-091 — Rückbau, Schnitt 2: nur der Standardweg bleibt (2026-11-27)
+
+**Kontext.** Stufe 8d des Rückbaus („Rückbau, Schnitt 2“). Sie ersetzt die Zwischenstufen 8a/8b: Die ältere Prüfschleife hat die
+Messung gegen den Standardweg verloren, und die in 8b geplante Teamauswahl wird nicht gebaut. Ziel: eine aufgeräumte, kleinere Codebasis, in der nur bleibt, was der Standardweg braucht. Die Datenbank wird später in einem eigenen Schritt aufgeräumt, nicht hier.
+
+**Entscheidung — entfernt.**
+- **Composer und Auto-Crew** (Zusammenstellungsläufe, Materializer, Validator, Prompts, `submit_auto_crew_request`).
+- **Der agentische Werkzeug-Pfad** (`/tools`, Werkzeugdefinitionen und -aufrufe, Werkzeugbindungen an Profilen und in Snapshots,
+  MCP-Server-Konfigurationen).
+- **Die Lernschleife** (Lernläufe, Learnings, `/learnings`, `Learning:*`).
+- **Die Vektor-Wissensbasis und die Embeddings** (`/knowledge`, Abschnitte, pgvector-Pakete, Übernahme von Laufanhängen,
+  `Embeddings:*`, `Knowledge:*`).
+- **Die alten Grounding-Profile und -Typen**, einschließlich `url-fetch` mit der URL-Sicherheitsprüfung und der Vektor- und
+  Anhangsquellen, die D-089 noch behalten hatte. Kein verbliebener Pfad braucht sie: Der Standardweg liest die Dateien des Auftrags in
+  seinem eigenen Grounding-Schritt und erreicht das Web nur über den Recherchedienst (D-074). `Tavily` behält nur `Endpoint` und
+  `ApiKey`.
+- **Alle Abschlussschritte** (Finalizer), einschließlich `MetadataEnrich`, mit den Laufartefakten, ihrem Download-Endpunkt und
+  `Finalizer:*`. Die Formatwandler ziehen zum Export der Aufträge um.
+- **Advisor und Spezialisierungspakete.**
+- **Die ältere Prüfschleife** mit ihren Vorlagen (`klassik`, `juristisch`, `akademisch`, `marketing`, jede eigene Vorlage), die
+  Werkstatt und die Editoren für Teams und für Schreiber-, Prüfer-, Advisor-, Abschluss- und Quellenprofile, das Werkstatt-Dashboard mit
+  seinem Live-Hub und die Schutzschalter aus D-085 (`Convergence:BestDraft`, `WriterBlockingOnly`, `StopWithoutProgress` samt
+  Ausnahmen). Pipelines baut nur noch `DirectPipelineAssembler`; `AtelierPipelineFactory` nimmt die Schritte, die man ihm gibt.
+- **Das alte Formular `/new`** und der Link „More options“ auf `/start`.
+- **Die älteren MCP-Werkzeuge** und der Schalter `Mcp:LegacyTools`; `Orders:LegacySubmitDefaultMode` entfällt ebenfalls.
+- Reste: der Löschschutz für Anbieter, der die alten Profiltabellen abfragte, die Warncodes alter Quellen und Abschlussschritte,
+  Slot-Helfer, die nur die Werkstatt nutzte, das Dashboard-Stylesheet, MailKit-Audit-Ausnahmen, das Einmalwerkzeug `MaterializeRun`.
+
+**Entscheidung — bleibt.** Die Auftrags- und Laufseiten des Standardwegs, Exporte, „My work“, „About me“, die Verwaltung (Nutzer,
+OAuth-Clients, Seiteneinstellungen, Anbieter), Datenschutz und Rechtliches, Erklär- und Startseite, Uploads und Upload-Tickets, die
+MCP-Werkzeuge des Standardwegs (`submit_order`, `answer_order`, `get_order_status`, `get_order_result`, `list_orders`, `cancel_order`,
+`revise_order`, `export_order`, `prepare_attachment`, `profile`), die Modellmatrix und der Modellkatalog. Das Werkstatt-Menü
+(`Ui:WorkshopForAdminsOnly`) enthält nur noch die technische Laufliste und, für Administratoren, die Anbieter.
+
+**Stummel für eine Version.** `submit_request`, `submit_auto_crew_request`, `get_run_status`, `get_run_result` und `get_run_details`
+bleiben registriert: Jeder Parameter ist optional, und jeder Aufruf liefert einen Werkzeugfehler, der `submit_order`,
+`get_order_status` oder `get_order_result` nennt (Clients halten Werkzeuglisten im Cache). Sie entfallen in der nächsten Version.
+
+**„Extra careful“.** Ein sorgfältiger Auftrag läuft auf dem Direktweg mit vorheriger Gliederung (`direct-outline`, D-087), wenn
+`Orders:CarefulOutline` für die Person `On` ist (`CarefulOutlineOverrides` je Benutzername); ausgeliefert ist `Off`. Sonst gibt es die
+Option nicht: `/start` zeigt kein Kästchen, die Erklärseite erwähnt sie nicht, `submit_order` lässt `extraCareful` aus seinem Schema,
+solange sie niemand hat, und ein `extraCareful=true` für eine Person ohne die Option wird mit „Extra careful is not available. Please
+send the order without it.“ abgelehnt. Ein sorgfältiger Auftrag läuft nie still als etwas anderes; „Start again“ eines älteren
+sorgfältigen Auftrags sagt, dass der Standardweg genutzt wird, und startet nichts von selbst. Einschalten oder Entfernen berührt den
+Schalter, `ResolveOrderSnapshotAsync`, die Vorlage in `SystemCrew` und den Planer — in beide Richtungen ein kleiner Diff.
+`scripts/atelier-smoke.sh` nutzt `submit_order`, `answer_order(skip=true)`, `get_order_status` und `get_order_result`.
+
+**Ältere Daten.** Kein `DROP`, keine Migration, keine gelöschte Zeile: Die Datenbank bleibt mit dem vorigen Image verträglich.
+Entfernte Entitäten sind nicht mehr gemappt; ihre Tabellen und die Spalten `Runs.GroundingCostEur`, `FinalizerCostEur`,
+`FinalizerErrorMessage` und `Iterations.AdvisorsTotalCostEur` bleiben. Snapshots behalten die Liste `advisors`, damit das vorige Image
+neue Snapshots lesen kann, und unbekannte Eigenschaften älterer Snapshots werden ignoriert. Fertige ältere Läufe und Aufträge bleiben
+in den Listen, in „My work“, auf Auftrags- und Ergebnisseite, in Exporten und auf der technischen Laufseite lesbar (sie nennt die
+Aufstellung und sagt, dass deren Arbeitsweise nicht mehr existiert). Ein wartender Lauf einer entfernten Aufstellung (ältere
+Prüfschleife, zusammengestelltes Team, Lernlauf) scheitert mit „This task was set up for a way of working that no longer exists, so it
+cannot run. Please start it again.“; das Fortsetzen eines solchen Laufs wird mit denselben Worten abgelehnt. Wiederherstellung nach
+Absturz und Aufräumer behandeln ältere Läufe wie bisher.
+
+**Beibehaltene Regeln.** Reihenfolge je Teil: Navigation → Registrierung → Code → Tests → Seeds; thematisch getrennte Commits; nur
+handgeschriebene Migrationen.
+
+**Nachweis.** Vollständige Testsuite, die End-to-End-Kategorie und die Tests des Smoke-Skripts. Neue End-to-End-Tests legen fertige
+und wartende Läufe und Aufträge entfernter Aufstellungen an und prüfen Listen, „My work“, Seiten, Orchestrator und Wiederherstellung
+nach Absturz. Der Test der Produktions-Snapshots (`ATELIER_SNAPSHOT_FIXTURES`, Export außerhalb des Repositorys) prüft jetzt, dass jeder
+Snapshot gelesen wird und entweder auf dem Direktweg läuft oder mit dem Satz oben abgelehnt wird; alle exportierten Snapshots bestehen.
+Orchestrator-Tests, die Abschlussschritte nutzten, verwenden jetzt den Abschluss-Haken des Assemblers (`OnRunFinishedAsync`).
+
+**Grenzen.**
+- Der EF-Modell-Snapshot kennt die entfernten Entitäten noch (wie nach D-089); keine Migration erzeugen. Eine neue Basis folgt dem
+  Aufräumen der Datenbank.
+- Das spätere Aufräumen darf die Tabellen `AdvisorConsultations`, `AdvisorProfiles`, `CrewTemplateEmbeddings`, `CrewTemplates`,
+  `ExecutorProfiles`, `FinalizationActorCosts`, `FinalizerProfiles`, `GroundingActorCosts`, `GroundingConsultations`,
+  `GroundingProviderProfiles`, `KnowledgeDocumentChunks`, `KnowledgeDocuments`, `LearningEntries`, `ReviewerProfiles`, `RunArtifacts`,
+  `StudioSettings`, `TemplateStudioAnalyses`, `mcp_server_configs`, `specialization_packs`, `tool_definitions`, `tool_invocations`, die
+  Spalten oben und die alten Zusammenstellungs- und Lernläufe entfernen; das Compose-Volume für Exporte wird nicht mehr genutzt.
+- `ModelSlot` behält seine Werte (Snapshots speichern Zahlen); die Matrixzeilen ausgemusterter Slots bleiben bis zum Aufräumen.
+- Der Arm `atelier` des Auswertungswerkzeugs in `tools/Eval` ruft noch `submit_request` auf; die Messungen des Standardwegs nutzen die
+  Auftragswerkzeuge.
+
+**Rückweg.** Das vorige Image; in der Datenbank wurde nichts entfernt oder geändert. Im Code nur über Git (Tag vor dem Deploy).

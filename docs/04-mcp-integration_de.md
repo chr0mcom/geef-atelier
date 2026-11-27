@@ -2,33 +2,54 @@
 
 *[English](04-mcp-integration.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-27 (D-089: Template Studio entfernt, `analyze_template_proposal` und `materialize_template_proposal` sind Stummel, `list_grounding_provider_profiles` ohne `maxQueriesPerRun`; D-086: Server-Hinweise in jeder Schalterkombination höchstens 3.900 Zeichen, Einzelheiten von Ändern, Ergebnis und Export in den Werkzeugbeschreibungen; MCP-SDK exakt 2.4.0, Transport ausdrücklich zustandslos, ältere Clients und lange stille Antworten; zuvor 2026-11-26, D-083: `profile` speichert vier About-me-Felder, `aboutMeMissing` und `fromAboutMe` in `get_order_result`, Server-Hinweis dazu hinter `Orders:TellOnce`; Upload-Ticket ausgeliefert `On` richtiggestellt; Etappe 6: Dateien über das Upload-Ticket mit `prepare_attachment` und `uploadIds` hinter `Uploads:Tickets`, Zählung abgelehnter Anhänge; Etappe 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`, `latestVersion`/`earlierOpenPoints`/`fromVersion` in `get_order_result`, ältere Werkzeuge hinter `Mcp:LegacyTools`; Etappe 3: `get_order_result` mit „What was checked“, offenen Punkten, Annahmen des Schreibers und Zitaten aus den Dateien; Etappe 1: Auftrags-Werkzeuge, `submit_request` als Hülle, Server-Hinweise, `list_learnings` nur für Admins; zuvor 2026-11-22, D-066: `ModelSlot`/`ModelDomain`/`Domain` in den Listen-Tools; zuvor 2026-05-20, D-051: neue providerType-Werte static-context, url-fetch, news-search in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
+*Letzte Aktualisierung: 2026-11-27 (D-091: Etappe 8d, der Server bietet die zehn Auftragswerkzeuge und für eine Version fünf Stummel an, die älteren Werkzeuge und `Mcp:LegacyTools` entfallen, `extraCareful` nur, solange „Extra careful“ angeboten wird; zuvor D-089: Template Studio entfernt; D-086: Server-Hinweise höchstens 3.900 Zeichen, MCP-SDK exakt 2.4.0, Transport ausdrücklich zustandslos; 2026-11-26, D-083: `profile` speichert vier About-me-Felder; Etappe 6: Upload-Ticket; Etappe 5: Werkzeuge für gelieferte Aufträge; Etappe 3: Prüfstand in `get_order_result`; Etappe 1: Auftrags-Werkzeuge und Server-Hinweise)*
 
 ## Warum MCP
 
-Geef.Atelier soll nicht nur per Web-UI bedienbar sein, sondern auch von KI-Agenten konsumierbar. Der typische Anwendungsfall: ein Claude (oder ein anderer MCP-fähiger Client) arbeitet an einer komplexeren Aufgabe und braucht für einen Teilschritt einen besonders sorgfältig erzeugten Text. Statt diesen Text inline zu generieren — wo der aufrufende Claude weder mehrere Iterationen noch eine Reviewer-Crew zur Verfügung hat — delegiert er den Auftrag an Geef.Atelier, holt sich später das Ergebnis und arbeitet weiter.
+Geef.Atelier soll nicht nur per Web-UI bedienbar sein, sondern auch von KI-Agenten konsumierbar. Der typische Anwendungsfall: ein Claude (oder ein anderer MCP-fähiger Client) arbeitet an einer komplexeren Aufgabe und braucht für einen Teilschritt einen besonders sorgfältig erzeugten Text. Statt diesen Text inline zu generieren — wo dem aufrufenden Claude weder eigene Prüfungen noch eine Faktenprüfung durch ein anderes Modell zur Verfügung stehen — delegiert er den Auftrag an Geef.Atelier, holt sich später das Ergebnis und arbeitet weiter.
 
 MCP (Model Context Protocol) ist der Standard, mit dem solche Delegationen sauber laufen: Tools mit JSON-Schema-definierten Inputs/Outputs, einheitliche Auth, einheitlicher Transport.
 
 ## Architektonische Konsequenz
 
-Der Service hat **zwei Frontends**: Web-UI und MCP-Server. Beide nutzen denselben Application-Service-Layer (`IRunService`). Die Pipeline-Logik, die Persistierung, das EventSink — all das ist Frontend-agnostisch.
+Der Service hat **zwei Frontends**: Web-UI und MCP-Server. Beide nutzen dieselben Anwendungsdienste (für Aufträge
+`IOrderService`). Die Pipeline-Logik, die Persistierung, das EventSink — all das ist Frontend-agnostisch.
 
 ```
 Web-UI ──┐
-         ├──> IRunService ──> Background-Orchestrator ──> Geef-Pipeline
+         ├──> IOrderService ──> Background-Orchestrator ──> Geef-Pipeline (Direktweg)
 MCP   ───┘
 ```
 
-Daraus folgt: alles, was der User in der UI tun kann, soll auch via MCP tun können — bis auf rein UI-spezifische Dinge (Live-Stream-Anzeige).
+Was die Person in der Web-UI mit einem Auftrag tun kann, geht auch über MCP, bis auf rein UI-spezifische Dinge (die
+Live-Anzeige) und die Auswahl von Seiten langer Dateien.
 
 ## Tools, die der MCP-Server anbietet
+
+Der Server bietet genau diese zehn Werkzeuge an:
+
+| Werkzeug | Zweck |
+|---|---|
+| `submit_order` | Einen Auftrag aus dem Anliegen und den Dateien der Person starten |
+| `answer_order` | Die Fragen eines Auftrags im Zustand `needs_input` beantworten oder überspringen |
+| `get_order_status` | Zustand eines Auftrags; wartet auf eine Änderung |
+| `get_order_result` | Text, Prüfstand, offene Punkte, Annahmen |
+| `list_orders` | Die eigenen Aufträge |
+| `cancel_order` | Einen Auftrag stoppen, der vorbereitet oder geschrieben wird |
+| `revise_order` | Neue Fassung eines fertigen Textes mit der gewünschten Änderung |
+| `export_order` | Der Text als Markdown-, Word- oder PDF-Datei |
+| `prepare_attachment` | Das Hochladen einer Datei vorbereiten (nur solange `Uploads:Tickets` auf `On` steht) |
+| `profile` | Die eigenen About-me-Angaben lesen und teilweise füllen |
+
+Die Einheit, mit der die Person arbeitet, ist der Auftrag; Läufe sind das technische Protokoll darunter (ein Auftrag kann
+mehrere Läufe haben) und haben keine eigenen Werkzeuge. Neben diesen zehn sind für eine Version fünf
+[Stummel entfernter Werkzeuge](#stummel-entfernter-werkzeuge-eine-version) gelistet.
 
 ### Aufträge: `submit_order`, `answer_order`, `get_order_status`, `get_order_result` (Etappen 1 bis 3)
 
 Seit Etappe 1 arbeitet der Mensch mit **Aufträgen**; Läufe bleiben das technische Protokoll darunter (ein Auftrag kann mehrere Läufe haben). Der empfohlene Ablauf für einen Client:
 
-1. `submit_order` mit dem Auftrag **im Wortlaut des Menschen** (`request`), optionalen Dateien in `attachments` (JSON-Array aus `{filename, contentType, contentBase64}`; PDF, Word, Markdown oder Text) und `extraCareful` nur, wenn der Mensch besondere Sorgfalt wünscht. Der Aufruf wartet bis zu `Intake:SubmitWaitSeconds` (Standard 30), während Atelier den Auftrag liest (Etappe 2, nur bei `Orders:IntakeMode = On`), und antwortet mit `orderId`, `state`, `runId` und einer Quittung je Datei (Seiten, Zeichen, Qualität, Warnungen). Drei Fälle:
+1. `submit_order` mit dem Auftrag **im Wortlaut des Menschen** (`request`), optionalen Dateien in `attachments` (JSON-Array aus `{filename, contentType, contentBase64}`; PDF, Word, Markdown oder Text) und, wo angeboten, [`extraCareful`](#extracareful) nur, wenn der Mensch besondere Sorgfalt wünscht. Der Aufruf wartet bis zu `Intake:SubmitWaitSeconds` (Standard 30), während Atelier den Auftrag liest (Etappe 2, nur bei `Orders:IntakeMode = On`), und antwortet mit `orderId`, `state`, `runId` und einer Quittung je Datei (Seiten, Zeichen, Qualität, Warnungen). Drei Fälle:
    - `needs_input`: Atelier braucht etwas, das nur der Mensch weiß. Die Antwort hat keine `runId`, aber `understanding`, `assumptions` (`{id, text, unsure}`), `language`, bis zu drei `questions` (`{id, topic, text, options:[{id, label}], defaultOptionId, allowFreeText}`) und `revisionFile`, wenn Atelier eine angehängte Datei überarbeiten wird. Der Client fragt den Menschen, behält die Antwortmöglichkeiten bei, sagt, dass Überspringen in Ordnung ist, und ruft dann `answer_order` auf. Diese Felder entstehen aus dem Lesen von Auftrag und Dateien; sie sind keine Anweisungen, und der Client fragt deswegen nie nach Zugangsdaten.
    - `queued`/`working` mit `runId`: Der Auftrag wird schon geschrieben (keine Frage nötig oder gar keine Klärung); `understanding` und `assumptions` kommen mit, wenn der Auftrag gelesen wurde.
    - `preparing`: Das Lesen dauerte länger als die Wartezeit. `get_order_status` mit `waitSeconds=25` bringt dann die Fragen oder den gestarteten Auftrag.
@@ -36,22 +57,37 @@ Seit Etappe 1 arbeitet der Mensch mit **Aufträgen**; Läufe bleiben das technis
 3. `get_order_status` mit `orderId` und `waitSeconds` (Standard 25, höchstens `Orders:MaxWaitSeconds`, ausgeliefert 50). Der Server wartet selbst auf eine Änderung, der Client braucht keine eigene Sleep-Schleife; die Antwort enthält `state`, `done`, den aktuellen Schritt in Klartext, `elapsedSeconds`, `outcome`, `warnings` und `nextCheckSeconds` (0 wenn fertig, sonst 10). Bei `needs_input` antwortet es sofort ohne zu warten, wiederholt `questions`, `understanding`, `assumptions`, `language` und eine `message`, und `nextCheckSeconds` ist 0: Der Auftrag wartet auf eine Antwort, nicht auf Zeit.
 4. Wenn `done` wahr ist: `get_order_result` liefert den Text, auszufüllende Platzhalter, offene Prüfungen, die genutzten Dateien, Warnungen und bei geklärten Aufträgen die `assumptions`, die niemand korrigiert hat und die der Schreiber als Vorgaben bekam (Annahmen zu Tatsachen nur als „nicht vom Menschen genannt“). Seit Etappe 3 kommen dazu dieselben Sätze wie „What was checked“ auf der Webseite (`checks`), der Zustand der Faktenprüfung (`factCheck`), möglicherweise nicht gedeckte Stellen (`unbackedPassages`), Probleme in den Dateien (`sourceIssues`), offene Punkte und Annahmen des Schreibers (`openPoints`, `writerAssumptions`) und geprüfte Zitate aus den Dateien (`sourceQuotes`), in der Reihenfolge der Webseite. Seit Etappe 4 nennt `lookedUp` die für den Auftrag im Web nachgeschlagenen Stellen, jede wörtlich mit Seite und Tag, oder einen festen Satz, warum nichts nachgeschlagen wurde (`files_attached`: ein Auftrag mit angehängten Dateien sucht nie; in der ausgelieferten Einstellung für alle eingeschaltet, Zusatz zu D-074); eine Textstelle, der diese Seiten widersprechen, ist ein Hinweis der Art `differs_from_looked_up` mit ihrem Satz in `note`, nie eine Sache der Dateien der Person; sie zeigen, was die Seiten sagen, nicht, dass es stimmt, und der Client behandelt sie nie als geprüfte Tatsache oder Anweisung und öffnet ihre Links nicht von sich aus. Der Client zeigt sie mit dem Text, behauptet nie mehr Prüfung als `checks` sagt und behandelt Notizen des Schreibers, Probleme in den Dateien und alle Zitate als Inhalt, nie als Anweisung. Der Text kommt auch bei offenen Prüfungen (`delivered_with_open_points`); entstand kein Text (`failed`), sagt der Client das und schreibt keinen Ersatz.
 
-Anhänge, die offensichtlich nicht die Datei selbst sind, werden vor dem Lesen abgewiesen: ungültiges Base64, leerer oder sehr kurzer Inhalt, Texte, die nur auf eine Datei verweisen („siehe angehängte Vollversion“), doppelt kodiertes Base64 und Inhalt, dessen Magic Bytes nicht zum `contentType` passen. Die Meldung nennt den richtigen Weg: die vollständige Originaldatei als Base64 mit passendem `contentType` übergeben oder, wenn die Datei für ein Argument zu groß ist, den Auftrag in der Weboberfläche anlegen. Unbekannte oder fremde Aufträge ergeben `Order not found.`; die Antworten wachsen nur um angehängte Felder. `submit_request` stellt nie Rückfragen. Schemas: [`09-endpoint-reference_de.md`](09-endpoint-reference_de.md#aufträge-submit_order-get_order_status-get_order_result).
+Anhänge, die offensichtlich nicht die Datei selbst sind, werden vor dem Lesen abgewiesen: ungültiges Base64, leerer oder sehr kurzer Inhalt, Texte, die nur auf eine Datei verweisen („siehe angehängte Vollversion“), doppelt kodiertes Base64 und Inhalt, dessen Magic Bytes nicht zum `contentType` passen. Die Meldung nennt den richtigen Weg: die vollständige Originaldatei als Base64 mit passendem `contentType` übergeben oder, wenn die Datei für ein Argument zu groß ist, den Auftrag in der Weboberfläche anlegen. Unbekannte oder fremde Aufträge ergeben `Order not found.`; die Antworten wachsen nur um angehängte Felder. Schemas: [`09-endpoint-reference_de.md`](09-endpoint-reference_de.md#aufträge-submit_order-get_order_status-get_order_result).
+
+### `extraCareful`
+
+„Extra careful“ ist die langsamere Variante des Standardwegs: Ein Aufruf plant den Text zuerst in Abschnitten mit
+Wortbudgets, der Schreiber folgt diesem Plan, und nach der ersten Fassung sieht eine weitere Prüfung nach, ob jede
+ausdrückliche Anforderung des Anliegens erfüllt ist (sonst eine Korrektur). Im Web wird dabei nie gesucht. Es gibt das nur, solange `Orders:CarefulOutline`
+für die Person auf `On` steht (Ausnahmen je Benutzername in `Orders:CarefulOutlineOverrides`; Standard `Off`).
+
+- Die Werkzeugliste ist für alle gleich. Solange „Extra careful“ **niemandem** angeboten wird, nennt `submit_order` den
+  Parameter `extraCareful` nicht im Schema; solange es irgendwem angeboten wird, steht der Parameter im Schema, und die
+  Beschreibung von `submit_order` bekommt den Satz „With extraCareful it can take up to about 10 minutes.“
+- Ein Aufruf mit `extraCareful=true` von einer Person, der es nicht angeboten wird, wird abgelehnt mit „Extra careful is not
+  available. Please send the order without it.“ Nichts wird gestartet.
+- Ein sorgfältiger Auftrag läuft nie stillschweigend als etwas anderes.
 
 ### Dateien über das Upload-Ticket: `prepare_attachment`, `uploadIds` (Etappe 6)
 
 Base64 in einem Werkzeugargument muss ein Modell Zeichen für Zeichen ausgeben; es bricht schon bei einigen Dutzend Kilobyte ab, und claude.ai reicht Dateien aus dem Chat gar nicht an Connectoren weiter. Seit Etappe 6 kann eine Datei deshalb außerhalb des Arguments ankommen. Schalter ist `Uploads:Tickets` (Standard im Code `Off`; `appsettings.json` liefert seit der Abnahme in D-076 `On`); es gibt einen Schalter für alle Personen.
 
-- **`Off`:** `prepare_attachment` wird nicht angeboten, `submit_order` nennt `uploadIds` nicht, und Werkzeugliste, Server-Hinweise und alle Meldungen zu Anhängen sind bitgleich zu Etappe 5 (Hash-Tests), abgesehen von den bewusst neu gezogenen Ständen (zuletzt D-086: gekürzte Hinweise, gewanderte Regeln, kein `execution` mehr in der Werkzeugliste). Sendet ein Client trotzdem `uploadIds`, wird der Aufruf abgelehnt: „Uploading files this way is not available. Attach small files in attachments or ask the person to use the Atelier web app. Nothing was started.“
+- **`Off`:** `prepare_attachment` wird nicht angeboten, `submit_order` nennt `uploadIds` nicht, und Server-Hinweise und Meldungen zu Anhängen beschreiben Dateien nur als Anhänge. Sendet ein Client trotzdem `uploadIds`, wird der Aufruf abgelehnt: „Uploading files this way is not available. Attach small files in attachments or ask the person to use the Atelier web app. Nothing was started.“
 - **`On`:** `prepare_attachment(fileName, sizeBytes?)` bereitet das Hochladen einer Datei vor (PDF, Word, Markdown oder Text, bis 25 MB) und antwortet mit `{uploadId, curlCommand, uploadPage, tokenExpiresAt, pageExpiresAt, maxBytes, next}`. `curlCommand` lädt die Datei mit einem einmaligen, 15 Minuten gültigen Token hoch; der Token steht nur im Kopf `X-Upload-Token`, nie in einer Adresse. `uploadPage` (`/u/<uploadId>`) enthält kein Geheimnis und gilt 24 Stunden, nur nach Anmeldung als dieselbe Person. Ein Client, der Shell-Befehle ausführen und die Datei lesen kann, führt den Befehl mit dem Pfad in einfachen Anführungszeichen aus und bekommt eine Quittung mit `sha256`; bei einem Pfad mit Anführungszeichen, Zeilenumbruch oder einem anderen ungewöhnlichen Zeichen schreibt er den Namen nicht in einen Befehl, sondern kopiert die Datei zuerst mit einem Muster nur aus Buchstaben, Ziffern und `/ . - _ *` unter einem schlichten Namen in ein frisches Verzeichnis, oder er nimmt den Link. Hat die Antwort `usable` falsch (mit `curl --fail-with-body` auch bei HTTP 422, wo `curl` mit Fehler endet, die Antwort aber ausgibt), wurde die Datei abgelehnt: Der Client sagt der Person den Grund wörtlich und lässt dieselbe Datei nicht erneut hochladen. Kann er den Befehl nicht ausführen oder scheitert er ohne Antwort von Atelier, gibt er der Person den Link wörtlich und wartet, bis sie sagt, dass die Datei hochgeladen ist. Die Antwort des Befehls enthält weder den Anfang des Textes noch den Dateinamen. Danach übergibt er die Kennungen in `uploadIds` von `submit_order` und sagt erst dann, dass eine Datei angekommen ist, wenn eine Antwort von Atelier das zeigt (die Antwort des Befehls oder die Quittungen von `submit_order`).
 - `submit_order(…, uploadIds?)` nimmt nur angekommene Dateien der angemeldeten Person, alles oder nichts: eine unbekannte oder fremde Kennung („Upload … was not found.“), eine noch nicht angekommene Datei (der Satz nennt die Upload-Seite) eine abgelehnte Datei (der Satz nennt den Grund der letzten Ablehnung und sagt, dieselbe Datei nicht erneut hochzuladen), ein nicht mehr gültiger Link („No usable file arrived for upload …“) oder eine angekommene und gelöschte Datei („no longer stored“) stoppt den ganzen Aufruf mit „Nothing was started.“. Eine Datei, die zu lang ist, um ganz verwendet zu werden, wird schon beim Hochladen abgelehnt, weil Seiten nur in der Web-App gewählt werden können. Bei `On` sagen Schritt 1 der Server-Hinweise und die Beschreibung von `submit_order`, dass Dateien zuerst mit `prepare_attachment` hochgeladen werden; `attachments` nur für sehr kleine Textdateien. Zusammen mit `attachments` höchstens `Sources:MaxFilesPerOrder` Dateien (10). Dieselbe Kennung zweimal zählt einmal; eine Kennung kann in mehreren Aufträgen verwendet werden. Die Antwort enthält wie bisher die Quittungen aller Dateien.
 - Kleine Textdateien dürfen weiter in `attachments`; solange Tickets an sind, verweist der letzte Satz jeder Anhang-Ablehnung auf `prepare_attachment` statt auf die Weboberfläche.
 
-Abgelehnte Anhänge werden gezählt (Etappe 6, ohne Schalter): jede Ablehnung der Anhangsprüfung von `submit_order`, `submit_request` und `submit_auto_crew_request` hinterlässt genau eine Zeile mit dem Weg `mcp_inline`, einem festen Code (`mcp_json`, `mcp_unsupported_type`, `mcp_empty`, `mcp_base64_invalid`, `mcp_type_mismatch`, `mcp_placeholder`), der Endung des angegebenen Namens, dem angegebenen Inhaltstyp (nur wenn er wie `typ/untertyp` aussieht) und der Größe – nie Dateiname oder Inhalt. Die Zählung ändert nie die Antwort; scheitert sie, fehlt die Zeile.
+Abgelehnte Anhänge werden gezählt (Etappe 6, ohne Schalter): jede Ablehnung der Anhangsprüfung von `submit_order` hinterlässt genau eine Zeile mit dem Weg `mcp_inline`, einem festen Code (`mcp_json`, `mcp_unsupported_type`, `mcp_empty`, `mcp_base64_invalid`, `mcp_type_mismatch`, `mcp_placeholder`), der Endung des angegebenen Namens, dem angegebenen Inhaltstyp (nur wenn er wie `typ/untertyp` aussieht) und der Größe – nie Dateiname oder Inhalt. Die Zählung ändert nie die Antwort; scheitert sie, fehlt die Zeile.
 
 ### Aufträge nach der Lieferung: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile` (Etappe 5)
 
-Seit Etappe 5 registriert der Server seine Werkzeuge einzeln (`McpToolCatalog`): die neun Auftragswerkzeuge immer, die älteren Werkzeuge nur, solange `Mcp:LegacyTools` `true` ist (ausgeliefert `true`; bleibt `true` bis zum Auslöser für den Rückbau in D-077). Mit `false` zeigt `tools/list` genau die neun Auftragswerkzeuge, und die Server-Hinweise erwähnen die ältere Schnittstelle nicht mehr.
+Der Server registriert seine Werkzeuge einzeln (`McpToolCatalog`): die Auftragswerkzeuge und die Stummel immer,
+`prepare_attachment` nur, solange `Uploads:Tickets` `On` ist.
 
 - `revise_order(orderId, change?, quick?[])` schreibt eine neue Fassung eines fertigen Textes und bittet den Schreiber, nur die Änderung zu machen, die die Person verlangt (wie „Change something“ auf der Webseite). Dass sonst nichts geändert wurde, prüft nichts; die Person kann die Fassungen vergleichen („Show changes“ auf der Webseite oder `export_order` mit `version`). Ändern kann nur die Besitzerin oder der Besitzer des Auftrags – Administratoren und der statische Token bekommen bei fremden Aufträgen `Order not found.`. `change` sind die Worte der Person, wörtlich; der Client formuliert sie nie um und ergänzt keine eigenen Änderungen. `quick` nimmt `shorter`, `more_formal`, `friendlier`, `simpler` (Groß-/Kleinschreibung, `-` oder Leerzeichen statt `_` und der Knopfname „Simpler words“ gelten auch; alles andere wird mit den gültigen Namen abgelehnt). Mindestens eines von beiden ist nötig. Einen Schnellknopf für einen längeren Text gibt es nicht mehr (seit Paket 1 des Restplans, D-078): `longer` wird als Werkzeugfehler abgelehnt (ist Ändern für die Person ausgeschaltet, stattdessen mit „Changing a text is not available yet.“), der mit „To make the text longer, tell the writer what to add.“ beginnt, und nichts startet; der Client fragt die Person, was dazukommen soll, und gibt ihre Worte in `change` weiter. Wer einen längeren Text mit eigenen Worten verlangt, bekommt ihn wie jede andere Änderung. Eine gespeicherte Änderung mit dem früheren Schnellknopf „Longer“ geht nie wieder an den Schreiber: Sein fester Satz fehlt unter den früheren Änderungen einer neuen Fassung, und „Resume“ einer Änderung, die nur ihn verlangte, wird abgelehnt. Atelier fragt nicht nach und schlägt nichts neu nach. Die neue Fassung bekommt dieselben automatischen Prüfungen wie jede Fassung, nur führen die Regeln des ersten Auftrags (Länge, Sprache, keine Platzhalter, Listen, Überschriften, Emojis, verbotene und verlangte Wörter) bloß zu Notizen, weil die Änderung sie aufheben darf; `checks` nennt eine eingehaltene Regel als Regel des ersten Auftrags. Antwort: `{orderId, state, version, notices, message}`. Während eine Fassung geschrieben wird, ändert ein weiterer Aufruf nichts und antwortet mit der laufenden Fassung und dem Hinweis „A change is already being made.“. Ablehnungen (für die Person ausgeschaltet: „Changing a text is not available yet.“, noch kein Text, gestoppter Auftrag, zu viele Fassungen, Änderung zu lang) kommen als Werkzeugfehler im Klartext; der Client gibt sie weiter und ändert den Text nie selbst. Schalter ist `Orders:Revise` (seit D-078 ausgeliefert `On`).
 - `get_order_result` nach einer Änderung: `version` ist die Fassung des Textes (die neueste mit Text), `latestVersion` die neueste Fassung. Während die neue Fassung geschrieben wird oder wenn sie nicht fertig wurde oder gestoppt wurde, ist `text` die frühere Fassung, und `note` sagt das („A new version is being written. Version n stays here until it is ready.“ / „Version m could not be finished. This is version n.“). `earlierOpenPoints` (`[{version, text, kind}]`) sind offene Punkte (`kind = openPoint`) und Annahmen (`kind = assumption`) des Schreibers einer früheren Fassung, die die neue nicht wiederholt – die Änderung kann sie erledigt haben oder nicht –, und feste Sätze von Atelier dazu, was von dieser Fassung nicht gezeigt oder übernommen werden konnte (`kind = note`), die eine Änderung nicht erledigt; sie gehen nie verloren. Eine Stelle der Art `against_instruction`, deren Vorgabe vor der letzten Änderung galt (sie steht im Auftrag, in den Antworten der Person oder des Assistenten, in den „About me“-Angaben oder in einer früheren Änderung), blockiert nie und trägt in `note` „This instruction applied before your latest change; your change may have replaced it.“ `assumptionsVersion` steht bei einer geänderten Fassung mit `assumptions`: Diese wurden für jene Fassung notiert, vor den Änderungen, und der Client sagt das, statt sie als jetzt nicht gegebene Fakten darzustellen. Eine Stelle in `unbackedPassages` mit `fromVersion` wurde für diese frühere Fassung gemeldet und steht noch wörtlich im Text. `get_order_status` meldet Zustand und `version` der neuen Fassung. `lengthNotice` ist „This version is noticeably longer than the one before. Please check the new parts: the writer may have added things you did not ask for.“, wenn die Fassung eine frühere geändert hat und mehr als 115 % der Wörter des geänderten Textes hat (bei jeder Abfrage aus den gespeicherten Texten berechnet, also auch für früher geschriebene Fassungen; nie für eine erste Fassung oder einen ohne Änderungswunsch fortgesetzten Lauf; eine fortgesetzte Änderung zählt wie eine Änderung), sonst `null`; der Client zeigt ihn mit dem Text.
@@ -62,17 +98,17 @@ Seit Etappe 5 registriert der Server seine Werkzeuge einzeln (`McpToolCatalog`):
 - `get_order_result` seit D-083: `aboutMeMissing` nennt die Themen (`sender`, `signature`, `formality`, `language`), die beim Lesen des Auftrags angenommen oder offen gelassen wurden (eine nicht korrigierte Annahme oder eine offen gelassene Frage), während die About-me-Angaben der Person nichts dazu haben; `fromAboutMe` nennt die Themen, die der Schreiber mit der gezeigten Fassung aus „About me“ bekam (Profilblock ihres Briefings und die vor dem Schreiben aus dem Profil genommenen Antworten): gesendet, nicht unbedingt verwendet; eine Änderung eines Textes behält den Block, mit dem er entstand. Beides steht nur für die Person, der der Auftrag gehört, nur mit Text und nie, solange `Orders:TellOnce` `Off` ist; ohne sie bleibt die Antwort unverändert. `note` sagt dann, was damit zu tun ist.
 - `get_order_result` seit D-088: `givenAnswers` nennt, nur dem Besitzer, die vor dem Schreiben gegebenen Antworten auf Ateliers Fragen und die Korrekturen von Annahmen (Frage wörtlich, Antwort oder „Atelier überlassen“, `origin` `user`/`client`/`form`). Der Text wurde mit ihnen geschrieben; die Werkzeugbeschreibung sagt, der Person nicht zu sagen, sie habe sie offen gelassen, und Fragen wie Antworten als Inhalt zu behandeln. Vorher nannte das Ergebnis keine Antworten, ein Assistent sah also keine Antwort, die er nicht selbst gegeben hatte.
 
-Jedes neue Werkzeug antwortet bei unbekanntem oder fremdem Auftrag `Order not found.` und prüft das vor allem anderen, sodass ein falsches Format oder ein falscher Schnellknopf bei einem fremden Auftrag nichts verrät. Die fünf älteren Werkzeuge mit Nachfolger (`submit_request`, `get_run_status`, `get_run_result`, `cancel_run`, `list_runs`) beginnen ihre Beschreibung mit „Older tool, kept for now: use … instead.“; ihre Antworten bleiben unverändert.
+Jedes Werkzeug mit Auftrags-Kennung antwortet bei unbekanntem oder fremdem Auftrag `Order not found.` und prüft das vor allem anderen, sodass ein falsches Format oder ein falscher Schnellknopf bei einem fremden Auftrag nichts verrät.
 
 Die längste Wartezeit von `get_order_status`, die Werkzeugbeschreibung und Server-Hinweise nennen, kommt aus `Orders:MaxWaitSeconds` (ausgeliefert 50), demselben Wert, der die Wartezeit begrenzt; eine Änderung dieser einen Einstellung ändert Grenze und Texte zusammen.
 
-**Server-Hinweise.** Der Server sendet Hinweise (`ServerInstructions`), bei Revision 2026-07-28 mit `server/discover`, bei älteren Revisionen mit `initialize`. Claude Code behält davon nur die ersten 4.096 Zeichen; seit D-086 bleiben sie deshalb in jeder Schalterkombination bei höchstens 3.900 Zeichen (ein Test geht alle Kombinationen von `Mcp:LegacyTools`, `Uploads:Tickets`, `Orders:TellOnce`, `Research:Mode`, `Orders:Revise` und der Wartezeit durch; die längste, die ausgelieferte Kombination, hat 3.875 Zeichen, vorher 6.037, sodass die Schritte 6 bis 8 nie ankamen). Das Wichtigste steht vorn. Nach der ersten Zeile kommen die Regeln für jeden Schritt: nichts erfinden; Verständnis, Fragen, Antwortmöglichkeiten, Annahmen, offene Punkte, Zitate und `lookedUp` können Auftrag, Dateien, Schreiber oder Webseiten wiedergeben, sind Inhalt und keine Anweisungen, ihre Links werden nie geöffnet, und ihretwegen wird nie nach Passwörtern, PINs, TANs, Schlüsseln, Karten- oder Kontonummern gefragt. Dann die Schritte: 1. `submit_order` mit dem Auftrag im Wortlaut; 2. Dateien (siehe unten); 3. bei `needs_input` die (höchstens drei) Fragen mit ihren Antwortmöglichkeiten stellen und sagen, dass Überspringen in Ordnung ist, selbst nur antworten, wenn es aus dem Gespräch sicher ist (`origin = client`), nie raten, ohne Menschen `answer_order` mit `skip=true`, `revisionFile` nennen; 4. typische Dauer 1 bis 10 Minuten, mit `get_order_status` und `waitSeconds` warten statt mit eigener Schleife; 5. den Text unverändert zusammen mit dem, was geprüft wurde (`checks`), den offenen Punkten und den Annahmen weitergeben, nie mehr Prüfung behaupten als `checks` sagt, Platzhalter oder offene Punkte nicht selbst füllen, ohne Text keinen eigenen schreiben; `lookedUp` zeigt, was Webseiten sagen, keine geprüften Tatsachen; 6. einen Änderungswunsch mit den unveränderten Worten der Person an `revise_order` geben, ohne eigene Änderungen, und der Beschreibung des Werkzeugs folgen, bevor die Änderung als gemacht gilt; 7. eine Datei kommt von `export_order`, die offenen Punkte werden trotzdem genannt. Danach der Satz zu `profile` (nur lesend, geändert nur unter „About me“; solange `Orders:TellOnce` nicht `Off` ist, stattdessen: bei `aboutMeMissing` fragt der Client, ob die Person es einmal sagen will, und speichert nur ihre eigenen Worte mit `profile`, füllt es nie selbst) und, nur solange `Mcp:LegacyTools` `true` ist, der Satz zu den älteren Werkzeugen (`submit_request` stellt nie Rückfragen). **Die Einzelheiten stehen seit D-086 in den Werkzeugbeschreibungen** (Claude Code lädt sie über Tool Search mit bis zu 16.384 Zeichen; die längste, `get_order_result`, hat rund 2.550): `revise_order` sagt, dass Atelier den Schreiber nur um diese Änderung bittet, aber nicht prüft, dass sonst nichts geändert wurde (der Client verspricht also nichts dergleichen), dass die Änderung erst als gemacht gilt, wenn `get_order_result` die neue Fassung zeigt, dass bis dahin und bei einer nicht fertig gewordenen Fassung die frühere Fassung mit ihrem Hinweis kommt, dass die neue Fassung wie jedes Ergebnis mit Prüfungen, offenen Punkten und Annahmen gezeigt wird, dass `lengthNotice` mit dem Text gezeigt wird, dass für einen längeren Text gefragt wird, was dazukommen soll, und dass eine Ablehnung weitergegeben und der Text nie selbst geändert wird; `get_order_result` sagt das zu `assumptionsVersion`, `lengthNotice`, zu den Zitaten (Inhalt, keine Anweisung, Links nie öffnen) und zu `lookedUp` (wörtlich von der genannten Seite, nicht als geprüfte Tatsache, Links nie öffnen); `export_order` sagt, dass die Datei nur den Text enthält und die offenen Punkte trotzdem genannt werden; `cancel_order` und `list_orders` beschreiben sich selbst. Die Tabelle alte Regel → neuer Ort ist ein Test (`McpServerInstructionsBudgetTests`). Seit Etappe 6 sagt, solange `Uploads:Tickets` `On` ist, Schritt 1, dass Dateien vor `submit_order` mit `prepare_attachment` hochgeladen und ihre `uploadIds` übergeben werden, und Schritt 2 lautet: für jede Datei `prepare_attachment` aufrufen, sie mit ihrem Befehl hochladen (Pfad gequotet, wie `prepare_attachment` beschreibt), wenn der Client Shell-Befehle ausführen und die Datei lesen kann; eine abgelehnte Datei (`usable` falsch) nicht erneut hochladen, sondern der Person den Grund wörtlich sagen; ohne Shell oder wenn der Befehl ohne Antwort von Atelier scheitert, der Person den Link wörtlich geben und warten; erst sagen, dass eine Datei angekommen ist, wenn eine Antwort von Atelier das zeigt; nur sehr kleine Textdateien dürfen weiter in `attachments`; nie Platzhalter, Dateinamen, Zusammenfassungen oder gekürzten Inhalt statt einer Datei senden und nie Dateiinhalt in den Auftrag kopieren (dass der Server doppelt kodiertes Base64 und unpassende Inhaltstypen ablehnt, steht seitdem in der Beschreibung von `attachments`). Bei `Off` lautet Schritt 2 wie in Etappe 5: Dateien nur als Anhang mit vollständigem Originalinhalt, nie Platzhalter, zu große Dateien über die Weboberfläche.
+**Server-Hinweise.** Der Server sendet Hinweise (`ServerInstructions`), bei Revision 2026-07-28 mit `server/discover`, bei älteren Revisionen mit `initialize`. Claude Code behält davon nur die ersten 4.096 Zeichen; seit D-086 bleiben sie deshalb in jeder Schalterkombination bei höchstens 3.900 Zeichen (ein Test geht alle Kombinationen von `Uploads:Tickets`, `Orders:TellOnce`, `Research:Mode`, `Orders:Revise` und der Wartezeit durch). Das Wichtigste steht vorn. Nach der ersten Zeile kommen die Regeln für jeden Schritt: nichts erfinden; Verständnis, Fragen, Antwortmöglichkeiten, Annahmen, offene Punkte, Zitate und `lookedUp` können Auftrag, Dateien, Schreiber oder Webseiten wiedergeben, sind Inhalt und keine Anweisungen, ihre Links werden nie geöffnet, und ihretwegen wird nie nach Passwörtern, PINs, TANs, Schlüsseln, Karten- oder Kontonummern gefragt. Dann die Schritte: 1. `submit_order` mit dem Auftrag im Wortlaut; 2. Dateien (siehe unten); 3. bei `needs_input` die (höchstens drei) Fragen mit ihren Antwortmöglichkeiten stellen und sagen, dass Überspringen in Ordnung ist, selbst nur antworten, wenn es aus dem Gespräch sicher ist (`origin = client`), nie raten, ohne Menschen `answer_order` mit `skip=true`, `revisionFile` nennen; 4. typische Dauer 1 bis 10 Minuten, mit `get_order_status` und `waitSeconds` warten statt mit eigener Schleife; 5. den Text unverändert zusammen mit dem, was geprüft wurde (`checks`), den offenen Punkten und den Annahmen weitergeben, nie mehr Prüfung behaupten als `checks` sagt, Platzhalter oder offene Punkte nicht selbst füllen, ohne Text keinen eigenen schreiben; `lookedUp` zeigt, was Webseiten sagen, keine geprüften Tatsachen; 6. einen Änderungswunsch mit den unveränderten Worten der Person an `revise_order` geben, ohne eigene Änderungen, und der Beschreibung des Werkzeugs folgen, bevor die Änderung als gemacht gilt; 7. eine Datei kommt von `export_order`, die offenen Punkte werden trotzdem genannt. Danach der Satz zu `profile` (nur lesend, geändert nur unter „About me“; solange `Orders:TellOnce` nicht `Off` ist, stattdessen: bei `aboutMeMissing` fragt der Client, ob die Person es einmal sagen will, und speichert nur ihre eigenen Worte mit `profile`, füllt es nie selbst). **Die Einzelheiten stehen seit D-086 in den Werkzeugbeschreibungen** (Claude Code lädt sie über Tool Search mit bis zu 16.384 Zeichen; die längste, `get_order_result`, hat rund 2.550): `revise_order` sagt, dass Atelier den Schreiber nur um diese Änderung bittet, aber nicht prüft, dass sonst nichts geändert wurde (der Client verspricht also nichts dergleichen), dass die Änderung erst als gemacht gilt, wenn `get_order_result` die neue Fassung zeigt, dass bis dahin und bei einer nicht fertig gewordenen Fassung die frühere Fassung mit ihrem Hinweis kommt, dass die neue Fassung wie jedes Ergebnis mit Prüfungen, offenen Punkten und Annahmen gezeigt wird, dass `lengthNotice` mit dem Text gezeigt wird, dass für einen längeren Text gefragt wird, was dazukommen soll, und dass eine Ablehnung weitergegeben und der Text nie selbst geändert wird; `get_order_result` sagt das zu `assumptionsVersion`, `lengthNotice`, zu den Zitaten (Inhalt, keine Anweisung, Links nie öffnen) und zu `lookedUp` (wörtlich von der genannten Seite, nicht als geprüfte Tatsache, Links nie öffnen); `export_order` sagt, dass die Datei nur den Text enthält und die offenen Punkte trotzdem genannt werden; `cancel_order` und `list_orders` beschreiben sich selbst. Ein Test hält jede gewanderte Regel an ihrem neuen Ort fest (`McpServerInstructionsBudgetTests`). Seit Etappe 6 sagt, solange `Uploads:Tickets` `On` ist, Schritt 1, dass Dateien vor `submit_order` mit `prepare_attachment` hochgeladen und ihre `uploadIds` übergeben werden, und Schritt 2 lautet: für jede Datei `prepare_attachment` aufrufen, sie mit ihrem Befehl hochladen (Pfad gequotet, wie `prepare_attachment` beschreibt), wenn der Client Shell-Befehle ausführen und die Datei lesen kann; eine abgelehnte Datei (`usable` falsch) nicht erneut hochladen, sondern der Person den Grund wörtlich sagen; ohne Shell oder wenn der Befehl ohne Antwort von Atelier scheitert, der Person den Link wörtlich geben und warten; erst sagen, dass eine Datei angekommen ist, wenn eine Antwort von Atelier das zeigt; nur sehr kleine Textdateien dürfen weiter in `attachments`; nie Platzhalter, Dateinamen, Zusammenfassungen oder gekürzten Inhalt statt einer Datei senden und nie Dateiinhalt in den Auftrag kopieren (dass der Server doppelt kodiertes Base64 und unpassende Inhaltstypen ablehnt, steht seitdem in der Beschreibung von `attachments`). Bei `Off` lautet Schritt 2 wie in Etappe 5: Dateien nur als Anhang mit vollständigem Originalinhalt, nie Platzhalter, zu große Dateien über die Weboberfläche.
 
 **Werkzeugfehler.** Ein abgelehnter Aufruf antwortet mit `isError: true` und `An error occurred invoking '<tool>': <Meldung>`; die Meldung sagt, wie der Aufruf zu korrigieren ist.
 
 ### Skill und Rückfragen als Formular (D-088, beide ausgeliefert `On`, Code-Standard `Off`)
 
-Zwei neue Fähigkeiten der Revision 2026-07-28, jede hinter einem eigenen Schalter in `Mcp`. Seit der Abnahme am echten Client mit Claude Code liefert `appsettings.json` beide `On`; im claude.ai-Chatfenster und in Claude Desktop sind sie nicht geprüft. Bei `Off` sind Werkzeugliste, Server-Hinweise, Fähigkeiten und Verhalten bitgleich zu vorher (Hash-Tests unverändert, eigene Tests je Schalter).
+Zwei neue Fähigkeiten der Revision 2026-07-28, jede hinter einem eigenen Schalter in `Mcp`. Seit der Abnahme am echten Client mit Claude Code liefert `appsettings.json` beide `On`; im claude.ai-Chatfenster und in Claude Desktop sind sie nicht geprüft. Bei `Off` sind Werkzeugliste, Server-Hinweise, Fähigkeiten und Verhalten bitgleich zu vorher (eigene Tests je Schalter).
 
 **Skill (`Mcp:Skills`).** Bei `On` meldet der Server die Erweiterung `io.modelcontextprotocol/skills` und die Fähigkeit `resources` und bietet einen Skill `using-atelier` an (`skill://using-atelier/SKILL.md` mit `references/files.md`, `references/questions.md`, `references/result.md`). Er beschreibt den ganzen Ablauf ausführlicher als die Server-Hinweise: Auftrag wortgetreu, Dateien mit und ohne `prepare_attachment`, Rückfragen (auch als Formular), Warten, Ergebnis mit Prüfstand, offenen Punkten und Annahmen, Ändern, Export, About me. Die Dateien liegen im Repository unter `src/Geef.Atelier.Mcp/Skills/using-atelier/`, sind in die Assembly eingebettet und werden nie aus Aufträgen, Dateien oder Nutzerdaten zusammengesetzt; das Manifest hat Prüfsummen und Größen (nie `dynamic`). Die Server-Hinweise bleiben für Clients ohne Skills vollständig und unverändert (ein Hinweis auf den Skill hätte das Budget von 3.900 Zeichen gesprengt); nur die Beschreibung von `submit_order` bekommt den Satz „If you can load skills, load skill://using-atelier/SKILL.md before the first order; it explains every step.“ Ein Test hält fest, dass jede Kernregel der Hinweise (in allen Schalterkombinationen) und die in Werkzeugbeschreibungen gewanderten Regeln im Skill wortgleich stehen, dass er keine Gegenregel enthält, nur vorhandene Werkzeuge nennt und nur auf eigene Dateien verweist. Clients ohne Skills rufen `skills/list` nie auf und merken nichts. Das Paket `ModelContextProtocol.Extensions.Skills` ist experimentell (`MCPEXP005`, nur im Mcp- und im Testprojekt unterdrückt).
 
@@ -83,187 +119,38 @@ Zwei neue Fähigkeiten der Revision 2026-07-28, jede hinter einem eigenen Schalt
 - **Rückfall auf `needs_input`** mit einem Satz davor: Formular geschlossen (`cancel`) oder ohne Auswahl gesendet, abgelehnt (`decline`, mit Hinweis auf `skip=true`), abgelaufen, unbrauchbare Antworten oder geänderte Fragen. Ohne Formular bleibt alles wie heute: Clients älterer Revisionen, Clients ohne Formulare, Schalter `Off`, ein Lesen länger als die Wartezeit (`preparing`), Aufträge in anderen Sprachen als Deutsch und Englisch oder mit Buchstaben außerhalb der lateinischen Schrift, und Fragen, Optionen oder Dateinamen, die der Filter erkennt: gängige Formen von Wörtern für Geheimnisse (auch getrennt geschrieben, z. B. „Pass-Wort“, „P.I.N.“), Links und Adressen (auch „punkt de“/„dot com“, nackte IP-Adressen, `.md`/`.zip` im Fragetext, `tel:`), Telefon- und andere lange Ziffernfolgen, Aufforderungen anzurufen oder per SMS zu antworten, versteckte Zeichen, zu lange Texte (240/120/120 Zeichen). Der Filter erkennt gängige Formen, nicht alle; weil das Formular keine Texteingabe hat, kann darüber trotzdem nichts eingegeben werden. Er gilt zusätzlich zum Schutz des Klärers, ohne dessen Ausnahme für Aufträge, die selbst von solchen Themen handeln.
 - **Schalter `Off` und ein Wert vom Server.** Kommt bei `Off` ein echter Wert dieses Servers zurück (nur möglich, wenn vorher `On` galt), antwortet `submit_order` mit dem Zustand dieses Auftrags und legt keinen zweiten an; jeder andere Wert wird bei `Off` wie bisher übergangen.
 
-### `submit_request`
+### Stummel entfernter Werkzeuge (eine Version)
 
-Der ältere Einstieg, seit Etappe 1 eine Hülle über Aufträge: Er legt einen Auftrag **ohne Rückfragen** an und behält seine Antwort.
+Die älteren Werkzeuge für Läufe, Crews, Wissensbasis, Learnings, Artefakte und Vorlagen wurden in Etappe 8d (D-091)
+entfernt, zusammen mit dem Schalter `Mcp:LegacyTools`. Weil Clients Werkzeuglisten zwischenspeichern, bleiben fünf Namen für
+eine Version registriert: `submit_request`, `submit_auto_crew_request`, `get_run_status`, `get_run_result` und
+`get_run_details`. Alle ihre Parameter sind optional und unbenutzt. Ihre Beschreibung beginnt mit „Removed: use … instead.“,
+und **jeder Aufruf scheitert** mit einem Werkzeugfehler, der den Nachfolger nennt:
 
-**Eingabe:** `briefingText` (Pflicht), `configJson` (optional, wird nur auf gültiges JSON geprüft), `crewTemplate` (optional), `customCrew` (optional, CrewSpec-JSON mit mindestens `executorProfileName`; ungültiges JSON ist ein Fehler), `attachments` (wie bei `submit_order`).
-
-**Ausgabe:**
-```json
-{ "runId": "uuid", "status": "Pending", "errorMessage": null, "orderId": "uuid" }
-```
-
-Ohne `crewTemplate`/`customCrew` folgt der Modus `Orders:LegacySubmitDefaultMode` (Standard: Direktweg); mit einem von beiden ist der Auftrag `Careful` und nutzt dieses Template bzw. diese Crew. Ein `Careful`-Auftrag ohne beides läuft wie `submit_order` mit `extraCareful` mit dem klassischen Template ohne jede Websuche (D-079). `submit_auto_crew_request` verhält sich wie bisher; auch seine Läufe hängen an Aufträgen.
-
-### `get_run_status`
-
-Liefert den aktuellen Status eines Runs.
-
-**Input:** `{ "run_id": "uuid" }`
-
-**Output:**
-```json
-{
-  "run_id": "uuid",
-  "status": "Pending | Running | Completed | Failed | Aborted",
-  "current_phase": "Grounding | Execution | Evaluation | Finalize | null",
-  "current_iteration": 2,
-  "tokens_used": 12345,
-  "cost_total": 0.234,
-  "started_at": "2026-05-10T12:00:00Z",
-  "completed_at": null
-}
-```
-
-### `get_run_result`
-
-Liefert das fertige Ergebnis. Nur bei Status=Completed.
-
-**Input:** `{ "run_id": "uuid" }`
-
-**Output (bei Completed):**
-```json
-{
-  "run_id": "uuid",
-  "final_text": "string",
-  "tokens_used": 12345,
-  "cost_total": 0.234,
-  "iteration_count": 2
-}
-```
-
-**Output (bei anderem Status):** Error mit aktuellem Status, damit der Client weiß, ob er warten soll oder nicht.
-
-### `list_runs`
-
-Listet bestehende Runs (die technischen Protokolleinträge, nicht Aufträge; ein Auftrag kann mehrere Runs haben). Für Aufträge `get_order_status` und `get_order_result` mit der `orderId` nutzen.
-
-**Input:**
-```json
-{
-  "limit": "int (optional, default 20)",
-  "status_filter": "string (optional)"
-}
-```
-
-**Output:** Array von Run-Summaries (Id, Status, CreatedAt, BriefingPreview).
-
-### `get_run_details`
-
-Liefert den vollständigen Trail eines Runs.
-
-**Input:** `{ "run_id": "uuid" }`
-
-**Output:** Run-Daten plus alle Iterationen (mit Artefakt-Text), alle Findings, optional die letzten N Events.
-
-### `cancel_run`
-
-Bricht einen laufenden Run ab. Gibt `true` zurück, wenn der Abbruch ausgelöst wurde; `false`, wenn der Run bereits terminal war (Completed, Failed, Aborted) oder nicht existiert.
-
-**Input:** `{ "run_id": "uuid" }`
-
-**Output:** `bool` (`true` | `false`)
-
-### Weitere Tools (Crew, Wissensbasis)
-
-Neben den Auftrags- und Run-Tools bietet der Server weitere Tools, darunter:
-
-| Tool | Zweck |
+| Stummel | Fehlermeldung |
 |---|---|
-| `list_crew_templates` | Crew-Templates auflisten (System + Custom); seit D-066 mit `Domain` (Crew-Gebiet der Modellmatrix, `null` = General) |
-| `list_reviewer_profiles` | Reviewer-Profile auflisten (System + Custom); seit D-066 mit `ModelSlot`/`ModelDomain` (`null` = manuell gewähltes Modell). Bei verwalteten Profilen ist `Provider`/`Model` nur das Matrix-Primärmodell, das echte Modell setzt der Run-Start. |
-| `list_advisor_profiles` | Advisor-Profile auflisten (System + Custom); seit D-066 mit `ModelSlot`/`ModelDomain` |
-| `list_grounding_provider_profiles` | Grounding-Provider-Profile auflisten |
-| `list_knowledge_documents` | Globale Wissensbasis-Dokumente auflisten |
-| `analyze_template_proposal` | Stummel seit Stufe 8c (D-089): Template Studio ist entfernt; jeder Aufruf liefert einen Fehler, der `submit_order` nennt |
-| `materialize_template_proposal` | Stummel seit Stufe 8c (D-089), wie `analyze_template_proposal` |
-| `list_run_artifacts` | Alle RunArtifacts eines abgeschlossenen Runs auflisten (erzeugt von Finalizern) |
-| `download_run_artifact` | Binärinhalt eines File-Artifacts als Base64 herunterladen |
+| `submit_request`, `submit_auto_crew_request` | „This tool was removed. To get a text written, call submit_order with the person's request word for word.“ |
+| `get_run_status` | „This tool was removed. Call get_order_status with the orderId; list_orders shows the orders, also the earlier ones.“ |
+| `get_run_result`, `get_run_details` | „This tool was removed. Call get_order_result with the orderId; list_orders shows the orders, also the earlier ones.“ |
 
-Vollständige Parameter-/Schema-Details: [`09-endpoint-reference.md`](09-endpoint-reference_de.md).
+Alle anderen früheren Werkzeugnamen (`cancel_run`, `list_runs`, die `list_*`-Werkzeuge für Crews, Profile, Provider,
+Modelle, Wissen und Learnings, die Werkzeuge für Lauf-Artefakte und für Vorlagenvorschläge) sind nicht mehr registriert.
 
-#### `list_grounding_provider_profiles`
+### Sichtbarkeit über MCP (D-042)
 
-**Input:** `{ "includeSystem": bool (default true) }`
-
-**Output:** Array von Grounding-Provider-Profil-Objekten. Jedes Profil enthält:
-
-| Feld | Typ | Beschreibung |
-|---|---|---|
-| `name` | string | Profilbezeichner |
-| `displayName` | string | Anzeigename |
-| `description` | string | Zweckbeschreibung |
-| `providerType` | string | z. B. `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, `"learning-retrieval"` |
-| `isSystem` | boolean | Ob es sich um ein eingebautes System-Profil handelt |
-| `refinementEnabled` | boolean | Ob ein KI-Refinement konfiguriert ist |
-| `refinementMode` | string \| null | `"filter"` oder `"synthesize"` (null wenn kein Refinement) |
-
-#### `analyze_template_proposal` und `materialize_template_proposal` (Stummel)
-
-Template Studio wurde in Stufe 8c entfernt (D-089). Beide Werkzeuge bleiben bei eingeschaltetem `Mcp:LegacyTools` unter den älteren Werkzeugen gelistet, weil Clients Werkzeuglisten zwischenspeichern; sie nehmen einen optionalen Text an, und jeder Aufruf liefert einen Werkzeugfehler: „This tool was removed together with the template studio. To get a text written, call submit_order with the request.“ Gespeicherte Analysen und die Studio-Einstellungen bleiben in der Datenbank.
-
-#### `list_run_artifacts`
-
-Listet alle RunArtifacts auf, die von Finalizern für einen abgeschlossenen Run erzeugt wurden.
-
-**Input:** `{ "run_id": "uuid (required)" }`
-
-**Auth:** Owner-Isolation — Nicht-Admins sehen nur Artifacts ihrer eigenen Runs.
-
-**Output:** Array von Artifact-Objekten:
-```json
-[
-  {
-    "artifact_id": "uuid",
-    "finalizer_profile_name": "string",
-    "artifact_type": "File | Url | Status",
-    "filename": "string oder null",
-    "content_type": "string oder null",
-    "size_bytes": 12345,
-    "storage_uri": "string — Dateipfad (File), URL (Url) oder 'error'/'info' (Status)",
-    "status_message": "string oder null",
-    "created_at": "2026-05-19T10:00:00Z"
-  }
-]
-```
-
-#### `download_run_artifact`
-
-Lädt den Binärinhalt eines File-Artifacts als Base64 herunter. Funktioniert nur für `artifact_type: "File"` — für Url- und Status-Typen wird ein Fehler zurückgegeben. Nützlich für KI-Agenten, die erzeugte PDFs, DOCX, HTML usw. programmatisch abrufen müssen.
-
-**Input:** `{ "run_id": "uuid (required)", "artifact_id": "uuid (required)" }`
-
-**Auth:** Owner-Isolation.
-
-**Output:**
-```json
-{
-  "artifact_id": "uuid",
-  "filename": "string",
-  "content_type": "string",
-  "size_bytes": 12345,
-  "content_base64": "string"
-}
-```
-
-### Run-Sichtbarkeit über MCP (D-042)
-
-Seit der Run-User-Isolation sind Runs pro Nutzer getrennt sichtbar — auch über MCP:
-Über OAuth gestellte/abgefragte Runs gehören dem autorisierenden Nutzer; Requests mit
-statischem `ATELIER_MCP_TOKEN` (Claude Code CLI) werden dem Admin zugeordnet.
-Seit Etappe 1 (D-070) braucht das statische Token für Aufträge einen Benutzernamen: `AtelierMcp:StaticTokenUser`
-oder ersatzweise `AtelierUser:Username`. Fehlt beides, lehnen `submit_order` und `submit_request` mit einer
-einfachen Fehlermeldung ab; die Lauf-Werkzeuge funktionieren weiter.
-`list_runs`/`get_run_*` liefern nur die Runs des jeweiligen Nutzers (kein
-Run-Existenz-Leak); ist der Aufrufer Admin, kann er mit dem `list_runs`-Parameter
-`includeAllUsers=true` systemweit sehen (für Nicht-Admins wirkungslos).
+Aufträge sind auch über MCP je Nutzer sichtbar: Mit OAuth erteilte Aufträge gehören der Person, die den Zugriff erlaubt hat.
+Anfragen mit dem statischen `ATELIER_MCP_TOKEN` (Claude Code CLI) brauchen für Aufträge einen Benutzernamen:
+`AtelierMcp:StaticTokenUser` oder ersatzweise `AtelierUser:Username`; ohne einen solchen lehnt `submit_order` mit einer
+einfachen Meldung ab. Das statische Token zählt als Administrator. Wer kein Administrator ist, erreicht nur die eigenen
+Aufträge (eine unbekannte oder fremde Kennung ergibt `Order not found.`). `list_orders` listet immer nur die eigenen
+Aufträge, `revise_order` geht nur für die Person, der der Auftrag gehört, und `profile` liest und füllt nur die eigenen
+Angaben.
 
 ## SDK
 
 **`ModelContextProtocol.AspNetCore` und `ModelContextProtocol.Core`, exakt v2.4.0** — das offizielle Anthropic+Microsoft C# SDK ([modelcontextprotocol/csharp-sdk](https://github.com/modelcontextprotocol/csharp-sdk)). Die Tools werden als `[McpServerTool]`-annotierte Methoden in `Geef.Atelier.Mcp` (Class Library) definiert und seit Etappe 5 einzeln über `McpToolCatalog` registriert.
 
-Seit D-086 stehen beide Pakete in `Directory.Packages.props` auf genau `[2.4.0]`. Vorher stand dort der Bereich `[1.3.0,2.0.0)`; NuGet nimmt aus einem Bereich die niedrigste passende Version, also immer 1.3.0, und Korrekturen kamen nie an. Ein Update ist deshalb immer eine bewusste Änderung dieser einen Zeile. Mit 2.4.0 handeln aktuelle Clients die Revision 2026-07-28 aus; mit den Schaltern `Off` nutzt der Server davon **keine neuen Fähigkeiten** und meldet nur Werkzeuge, ohne `extensions`; ausgeliefert sind seit D-088 Skill und Formular-Rückfragen eingeschaltet. Skill und Formular-Rückfragen gibt es seit D-088 nur hinter `Mcp:Skills` und `Mcp:Elicitation` (siehe oben); Tasks gibt es nicht. Das Skill-Paket `ModelContextProtocol.Extensions.Skills` steht ebenfalls auf genau `[2.4.0]` und muss bei jedem Update mitgezogen werden. 1.3.0 hatte jedes Werkzeug mit `execution: {"taskSupport":"optional"}` markiert, obwohl der Server keine Tasks anbietet; 2.4.0 lässt das Feld weg. Das ist die einzige Änderung der Werkzeugliste durch das Update (Hash-Tests bewusst neu gezogen, Test „No_tool_announces_task_support“).
+Seit D-086 stehen beide Pakete in `Directory.Packages.props` auf genau `[2.4.0]` (ein Versionsbereich war immer zur niedrigsten Version aufgelöst worden, sodass Korrekturen nie ankamen); ein Update ist deshalb eine bewusste Änderung dieser Zeile. Aktuelle Clients handeln die Revision 2026-07-28 aus. Stehen `Mcp:Skills` und `Mcp:Elicitation` auf `Off`, nutzt der Server davon **keine neuen Fähigkeiten** und meldet nur Werkzeuge, ohne `extensions`; ausgeliefert sind beide eingeschaltet (siehe oben); Tasks gibt es nicht. Das Skill-Paket `ModelContextProtocol.Extensions.Skills` steht ebenfalls auf genau `[2.4.0]` und muss bei jedem Update mitgezogen werden.
 
 ## Transport
 
@@ -305,7 +192,7 @@ Self-hosted OAuth-2.1-Authorization-Server, direkt in Geef.Atelier implementiert
 | `/oauth/token` | POST | Token-Endpoint (authorization_code + refresh_token) |
 | `/oauth/revoke` | POST | RFC 7009 Token-Revocation |
 | `/account/connected-clients` | GET | Selbstverwaltung verbundener Clients (Nutzer-UI) |
-| `/admin/oauth-clients` | GET | OAuth-Client-Verwaltung (nur Admin) |
+| `/admin/oauth-clients` | GET | OAuth-Client-Verwaltung (Löschen nur durch Administratoren) |
 
 **Flow:**
 
@@ -334,12 +221,12 @@ Self-hosted OAuth-2.1-Authorization-Server, direkt in Geef.Atelier implementiert
 
 ## Beziehung zu Web-UI
 
-Beide Frontends rufen denselben `IRunService` auf. Konsequenzen:
+Beide Frontends rufen denselben `IOrderService` auf. Konsequenzen:
 
-- Ein via MCP gestarteter Run erscheint sofort in der Web-UI (gleiche DB).
-- Ein via UI gestarteter Run kann via MCP abgefragt werden.
-- Status-Updates eines via MCP gestarteten Runs sind in der UI live sichtbar (SignalR-Stream).
-- Cancellation funktioniert von beiden Seiten.
+- Ein über MCP gestarteter Auftrag erscheint sofort in der Web-UI derselben Person (gleiche DB), und ein in der Web-UI
+  gestarteter Auftrag lässt sich über MCP verfolgen.
+- Auftragsseiten aktualisieren sich auch für über MCP gestartete Aufträge live.
+- Abbrechen funktioniert von beiden Seiten.
 
 Das ist ein bewusstes Design-Ziel: ein Auftrag ist ein Auftrag, unabhängig vom Eintragsweg.
 
@@ -372,20 +259,7 @@ URL `https://geef.stefan-bechtel.de/mcp` eingeben — der Client erkennt `WWW-Au
 
 ## Nicht im Scope
 
-- Rate-Limiting (Single-User, kein Bedarf)
+- Rate-Limiting für MCP-Aufrufe
 - Mehrere Scopes / feingranulare Berechtigungen (nur `mcp:full`)
 - JWTs / OpenID Connect (Opaque Tokens + DB-Lookup ist ausreichend)
 - Multi-Tenant
-
-## Tool `list_learnings` (D-054)
-
-| Feld | Wert |
-|---|---|
-| Tool-Name | `list_learnings` |
-| Parameter | `status_filter?` (Proposed / Approved / Rejected), `domain_filter?` (String) |
-| Rückgabe | Array von `LearningEntryDto` |
-| Zugriff | Nur Administratoren (seit Etappe 1); andere Nutzer bekommen eine klare Fehlermeldung, weil die Liste Einträge aller Nutzer enthält |
-
-**`LearningEntryDto`-Felder:** `id`, `text` (gekürzt auf 300 Zeichen), `source_run_id`, `learning_run_id?`, `domain`, `status`, `owner_username`, `created_at`, `approved_at?`.
-
-`status_filter=Approved` gibt nur aktive Learnings zurück, die beim Retrieval tatsächlich genutzt werden. `domain_filter` matcht den Crew-Template-Namen des Ursprungs-Runs (z. B. `juristisch`, `akademisch`).

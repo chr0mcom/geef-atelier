@@ -10,7 +10,7 @@ Dies ist die laufend gepflegte Doku zum Projekt **Geef.Atelier**: Es macht aus e
 |---|---|
 | [12-user-guide_de.md](12-user-guide_de.md) | Alle, die im Browser mit Atelier schreiben |
 | [13-ai-assistant-guide_de.md](13-ai-assistant-guide_de.md) | Menschen, die Atelier aus einem KI-Assistenten nutzen (MCP) |
-| [14-admin-guide_de.md](14-admin-guide_de.md) | Administration: Konten, Schalter, die ältere Werkstatt |
+| [14-admin-guide_de.md](14-admin-guide_de.md) | Administration: Konten, Schalter, Anbieter |
 | [15-developer-guide_de.md](15-developer-guide_de.md) | Entwicklung und Betrieb: Karte des Systems, Tests, Regeln |
 
 Die laufende Anwendung erklärt sich außerdem auf der öffentlichen Seite `/how-it-works`, die den aktuellen Schaltern folgt.
@@ -27,12 +27,12 @@ Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsru
 | [03-walking-skeleton-plan.md](03-walking-skeleton-plan_de.md) | Der ursprüngliche 10-Schritte-Bauplan (historisch; Skeleton abgeschlossen) | Historisch |
 | [04-mcp-integration.md](04-mcp-integration_de.md) | MCP-Server: Tools, Auth (Bearer + OAuth 2.1), Transport | Living |
 | [05-decisions-log.md](05-decisions-log_de.md) | Chronologisches, append-only Protokoll aller Architektur-Entscheidungen (D-001 ff.) | Historisch |
-| [06-reviewer-calibration.md](06-reviewer-calibration_de.md) | Severity-Taxonomie und Convergence-Policy-Standard für Reviewer | Living |
+| [06-reviewer-calibration.md](06-reviewer-calibration_de.md) | Severity-Taxonomie und Convergence-Policy; die Teile zur alten Prüfschleife sind als historisch gekennzeichnet (in D-091 entfernt) | Living |
 | [07-design-system.md](07-design-system_de.md) | Theme-System, Typografie, Komponenten-Inventar (Stand Design-Translation PS-3) | Living |
-| [08-crew-system.md](08-crew-system_de.md) | Crew-/Profil-/Template-System, System-Profile, Advisor-Pässe – der ältere Weg („Workshop“, „Extra careful“) | Living |
+| [08-crew-system.md](08-crew-system_de.md) | Was vom Crew-System bleibt: die zwei Aufstellungen im Code, Crew-Snapshot, Modellmatrix, Prüfer des Direktwegs, alte Läufe; die entfernten Teile sind aufgeführt (D-091) | Living |
 | [09-endpoint-reference.md](09-endpoint-reference_de.md) | Referenz aller extern erreichbaren HTTP-Endpunkte (MCP, OAuth, Web/Account) | Living |
-| [10-tool-system.md](10-tool-system_de.md) | Zentraler Tool-Katalog + agentischer Tool-Use (Pull) + Grounding (Push) + MCP-Client (D-060); Ist-Zustand: Pull nie verdrahtet und eingefroren, Allowlist für Umgebungsvariablen (D-067) | Living |
-| [11-specialization-packs.md](11-specialization-packs_de.md) | Generische Akteure + wiederverwendbare gescopte Spezialisierungs-Packs (D-061) | Living |
+| [10-tool-system.md](10-tool-system_de.md) | Kurzer Hinweis: Das Tool-System wurde in Stufe 8d entfernt (D-091); die Allowlist für Umgebungsvariablen gilt weiter | Hinweis |
+| [11-specialization-packs.md](11-specialization-packs_de.md) | Kurzer Hinweis: Die Spezialisierungs-Packs wurden in Stufe 8d entfernt (D-091) | Hinweis |
 | [ops/atelier-smoke.md](ops/atelier-smoke.md), [ops/atelier-watch.md](ops/atelier-watch.md) | Betrieb: Mini-Lauf nach dem Deploy, Wächter für hängende Läufe (nur Deutsch) | Living |
 
 > **Interne Arbeitsverzeichnisse (nicht im öffentlichen Repository):**
@@ -48,9 +48,9 @@ Im übergeordneten Infrastruktur-Repository unter `/srv/docker/docs/` liegen die
 
 ## Status
 
-- **Phase:** produktiv. Seit dem Umbau im November 2026 (D-068 bis D-077) ist der Auftrag mit dem Direktweg der Standard; das ältere Crew-System (mit seinen Erweiterungen wie Advisor-Pässen, Grounding, Finalizern und der pausierten Lernschleife; Template Studio wurde in Stufe 8c entfernt, D-089) bleibt als „Workshop“ und „Extra careful“ verfügbar.
-- **Letzte Aktualisierung:** 2026-11-26
-- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-089 „Rückbau, Schnitt 1“). Der Umbau nach D-068 endet mit Etappe 6 und der Abschlussrunde 8a (D-077): Die Etappen 1b, 7, 8 (außer 8a) und 9 sind nicht gebaut, und das alte Crew-, Tool- und Learning-System bleibt bestehen, bis der Auslöser für den Rückbau in D-077 erfüllt ist; der erste Schnitt des Rückbaus (Stufe 8c, D-089) hat die ungenutzten Teile entfernt; die Dokumente kennzeichnen eingefrorene oder zum Rückbau vorgesehene Teile.
+- **Phase:** produktiv. Atelier schreibt jeden Text auf einem Weg: dem Auftrag mit dem Direktweg (D-068 bis D-077). „Extra careful“ (zuerst eine Gliederung, D-087) gibt es nur hinter dem Schalter `Orders:CarefulOutline`, ausgeliefert aus. Das ältere Crew-System und alles, was nur es nutzte (Werkstatt, Tools, Lernen, Wissensbasis, Abschlussschritte, Advisor, Packs), wurden in Stufe 8d entfernt (D-091).
+- **Letzte Aktualisierung:** 2026-11-27
+- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-091, Stufe 8d: Der Rest der älteren Arbeitsweise ist entfernt, nach dem ersten Schnitt in Stufe 8c, D-089). Keine Datenbanktabelle oder -spalte wurde gelöscht, alte Aufträge und Läufe bleiben also lesbar; die Datenbankbereinigung ist ein eigener späterer Schritt. Die Dokumente kennzeichnen, was entfernt wurde.
 
 ## Konventionen
 

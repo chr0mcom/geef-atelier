@@ -4,7 +4,7 @@
 
 *Last updated: 2026-11-27 (D-085: older review loop, three safeguard switches, shipped off; before that 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
-*Last updated: 2026-11-27 (D-087: “Extra careful” with an outline behind a switch, loop switches per account, measurement prepared; before that D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-27 (D-091: cleanup, cut 2, only the standard way remains; before that D-090: gateway failover to the same model only; D-087: “Extra careful” with an outline behind a switch, loop switches per account, measurement prepared; before that D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -3767,3 +3767,80 @@ both values in `LlmHttpRetryTests`.
 
 **Way back.** Rolling back the gateway image alone is not enough while `web` sends `same-model` (full failover again); roll back `web`
 first, then the gateway.
+
+## D-091 — Cleanup, cut 2: only the standard way remains (2026-11-27)
+
+**Context.** Stage 8d of the cleanup ("removal cut 2"). It replaces the interim stages 8a/8b: the older review loop lost the
+measurement against the standard way, and the team choice that 8b had planned is not built. Goal: a clean, smaller code base in which only what the standard way needs stays. The database is cleaned up later in a separate step, not here.
+
+**Decision — removed.**
+- **Composer and Auto-Crew** (composition runs, materializer, validator, prompts, `submit_auto_crew_request`).
+- **The agentic tool path** (`/tools`, tool definitions and invocations, tool bindings on profiles and in snapshots, MCP server configs).
+- **The learning loop** (learning runs, learnings, `/learnings`, `Learning:*`).
+- **The vector knowledge base and embeddings** (`/knowledge`, chunks, pgvector packages, promoting run attachments, `Embeddings:*`,
+  `Knowledge:*`).
+- **The old grounding profiles and types**, including `url-fetch` with the URL security check and the vector and attachment sources
+  that D-089 still kept. No remaining path needs them: the standard way reads the order's files in its own grounding step and reaches
+  the web only through the research service (D-074). `Tavily` keeps only `Endpoint` and `ApiKey`.
+- **All finishing steps** (finalizers), including `MetadataEnrich`, with run artifacts and their download endpoint and `Finalizer:*`.
+  The format converters move to the order export.
+- **Advisors and specialization packs.**
+- **The older review loop** with its templates (`klassik`, `juristisch`, `akademisch`, `marketing`, every custom template), the
+  workshop and the editors for teams and executor, reviewer, advisor, finisher and source profiles, the workshop dashboard and its live
+  hub, and the D-085 safeguards (`Convergence:BestDraft`, `WriterBlockingOnly`, `StopWithoutProgress` with their overrides). Pipelines
+  are built only by `DirectPipelineAssembler`; `AtelierPipelineFactory` takes the steps it is given.
+- **The old form `/new`** and the link "More options" on `/start`.
+- **The older MCP tools** and the switch `Mcp:LegacyTools`; `Orders:LegacySubmitDefaultMode` goes as well.
+- Leftovers: the provider delete guard that looked at the old profile tables, the warning codes of old sources and finishing steps,
+  slot helpers only the workshop used, the dashboard stylesheet, MailKit audit exceptions, the one-off tool `MaterializeRun`.
+
+**Decision — kept.** The order and run pages of the standard way, exports, "My work", "About me", administration (users, OAuth
+clients, site settings, providers), privacy and legal pages, the explanation and start pages, uploads and upload tickets, the MCP tools
+of the standard way (`submit_order`, `answer_order`, `get_order_status`, `get_order_result`, `list_orders`, `cancel_order`,
+`revise_order`, `export_order`, `prepare_attachment`, `profile`), the model matrix and the model catalog. The workshop menu
+(`Ui:WorkshopForAdminsOnly`) now holds only the technical run list and, for administrators, the providers.
+
+**Stubs for one version.** `submit_request`, `submit_auto_crew_request`, `get_run_status`, `get_run_result` and `get_run_details` stay
+registered: every parameter is optional and every call returns a tool error that names `submit_order`, `get_order_status` or
+`get_order_result` (clients keep tool lists cached). They go in the next version.
+
+**"Extra careful".** A careful order runs on the direct path with an outline first (`direct-outline`, D-087) when `Orders:CarefulOutline`
+is `On` for the person (`CarefulOutlineOverrides` per user name); it is shipped `Off`. Otherwise the option does not exist: `/start`
+shows no checkbox, the explanation page does not mention it, `submit_order` leaves `extraCareful` out of its schema while nobody has it,
+and an `extraCareful=true` for a person without it is refused with "Extra careful is not available. Please send the order without
+it." A careful order never runs as something else; "Start again" of an older careful order says that the standard way is used and
+starts nothing on its own. Switching it on or removing it touches the switch, `ResolveOrderSnapshotAsync`, the template in `SystemCrew`
+and the planner — a small diff either way. `scripts/atelier-smoke.sh` uses `submit_order`, `answer_order(skip=true)`,
+`get_order_status` and `get_order_result`.
+
+**Older data.** No `DROP`, no migration, no deleted row: the database stays compatible with the previous image. Removed entities are no
+longer mapped; their tables and the columns `Runs.GroundingCostEur`, `FinalizerCostEur`, `FinalizerErrorMessage` and
+`Iterations.AdvisorsTotalCostEur` stay. Snapshots keep the `advisors` list, so the previous image can read new snapshots, and unknown
+properties of older snapshots are ignored. Finished older runs and orders stay readable in lists, "My work", the order and result
+pages, exports and the technical run page (which names the setup and says that its way of working no longer exists). A pending run
+of a removed setup (older review loop, composed team, learning run) fails with "This task was set up for a way of working that no
+longer exists, so it cannot run. Please start it again."; continuing such a run is refused in the same words. Crash recovery and
+cleanup treat older runs as before.
+
+**Rules kept.** Order per part: navigation → registration → code → tests → seeds; thematically separate commits; hand-written
+migrations only.
+
+**Proof.** Full test suite, the end-to-end category and the smoke-script tests. New end-to-end tests store finished and pending runs
+and orders of removed setups and check the lists, "My work", the pages, the orchestrator and crash recovery. The production-snapshot
+test (`ATELIER_SNAPSHOT_FIXTURES`, export outside the repository) now checks that every snapshot is read and either runs on the direct
+path or is refused with the sentence above; all exported snapshots pass. Orchestrator tests that used finishing steps now use the
+completion hook of the assembler (`OnRunFinishedAsync`).
+
+**Limits.**
+- The EF model snapshot still knows the removed entities (as after D-089); do not generate a migration. A new baseline follows the
+  database cleanup.
+- The later cleanup may drop the tables `AdvisorConsultations`, `AdvisorProfiles`, `CrewTemplateEmbeddings`, `CrewTemplates`,
+  `ExecutorProfiles`, `FinalizationActorCosts`, `FinalizerProfiles`, `GroundingActorCosts`, `GroundingConsultations`,
+  `GroundingProviderProfiles`, `KnowledgeDocumentChunks`, `KnowledgeDocuments`, `LearningEntries`, `ReviewerProfiles`, `RunArtifacts`,
+  `StudioSettings`, `TemplateStudioAnalyses`, `mcp_server_configs`, `specialization_packs`, `tool_definitions`, `tool_invocations`, the
+  columns above, and the old composition and learning runs; the compose volume for exports is no longer used.
+- `ModelSlot` keeps its values (snapshots store numbers); the matrix rows of retired slots stay until the cleanup.
+- The arm `atelier` of the evaluation harness in `tools/Eval` still calls `submit_request`; the measurements of the standard way use
+  the order tools.
+
+**Rollback.** The previous image; nothing in the database was dropped or changed. In code only through Git (tag before the deploy).

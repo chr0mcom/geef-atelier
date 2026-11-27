@@ -2,74 +2,80 @@
 
 *[English](01-vision-and-scope.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-26 (Leitfäden je Zielgruppe und die Seite „How it works“; Export-Knopf auf der Auftragsseite richtiggestellt; D-077: Gedächtnis je Nutzer nicht gebaut, Learning-Schleife bleibt pausiert; D-068: höchstens drei kurze Rückfragen mit Klickantworten vor dem Lauf, nie währenddessen; D-067: Learning-Schleife standardmäßig pausiert; zuvor 22. Mai 2026, D-054: Continuous-Learning-Loop in den Scope aufgenommen; learning-retrieval-Providertyp)*
+*Letzte Aktualisierung: 2026-11-27 (D-091: Etappe 8d, der Umfang entspricht dem aktuellen Produkt: nur der Standardweg, kein Zusammenstellen von Teams, kein Lernen, keine Wissensbasis; zuvor 2026-11-26: Leitfäden je Zielgruppe und die Seite „How it works“; D-077; D-068: höchstens drei kurze Rückfragen mit Klickantworten vor dem Lauf, nie währenddessen; 22. Mai 2026, D-054)*
 
 ## Vision
 
-> **Aktueller Stand (seit dem Umbau im November 2026, D-068 bis D-077).** Die Vision unten wurde für die Crew-basierte
-> Arbeitsweise geschrieben. Was eine Person heute standardmäßig nutzt, ist einfacher: Ein Anliegen wird ein **Auftrag**; höchstens
-> drei Fragen vor dem Start; ein Schreibaufruf mit den Dateien im Volltext; Prüfungen mit einem festen Bericht, was geprüft wurde;
-> höchstens eine Korrektur. Das Crew-System bleibt als „Workshop“ und „Extra careful“ verfügbar. Die Leitfäden
-> [12](12-user-guide_de.md) bis [15](15-developer-guide_de.md) beschreiben den aktuellen Stand je Zielgruppe.
+**Geef.Atelier** ist eine Text-Manufaktur: Aus dem Anliegen und den Dateien einer Person wird ein fertiger Text, und das
+Atelier sagt ehrlich, was geprüft wurde und was noch offen ist. Ein Anliegen wird ein **Auftrag**; höchstens drei kurze
+Fragen kommen vor dem Start; ein Schreibaufruf bekommt die Dateien im Volltext; danach folgen automatische Prüfungen und
+eine Faktenprüfung durch ein anderes Modell, mit höchstens einer Korrektur. „Extra careful“, nur dort angeboten, wo es
+eingeschaltet ist, ergänzt einen Plan vor dem Schreiben und eine Prüfung jeder ausdrücklichen Anforderung des Anliegens. Die
+Leitfäden [12](12-user-guide_de.md) bis [15](15-developer-guide_de.md) beschreiben das Produkt je Zielgruppe.
 
-**Geef.Atelier** ist eine Text-Manufaktur: ein Atelier aus spezialisierten KI-Rollen (Executor, Reviewer, optional Advisor), das je nach Werkstück unterschiedlich besetzt wird. Der Unterschied zu einem klassischen "GPT-Wrapper" ist nicht Bedienung oder Preis, sondern dass die Maschine *vor der Arbeit entscheidet, wie sie arbeitet* (adaptive Crew-Komposition) und *während der Arbeit transparent macht, was sie tut* (Prozess-Sichtbarkeit über Iterations- und Findings-Trail).
+Die ursprüngliche Vision war eine Maschine, die für jedes Werkstück eine Crew aus KI-Rollen zusammenstellt. Diese
+Arbeitsweise wurde in Etappe 8d (D-091) entfernt, zusammen mit der Learning-Schleife und der Wissensbasis; die Git-Historie
+und das [Decisions-Log](05-decisions-log_de.md) bewahren ihre Beschreibung.
 
-Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0mcom/geef): Es nutzt das GEEF-Pipeline-Pattern (Grounding / Execution / Evaluation / Finalize) und die Erweiterungen (Convergence-Policies, Evaluation-Strategies, Advisor-Pattern, EventSink, Middleware), um Texte in Höchstqualität zu erzeugen.
+Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0mcom/geef): Es nutzt das
+GEEF-Pipeline-Pattern (Grounding / Execution / Evaluation / Finalize), seine Convergence-Policies, Evaluation-Strategies,
+den EventSink und die Middleware.
 
 ## Leitsterne
 
-1. **Adaptive Crew-Komposition** — Der Klassifikator erkennt die Textsorte und stellt aus einem getaggten Reviewer-/Advisor-Pool die passende Crew zusammen. Spezialisierung passiert über Daten (Reviewer-Profile, Crew-Templates), nicht über Code-Branches.
-2. **Prozess-Transparenz** — Jeder Run hinterlässt einen vollständigen Trail: alle Iterationen, alle Findings, alle Advisor-Konsultationen. Vertrauen entsteht durch Nachvollziehbarkeit.
-3. **Modell-Pluralismus** — Reviewer nutzen bewusst andere Modelle als der Executor, um echte Außenperspektive zu erzeugen statt Selbstbestätigung.
+1. **Ein klarer Weg** — jeder Auftrag geht denselben Weg. Es gibt keine Teams, Profile oder Pipelines einzurichten.
+2. **Ehrliche Transparenz** — jedes Ergebnis kommt mit einem festen Bericht, was geprüft wurde, den offenen Punkten und den
+   Annahmen; jeder Lauf behält seine Durchgänge und Befunde.
+3. **Modell-Pluralismus** — die Prüfungen nutzen bewusst andere Modelle als der Schreiber, um eine echte Außenperspektive
+   statt Selbstbestätigung zu bekommen.
 
 ## In Scope
 
-- Generische Pipeline für beliebige Textsorten (juristische Schriftsätze, Fachartikel, Marketing, akademische Texte, Briefe, Gedichte, …)
-- Mehrbenutzer-Hosting auf eigenem Docker-Server: DB-basierte Benutzerverwaltung (BCrypt), Run-Sichtbarkeit pro Nutzer isoliert, Admin-Override per expliziten Umschaltern
-- Web-UI (Blazor Server) für Auftragserteilung, Live-Status, Ergebnis-Abholung
-- MCP-Server-Schnittstelle, damit externe KI-Clients (Claude Desktop, Claude Code, Custom-Agents) Aufträge erteilen und Ergebnisse abholen können — Auth über statisches Bearer-Token oder self-hosted OAuth 2.1
-- Multi-Provider-LLM-Support: OpenRouter (Pay-per-Token) sowie Subscription-CLIs (Claude Code, Codex) über einen lokalen Proxy; Reviewer/Advisor bewusst mit Fremd-Modellen
-- Quellen-Übergabe in mehreren Formen: Datei-Upload (PDF, DOCX, TXT, MD), URLs, Freitext-Briefing, Stil-Referenztexte; semantische Wissensbasis (Vector-Store-RAG) und Run-lokale Attachments
-- Fire-and-Forget-Workflow: Auftrag starten, später Status prüfen, am Ende Ergebnis abholen — keine Mensch-im-Loop-Eingriffe während des Runs. **Vor** dem Lauf sind höchstens drei kurze Rückfragen mit fertigen Antworten zum Anklicken erlaubt, immer überspringbar (D-068)
-- Persistente Run-Historie mit vollständigem Iterations-Trail
-- Run-Fortsetzung: einen fehlgeschlagenen oder abgebrochenen Run ab dem letzten Draft-Text (Seed-Modus) oder mit frischer Pipeline (Clean-Modus) fortsetzen — D-046
-- Download des Textes jedes Auftrags als Word, PDF oder Markdown auf der Auftragsseite und über MCP (`export_order`, D-070, D-075); im älteren Crew-System zusätzlich Datei-Export in md / html / pdf / docx / txt / json über die Finalizer-Pipeline (D-044; Finalizer-Typen FileExport, MetadataEnrich, Transform; ExternalSink wurde in Stufe 8c entfernt, D-089)
-- Grounding-Anreicherung in mehreren Formen: Tavily-Websuche (`tavily`), semantische Vector-Store-RAG (`vector-store`), kuratierter Fixtext für Style-Guides und Glossare (`static-context`), und gezieltes URL-Fetching mit SSRF-Schutz (`url-fetch`) (die Typen `news-search`, `academic-search` und `rest-api` wurden in Stufe 8c entfernt, D-089); jeder Provider unterstützt optional einen KI-Refinement-Pass (D-050–D-052); domänen-bewusste Abfrage aus dem Learning-Store (`learning-retrieval`, D-054)
-- **Continuous-Learning-Loop (D-054):** Ein opt-in-`learning-extractor`-Finalizer extrahiert strukturierte Fakten aus abgeschlossenen Runs und stößt fire-and-forget einen dedizierten Qualitäts-Gate-Run an (`learning-evaluation`-Crew). Nur Learnings, die das Gate konvergent durchlaufen (drei strenge Reviewer, `AbortOnCritical=true`, Multi-Modell-Pluralismus), werden als `Approved` im Learning-Store gespeichert (`LearningEntries`-Tabelle, getrennter Namespace von der kuratierten Wissensbasis). Der `learning-retrieval`-Grounding-Provider spielt sie gewichtet nach Domänen-Ähnlichkeit in spätere Runs ein. Verwaltungs-UI unter `/crew/learnings`; MCP-Tool `list_learnings`. Drei Schutzmechanismen gegen Model Collapse: (1) getrennter Namespace, (2) auditierbares Gate, (3) ausschließlich strukturierte Fakten. **Seit D-067 pausiert** (`Learning:Enabled`, Standard `false`); ein Gedächtnis je Nutzer (D-068) sollte sie ersetzen; Etappe 7 ist bis zu ihrem Auslöser gestrichen (D-077), die Schleife bleibt pausiert
+- Texte, die Menschen geschrieben haben wollen: Briefe, E-Mails, Artikel, Zusammenfassungen, Berichte und Ähnliches, aus Anliegen und Dateien
+- Mehrbenutzer-Hosting auf eigenem Docker-Server: DB-basierte Benutzerverwaltung (BCrypt), Aufträge und Läufe pro Nutzer isoliert, Admin-Override per expliziten Umschaltern
+- Web-UI (Blazor Server) für Aufträge: Startseite, „My work“, Auftragsseite, „About me“
+- MCP-Server-Schnittstelle, damit KI-Assistenten (Claude Desktop, Claude Code, Custom-Agents) Aufträge erteilen und Ergebnisse abholen können, mit statischem Bearer-Token oder dem selbst gehosteten OAuth 2.1
+- LLM-Provider: Abo-CLIs (Claude Code, Codex) über einen lokalen Proxy und OpenRouter (Pay-per-Token); die Prüfungen laufen bewusst auf anderen Modellen als der Schreiber
+- Dateien als Quellen: Upload von PDF, Word, Markdown oder reinem Text, auch über ein Upload-Ticket aus einem KI-Assistenten; der Schreiber bekommt sie im Volltext
+- Web-Recherche für Aufträge ohne Dateien, wo eingeschaltet (Tavily), gezeigt als Stellen anderer Webseiten, nicht als geprüfte Tatsachen
+- Fire-and-Forget-Workflow: Auftrag erteilen, später nachsehen, Ergebnis abholen. **Vor** dem Schreiben sind höchstens drei kurze Rückfragen mit fertigen Antworten zum Anklicken erlaubt, immer überspringbar (D-068); während des Schreibens gibt es keinen Eingriff
+- Einen fertigen Text als neue Version desselben Auftrags ändern, mit Vergleich der Versionen
+- Download des Textes jedes Auftrags als Word, PDF oder Markdown, auf der Auftragsseite und über MCP (`export_order`, D-070, D-075)
+- Persistente Historie von Aufträgen und Läufen; einen fehlgeschlagenen oder abgebrochenen Lauf des Standardwegs fortsetzen (D-046)
 
 ## Out of Scope (vorerst)
 
-- Echte Mandantenfähigkeit / Multi-Tenant-Isolation (das System ist Mehrbenutzer, aber single-tenant: ein Admin, gemeinsame Konfiguration; pro Nutzer ist nur die Run-Sichtbarkeit isoliert)
+- Echte Mandantenfähigkeit / Multi-Tenant-Isolation (das System ist Mehrbenutzer, aber single-tenant: ein Admin, gemeinsame Konfiguration; pro Nutzer sind nur Aufträge und Läufe isoliert)
 - Öffentlicher Zugang ohne Auth
-- Mensch-im-Loop zwischen Iterationen (bewusst nicht implementiert; Fire-and-Forget bleibt das Modell: keine Rückfragen oder Eingriffe, während der Lauf läuft). Nur **vor** dem Lauf darf das Atelier höchstens drei kurze Rückfragen mit Klickantworten stellen, und nur dann, wenn sich die Antwort weder aus Auftrag, Dateien, Profil oder Gedächtnis entnehmen noch recherchieren noch vernünftig annehmen lässt, der Anwender sie wissen kann und sie das Ergebnis wesentlich ändert (D-068)
+- Mensch-im-Loop während des Schreibens. Nur **vor** dem Schreiben darf das Atelier höchstens drei kurze Rückfragen mit Klickantworten stellen, und nur dann, wenn sich die Antwort weder aus Anliegen, Dateien oder Profil entnehmen noch recherchieren noch vernünftig annehmen lässt, der Anwender sie wissen kann und sie das Ergebnis wesentlich ändert (D-068)
+- Das Zusammenstellen von Teams aus KI-Rollen, eigene Pipelines oder Werkzeugnutzung durch Modelle
+- Lernen über Aufträge hinweg, ein Gedächtnis je Nutzer über „About me“ hinaus und eine Wissensbasis (Vektorsuche)
+- Abschlussschritte, die einen Text umwandeln oder anderswohin schicken
 - Mobile Apps oder native Clients
 - Kommerzielles Hosting, Billing, Abrechnung
-- Ungefiltertes Cross-Run-Self-RAG (bewusst verworfen; der Continuous-Learning-Loop oben bietet gegatetes Cross-Run-Lernen mit drei Schutzmechanismen gegen Model Collapse)
-- Domänen-spezifische Datenbank-Connectors (z.B. juristische Datenbanken wie dejure.org oder Beck-Online) — später optional
+- Domänen-spezifische Datenbank-Connectors (zum Beispiel juristische Datenbanken)
 
 ## Zielnutzer
 
-Mehrere benannte Benutzerkonten, verwaltet durch einen Admin. Die Anwendung ist nicht mandantenfähig (keine Tenant-Trennung von Konfiguration oder Crew-Daten), aber jeder Nutzer sieht nur seine eigenen Runs; der Admin kann optional alles einsehen. Authentifizierung ist Pflicht, weil die App über das öffentliche Internet erreichbar ist (Server-Hosting).
+Mehrere benannte Benutzerkonten, verwaltet durch einen Admin. Die Anwendung ist nicht mandantenfähig (keine Tenant-Trennung der Konfiguration), aber jeder Nutzer sieht nur seine eigenen Aufträge und Läufe; der Admin kann optional alles einsehen. Authentifizierung ist Pflicht, weil die App über das öffentliche Internet erreichbar ist (Server-Hosting).
 
 ## Hosting-Umgebung
 
-- Docker-Container auf eigenem Server
-- Postgres ist bereits als Datenbankdienst auf dem Server vorhanden — das Projekt nutzt diese existierende Postgres-Instanz, kein separater DB-Container nötig (außer für lokale Entwicklung)
+- Docker-Container auf eigenem Server (Docker Compose): Web-App, cli-proxy, Postgres und ein Backup-Dienst
 - Reverse-Proxy (Traefik / Nginx) übernimmt TLS-Terminierung
 - API-Keys, Connection-Strings, Auth-Secrets über Environment-Variablen / Docker Secrets
-- Persistente Datenhaltung in Postgres (inkl. pgvector für die semantische Wissensbasis); hochgeladene Quellen werden indexiert in der Datenbank gehalten
+- Persistente Daten in Postgres; hochgeladene Dateien auf einem Volume
 
 ## Erfolgs-Kriterium für das Skeleton
 
-> **Status:** Dieses Skeleton-Erfolgskriterium ist seit Mai 2026 vollständig erfüllt; die App läuft produktiv. Die unten als „danach“ genannten Erweiterungen (Quellen-Upload/RAG, Crew-Komposition, Advisor-Pässe) sind inzwischen ausgeliefert. Die folgende Liste bleibt als ursprüngliche Definition des Minimal-Ziels erhalten.
+> **Historisch.** Das war zu Projektbeginn die Definition des Minimal-Ziels; es wurde im Mai 2026 erreicht. Es nennt zwei
+> feste Reviewer; so arbeitet das Produkt heute nicht (siehe [Vision](#vision)).
 
-Das Walking Skeleton (siehe [03-walking-skeleton-plan.md](03-walking-skeleton-plan_de.md)) ist erfolgreich, wenn:
+Das Walking Skeleton (siehe [03-walking-skeleton-plan.md](03-walking-skeleton-plan_de.md)) war erfolgreich, wenn:
 
-1. Ein Auftrag mit reinem Text-Briefing über die Web-UI startbar ist.
-2. Die Pipeline mit Anthropic als Executor und zwei festen Reviewern (z.B. mit OpenAI-Modell) durchläuft, ohne dass der User eingreifen muss.
-3. Während des Runs ein Live-Status in der UI sichtbar ist (aktuelle Phase, Iteration, Findings).
-4. Nach Abschluss der finale Text in der UI angezeigt wird.
-5. Derselbe Workflow auch über den MCP-Server funktioniert (Auftrag absetzen, Status abfragen, Ergebnis abholen via MCP-Tools).
-6. Die ganze Anwendung als Docker-Container deploybar ist und sich an die existierende Postgres-Instanz anbindet.
-
-Alles weitere (Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export) sind Erweiterungen *nach* dem Skeleton.
+1. Ein Auftrag mit reinem Text-Briefing über die Web-UI startbar war.
+2. Die Pipeline mit Anthropic als Executor und zwei festen Reviewern (z.B. mit OpenAI-Modell) durchlief, ohne dass der User eingreifen musste.
+3. Während des Runs ein Live-Status in der UI sichtbar war (aktuelle Phase, Iteration, Findings).
+4. Nach Abschluss der finale Text in der UI angezeigt wurde.
+5. Derselbe Workflow auch über den MCP-Server funktionierte (Auftrag absetzen, Status abfragen, Ergebnis abholen via MCP-Tools).
+6. Die ganze Anwendung als Docker-Container deploybar war und sich an Postgres anband.

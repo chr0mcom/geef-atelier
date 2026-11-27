@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](12-user-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-27 („Tell Atelier once“ mit seiner Zusage, Zusatz zu D-083; Nachschlagen im Web für alle eingeschaltet, Zusatz zu D-074; davor „Tell Atelier once“, D-083; davor nach Prüfung: Websuche nur auf dem Standardweg, Aufbewahrung, Wortwahl)*
+*Letzte Aktualisierung: 2026-11-27 (D-091: Stufe 8d, ein Weg zu schreiben; „Extra careful“ nur, wo es eingeschaltet ist; ältere Aufträge; davor „Tell Atelier once“ mit seiner Zusage, Zusatz zu D-083; Nachschlagen im Web für alle eingeschaltet, Zusatz zu D-074)*
 
 Dieser Leitfaden ist für alle, die Atelier im Browser nutzen. Technisches Wissen ist nicht nötig. Die Seite **How it works**
 (`/how-it-works`, auch ohne Anmeldung erreichbar) zeigt dasselbe in kurz, zusammen mit den Funktionen, die gerade für dich
@@ -45,8 +45,13 @@ eine kurze Quittung: was Atelier gelesen hat, mit Seiten, Zeichen und wie gut si
 - Eingescannte Seiten (Fotos von Papier) kann Atelier nicht lesen.
 - Dateien lassen sich später nicht nachreichen. Füg alles hinzu, bevor du auf „Start“ drückst.
 
-**Extra careful** ist ein Kästchen unter den Dateien. Es nutzt eine ältere Arbeitsweise mit mehreren Prüfrunden. Es dauert länger,
-schlägt nichts im Web nach, und sein Ergebnis zeigt kein „What was checked“. Für die meisten Texte lässt du es aus.
+**Extra careful** ist ein Kästchen unter den Dateien. Es erscheint nur, wo die Administration es für dich eingeschaltet hat; in
+der ausgelieferten Einstellung ist es aus, dann gibt es kein Kästchen. Mit ihm plant Atelier den Text zuerst in Abschnitten mit
+Wortbudgets und schreibt dann nach diesem Plan, mit denselben Prüfungen wie immer. Nach der ersten Fassung sieht eine weitere
+Prüfung nach, ob alles, was dein Auftrag ausdrücklich verlangt, im Text steht; fehlt etwas, bekommt der Schreiber eine Korrektur.
+Diese Prüfung steht nicht in „What was checked“, und der korrigierte Text wird nicht noch einmal gegen deine Vorgaben geprüft.
+Kommt kein brauchbarer Plan zurück, wird in einem Zug geschrieben, und das Ergebnis sagt es. Es dauert länger (bis etwa
+10 Minuten) und schlägt nichts im Web nach.
 
 ### 2. Ein paar Fragen beantworten (oder überspringen)
 
@@ -128,11 +133,20 @@ nächsten Aufträge. Ob der Schreiber es wirklich verwendet, etwa deinen Gruß w
   den Auftrag geschrieben; eine übersetzte oder umformulierte Angabe kann aber durchrutschen. Das Ergebnis zeigt, welche
   Suchwörter gesendet wurden. Eine Änderung eines fertigen Textes nutzt, was beim ersten Mal nachgeschlagen wurde, und sucht nicht neu. Es
   gibt eine Tagesgrenze; ist sie erreicht, wird der Text ohne Nachschlagen geschrieben, und das Ergebnis sagt es. „Extra careful“
-  sucht nie im Web. Teams, die die Administration in der Werkstatt einrichtet, können eine eigene Websuche haben.
+  sucht nie im Web.
 - Nur du und die Administration dieses Ateliers sehen deine Aufträge.
 - Atelier behält deinen Auftrag, deinen Text und das aus deinen Dateien Gelesene, bis du den Auftrag unter My work löschst. Dabei
   werden auch die Dateien gelöscht, die kein anderer Auftrag nutzt. Die Originaldatei wird etwa 30 Tage nach dem Ende des letzten
   Auftrags entfernt, der sie nutzte; der daraus gelesene Text bleibt beim Auftrag.
+
+## Aufträge aus früheren Versionen von Atelier
+
+Fertige Aufträge aus früheren Versionen bleiben unter **My work** lesbar, mit Text und Downloads. Die älteren Arbeitsweisen, mit
+denen sie entstanden sein können, gibt es nicht mehr; ein noch unfertiger Auftrag dieser Art kann deshalb nicht laufen. Er endet
+mit „This task was set up for a way of working that no longer exists, so it cannot run. Please start it again.“ (Diese Aufgabe
+wurde für eine Arbeitsweise angelegt, die es nicht mehr gibt; bitte neu starten.) Startest du einen alten „Extra careful“-Auftrag
+über **Start again** neu, während das Kästchen für dich nicht verfügbar ist, wird dein Auftrag ohne es eingetragen, und ein Hinweis
+sagt: „Extra careful is not available now, so this request uses the standard way.“ Es läuft nichts, bevor du auf „Start“ drückst.
 
 ## Was Atelier um das Schreiben herum tut
 

@@ -2,59 +2,47 @@
 
 *[English](02-architecture.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-26 (Verweis auf die Schalter der Auftragsfunktionen und die Seite `/how-it-works`; zuvor 2026-11-24, D-067: Etappe 0 Sicherheitsnetz — Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess und Hub nur für Angemeldete, Konfigurationsschalter, Ende-zu-Ende-Gerüst; zweite Prüfrunde: als umgesetzt beschrieben, `LiveRunNotifier`, `CircuitDataGate`, Schwärzen von Geheimnissen, Outcome-Tabelle und Variablen für den Snapshot-Test; zuvor 2026-11-22, D-066: Modellmatrix — Spalten `ModelSlot`/`ModelDomain`/`Domain` (Step46), Zuweisung beim Snapshot-Bau; zuvor 2026-08-04, D-064: dynamischer Modell-Katalog für CLI-Provider über den cli-proxy, dreiwertige Herkunft, Alias-Auflösung zum Snapshot-Bauzeitpunkt)*
+*Letzte Aktualisierung: 2026-11-27 (D-091: Etappe 8d, Dokument auf den aktuellen Stand gebracht: Es läuft nur noch der Direktweg, die entfernten Teile stehen nicht mehr in der Beschreibung; zuvor 2026-11-26: Verweis auf die Schalter der Auftragsfunktionen und die Seite `/how-it-works`; 2026-11-24, D-067: Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess, Ende-zu-Ende-Tests; 2026-11-22, D-066: Modellmatrix; 2026-08-04, D-064: Modell-Katalog für CLI-Provider)*
+
+Atelier macht aus dem Anliegen und den Dateien einer Person einen fertigen Text. Die Einheit, die die Person sieht, ist der
+**Auftrag**; **Läufe** sind das technische Protokoll darunter (ein Lauf je Version eines Auftrags). Seit Etappe 8d (D-091)
+gibt es **eine Arbeitsweise, den Direktweg**, mit der Variante „Extra careful“. Die früheren Wege (die Prüfschleife mit
+Crews, zusammengestellte Teams, die Learning-Schleife, der agentische Werkzeug-Pfad, die Vektor-Wissensbasis, Advisor,
+Spezialisierungs-Pakete, Abschlussschritte und die Werkstatt-Editoren) sind aus dem Code entfernt; ihre Beschreibungen
+bewahren die Git-Historie und das [Decisions-Log](05-decisions-log_de.md).
 
 ## Schichtenbild
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                    Frontends (zwei Adapter)                    │
-│  ┌──────────────────────────────┐  ┌─────────────────────────┐ │
-│  │  Web-UI (Blazor Server)      │  │  MCP-Server             │ │
-│  │  - /new, /runs, /runs/{id}   │  │  - submit_request       │ │
-│  │  - SignalR Live-Stream       │  │  - get_run_status       │ │
-│  │  - Cookie-Auth               │  │  - get_run_result       │ │
-│  └──────────────┬───────────────┘  └─────────────┬───────────┘ │
-│                 │                                │             │
-└─────────────────┼────────────────────────────────┼─────────────┘
-                  │                                │
+┌──────────────────────────────────────────────────────────────────┐
+│                     Frontends (zwei Adapter)                     │
+│  ┌──────────────────────────────┐  ┌───────────────────────────┐ │
+│  │  Web-UI (Blazor Server)      │  │  MCP-Server (/mcp)        │ │
+│  │  /start, /work, /orders/{id} │  │  submit_order,            │ │
+│  │  /runs, /runs/{id}           │  │  get_order_status,        │ │
+│  │  Cookie-Auth                 │  │  get_order_result, ...    │ │
+│  └──────────────┬───────────────┘  └─────────────┬─────────────┘ │
+└─────────────────┼────────────────────────────────┼───────────────┘
                   ▼                                ▼
-┌────────────────────────────────────────────────────────────────┐
-│              Application Service Layer  (IRunService)          │
-│  - SubmitRunAsync(briefing, sources, options) -> RunId         │
-│  - GetRunStatusAsync(runId) -> RunStatus                       │
-│  - GetRunResultAsync(runId) -> Result                          │
-│  - ListRunsAsync(filter) -> Summaries                          │
-│  - CancelRunAsync(runId)                                       │
-└──────────────────────────────┬─────────────────────────────────┘
-                               │
-                               ▼
-┌────────────────────────────────────────────────────────────────┐
-│                     Background Orchestrator                    │
-│  - BackgroundService pollt Pending-Runs                        │
-│  - Baut Geef-Pipeline aus Run-Konfiguration                    │
-│  - Führt PipelineRunner.RunAsync() aus                         │
-│  - Custom IGeefEventSink schreibt Events in DB + SignalR       │
-└──────────────────────────────┬─────────────────────────────────┘
-                               │
-                               ▼
-┌────────────────────────────────────────────────────────────────┐
-│                       Geef SDK Pipeline                        │
-│   Grounding → Execution → Evaluation (Loop) → Finalize         │
-│                                                                 │
-│   Provider-Implementierungen leben in Infrastructure:           │
-│   - BriefingGroundingStep                                       │
-│   - LlmExecutionStep      (Multi-Provider-fähig)                │
-│   - LlmReviewer           (Multi-Provider-fähig, getaggt)       │
-│   - MarkdownFinalizer                                           │
-└──────────────────────────────┬─────────────────────────────────┘
-                               │
-                               ▼
-┌────────────────────────────────────────────────────────────────┐
-│                          Persistenz                            │
-│   Postgres via EF Core                                         │
-│   Tabellen: Runs, Iterations, Findings, Events                 │
-└────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  Anwendungsschicht: IOrderService, IRunService, Klärung,         │
+│  Quellen, Profil („About me“), Provider, Auth und OAuth          │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  Hintergrunddienste: Klärungs-Worker, Lauf-Orchestrator,         │
+│  Quellen-Aufräumen, OAuth-Aufräumen, Modell-Katalog-Aufwärmen    │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  Geef-SDK-Pipeline des Direktwegs                                │
+│  OrderGroundingStep → DirectWriterExecutor → Prüfungen (höchstens│
+│  zwei Durchgänge) → MarkdownFinalizer → Bericht                  │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  Persistenz: Postgres über EF Core; Dateien auf einem Volume     │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## Solution-Struktur
@@ -62,703 +50,395 @@
 ```
 Geef.Atelier.slnx
 ├── src/
-│   ├── Geef.Atelier.Core/           // Domain-Records, Interfaces (IRunRepository,
-│   │                                // IRunPersistenceService), Pipeline-Konfig-Records
-│   ├── Geef.Atelier.Application/    // IRunService-Vertrag + RunService-Implementierung,
-│   │                                // ApplicationServiceExtensions (AddAtelierApplication)
-│   ├── Geef.Atelier.Infrastructure/ // EF Core, LLM-Clients (OpenAiCompatibleClient),
-│   │                                // EventSink, Provider-Implementierungen, Repositories,
-│   │                                // Finalizers/ (4 Executor-Implementierungen),
-│   │                                // FormatConverters/ (Markdig, QuestPDF, OpenXml, PlaintextStripper)
-│   ├── Geef.Atelier.Web/            // Blazor Server: UI + BackgroundService
-│   │                                // (RunOrchestratorService), DI-Composition
-│   └── Geef.Atelier.Mcp/            // Class Library: MCP-Tool-Definitionen,
-   │                                // gehostet im Web-Projekt (shared DI, shared Container)
+│   ├── Geef.Atelier.Core/           // Domain-Records, Regeln ohne LLM und Datenbank,
+│   │                                // Konfigurationsklassen, Repository-Verträge
+│   ├── Geef.Atelier.Application/    // Dienste: Aufträge, Läufe, Klärung, Quellen, Profil,
+│   │                                // Provider, Modellzuweisung, Auth, OAuth
+│   ├── Geef.Atelier.Infrastructure/ // EF Core, LLM-Clients, Modell-Katalog, Pipeline des
+│   │                                // Direktwegs, Klärungs-Worker, Recherche (Websuche),
+│   │                                // Textextraktion, Auftragsexport, Event-Sink
+│   ├── Geef.Atelier.Web/            // Blazor-Server-UI, HTTP-Endpunkte, Orchestrator,
+│   │                                // DI-Zusammenbau
+│   └── Geef.Atelier.Mcp/            // Klassenbibliothek: MCP-Werkzeuge, Server-Hinweise,
+│                                    // Skill; gehostet im Web-Projekt
 ├── tests/
-│   └── Geef.Atelier.Tests/          // xUnit; EndToEnd/ = Ende-zu-Ende-Gerüst (D-067)
-└── tools/
-    └── Eval/                        // Python-Messwerkzeug, blinder Paarvergleich (D-067)
+│   └── Geef.Atelier.Tests/          // xUnit; EndToEnd/ = Ende-zu-Ende-Tests
+└── tools/                           // Eval (Python), IntakeEval, FactCheckEval, ResearchEval,
+                                     // HashPassword
 ```
 
-**Begründung der Aufteilung:**
+- **Core** braucht weder Datenbank noch LLM, seine Regeln sind deshalb für sich testbar.
+- **Application** enthält die Anwendungsfälle und hängt nur von Core ab.
+- **Infrastructure** kapselt die externen Abhängigkeiten (Postgres, LLM-APIs, Websuche, Geef SDK).
+- **Web** ist der einzige Host. **Mcp** ist eine Klassenbibliothek ohne eigenen Host: Der Endpunkt `/mcp` liegt im
+  Web-Projekt, teilt dessen DI-Container und ruft dieselben Dienste auf, ohne HTTP-Sprung dazwischen.
 
-- **Core** ist LLM-frei und persistenz-frei — enthält nur Records, Interfaces, Domain-Logik. Damit testbar ohne Infrastruktur.
-- **Infrastructure** kapselt alle externen Abhängigkeiten (Postgres, LLM-APIs, Geef SDK). Provider-Implementierungen leben hier, weil sie LLM-Clients und Repositories brauchen.
-- **Web** hostet die UI, den `BackgroundService` und die `IRunService`-Implementierung. Letztere könnte später in ein eigenes Projekt wandern, ist aber im Skeleton hier am praktischsten.
-- **Mcp** ist eine **Class Library** (kein eigener Host). Sie enthält alle MCP-Tool-Definitionen. Der MCP-Endpoint lebt im `Web`-Projekt (Pfad `/mcp`), das `Geef.Atelier.Mcp` referenziert und die Tools im selben DI-Container registriert. Vorteile: kein zweiter Host-Prozess, `IRunService` und alle Singletons (SignalR, DbContext) werden direkt geteilt, kein HTTP-Hop zwischen MCP und Application Layer.
+## Aufträge und Quellen (D-069, D-070)
+
+| Tabelle | Inhalt |
+|---|---|
+| `Orders` | Das Anliegen der Person im Wortlaut, Modus (`Direct`/`Careful`), Eingang (`Web`/`Mcp`/`Legacy`), Zustand (`Analyzing`, `NeedsInput`, `Ready`, `Cancelled`), Eigentümer, der Verlauf der Fragen und Antworten, das Rechercheergebnis |
+| `Sources` | Eine hochgeladene Datei: extrahierter Text mit Seitenmarken (`[[page N]]`), Zähler, Qualität, Warnungen, Pfad des aufbewahrten Originals, Ablauf, solange kein Auftrag sie verwendet |
+| `OrderSources` | Welche Quelle zu welchem Auftrag gehört, mit Rolle, Position und Seitenauswahl (`1-40,55`) |
+| `RunSourceUsages` | Welche Datei in welchen Lauf ging, in welcher Form (`FullText`, `FullTextWithMap`) und mit wie vielen Zeichen |
+
+`Runs.OrderId`/`Runs.OrderVersion` verbinden einen Lauf mit seinem Auftrag. `OrderService` (Application) prüft und legt
+Aufträge an; `OrderStateResolver` (Core) leitet den Anzeigezustand nur aus `Orders.State` und dem aktuellen Lauf ab. Die
+Größengrenzen kommen aus `SourceBudgetPlanner.Classify`, das Startseite, Auftragsdienst und der Quellenblock des Schreibers
+(`SourceBlockRenderer`) gemeinsam nutzen. Der Text wird in einem eigenen, im Speicher begrenzten Prozess aus den Uploads
+gelesen (`Sources:ExtractionMode = Isolated`).
+
+**Vom Anliegen zum Lauf.** Ein Auftrag startet entweder sofort mit seinem ersten Lauf oder, wenn für ihn Rückfragen
+eingeschaltet sind (`Orders:IntakeMode = On`), im Zustand `Analyzing`: Der `OrderIntakeWorker` lässt den Klärer
+(`LlmClarifier`) das Anliegen lesen, das `QuestionGate` behält höchstens drei kurze Fragen, und der Auftrag wartet in
+`NeedsInput`, bis die Person antwortet oder überspringt (oder die Frist `Intake:NeedsInputAutoStartAfter` abläuft). Fragen
+gibt es nur vor dem Schreiben, nie währenddessen.
+
+**Einen fertigen Text ändern** („Change something“, `revise_order`) fügt einen Lauf als nächste Version hinzu. Er wird mit
+dem Text der gezeigten Version vorbelegt (`Runs.SeedDraftText`, `Runs.ParentRunId`) und trägt den Wunsch der Person in
+`Runs.RevisionHint`.
+
+## Die Pipeline des Direktwegs
+
+Es gibt zwei Zusammenstellungen, beide nur im Code (`SystemCrew`):
+
+| Zusammenstellung | Wann | Schreiber und Prüfungen |
+|---|---|---|
+| `direct` | jeder Auftrag im Modus `Direct` | Schreiber, automatische Prüfungen ohne Modell (`DeterministicChecksReviewer`), Faktenprüfung (`SourceFactCheckReviewer`); höchstens zwei Durchgänge, also höchstens eine Korrektur |
+| `direct-outline` | jeder Auftrag im Modus `Careful` („Extra careful“, D-087) | wie oben, davor ein Planungsaufruf (`WritingPlanner`: Abschnitte mit Wortbudgets), dazu nach der ersten Fassung die Prüfung der ausdrücklichen Anforderungen (`RequirementsCheckReviewer`) |
+
+`Careful` wird nur angenommen, solange „Extra careful“ der Person angeboten wird (`Orders:CarefulOutline`, Standard `Off`,
+Ausnahmen in `Orders:CarefulOutlineOverrides`). Ein als sorgfältig angenommener Auftrag läuft immer als `direct-outline`,
+nie stillschweigend als etwas anderes.
+
+`IPipelineAssembler` hat genau einen produktiven Assembler, den `DirectPipelineAssembler`; der `PipelineAssemblerSelector`
+weist jeden Lauf ab, den keiner annimmt (siehe [Altdaten](#altdaten-läufe-entfernter-arbeitsweisen)).
+`AtelierPipelineFactory` baut die Geef-Pipeline aus dem Snapshot des Laufs:
+
+1. **`OrderGroundingStep`** lädt den Auftrag und seine Dateien, setzt die Dateien in das Hintergrunddokument, liest die im
+   Anliegen genannten Regeln, schreibt die `RunSourceUsages`, bereitet das Material der Faktenprüfung vor und legt den
+   Modus der Faktenprüfung des Laufs fest (`Runs.FactCheckMode`). Für die erste Version eines Auftrags im Modus `Direct` ohne Dateien fragt
+   er den `OrderResearchService` nach Stellen aus dem Web (Tavily; Schalter `Research:Mode`). Dieser Grounding-Schritt
+   zusammen mit der Web-Recherche ist das einzige Grounding.
+2. **`DirectWriterExecutor`** schreibt den Text. Mit einem CLI-Provider schreibt er in ein Dokument (`draft.md`) und bittet
+   das Gateway, nicht auf eine andere CLI auszuweichen. In einem Korrekturdurchgang bekommt er nur die blockierenden Befunde
+   des vorigen Durchgangs. Notizen des Schreibers (Annahmen, offene Punkte) werden vom Text getrennt. Eine leere oder
+   unveränderte Antwort wird nie angenommen.
+3. **Prüfungen** laufen nach jedem Durchgang. Welche Befunde die Korrektur auslösen dürfen, hängt von der Prüfung und von
+   `Direct:FactCheckMode` ab (`Off`, `Shadow`, `Report`, `On`; D-073).
+4. **`MarkdownFinalizer`** liefert den Text. Bestehen die Prüfungen in den erlaubten Durchgängen nicht, wird der
+   Best-Effort-Text des SDK mit seinen offenen Punkten geliefert.
+5. **Bericht:** Der `DirectReportBuilder` baut den `RunReport` (Vorgaben, Prüfergebnisse des gelieferten Textes,
+   Platzhalter, verwendete Dateien, Lesebeleg, Notizen); er wird in `Runs.ReportJson` abgelegt, bevor das Ergebnis
+   (`Outcome`) gesetzt wird. Die Sätze „What was checked“ der Webseite und von `get_order_result` stammen daraus.
+
+**Konvergenzregel:** `DefaultConvergencePolicy` aus dem Abschnitt `Convergence` (`ConvergenceOptions`), überschrieben von
+der Zusammenstellung (beide: zwei Durchgänge, kein Abbruch bei einem kritischen Befund, keine Regressionserkennung). Ein
+Reviewer, der technisch ausfällt, blockiert nicht; der Lauf bekommt eine Warnung.
+
+## Lauf-Orchestrator
+
+`RunOrchestratorService` (im Web-Projekt) fragt die Datenbank alle `Orchestrator:PollingInterval` (2 s) ab, führt höchstens
+`Orchestrator:MaxConcurrentRuns` (5) Läufe gleichzeitig aus und nimmt nur Läufe im Status `Pending` **mit** Snapshot, jeden
+mit einem atomaren Wechsel auf `Running`. Er setzt **genau eine Instanz** voraus: Die Crash-Wiederherstellung beim Start
+setzt jeden laufenden Lauf zurück.
+
+Für jeden Lauf liest er den Snapshot streng, wählt den Assembler, führt die Pipeline mit dem `PostgresEventSink` aus
+(Ereignisse, Durchgänge, Befunde, Status und Text; Live-Updates über `IRunNotifier`), speichert die Kosten, lässt den
+Assembler den Bericht schreiben und setzt dann das Ergebnis. Ein Wächter fragt `Runs.CancellationRequested` ab; Abbruch
+durch die Person oder ein Stopp des Dienstes enden als `Aborted`. Ein unerwarteter Fehler endet als `Failed` mit einem von
+wenigen festen, einfachen Sätzen; die Einzelheiten gehen nur ins Log.
+
+**Crash-Wiederherstellung beim Start:** Jeder Lauf, der noch `Running` ist, wird `Failed` („Service restarted“);
+`Pending`-Läufe ohne Snapshot, die älter sind als diese Instanz, werden `Failed`; Läufe mit Endstatus, aber ohne `Outcome`
+(beim Speichern ihres Ergebnisses gestoppt) bekommen ein Ergebnis und eine Warnung (siehe unten).
+
+### Altdaten: Läufe entfernter Arbeitsweisen
+
+Die Datenbank behält jede Tabelle und Spalte (keine `DROP`-Migration), damit das vorige Image sie weiter lesen kann. Deshalb
+tragen neue Snapshots weiterhin eine (leere) Liste `advisors`.
+
+- Abgeschlossene Läufe und Aufträge der entfernten Wege bleiben lesbar: Listen, „My work“, Auftragsseite, Ergebnis, Export
+  und die technische Laufseite, die den Namen der Zusammenstellung zeigt und sagt, dass sie zu einer Arbeitsweise gehört,
+  die es nicht mehr gibt.
+- Ein wartender Lauf einer entfernten Zusammenstellung (alte Prüfschleife, zusammengestelltes Team, Learning-Lauf) schlägt
+  fehl mit „This task was set up for a way of working that no longer exists, so it cannot run. Please start it again.“
+- „Resume“ wird für einen solchen Lauf abgelehnt („This task was set up for a way of working that no longer exists, so it
+  cannot be continued. Please start it again.“).
+- Ein Snapshot, der eine Prüfung nennt, die es in dieser Version nicht mehr gibt, lässt den Lauf ebenfalls mit einem
+  einfachen Satz fehlschlagen.
+- Wird ein alter „Extra careful“-Auftrag neu gestartet, während die Option nicht angeboten wird, füllt die Startseite das
+  Anliegen ohne sie aus, sagt das, und nichts läuft, bevor die Person es abschickt.
+- Crash-Wiederherstellung und Aufräumen behandeln alte Läufe wie alle anderen. `RunKind` behält die Werte `Learning` und
+  `CrewComposition`, damit alte Zeilen gelesen werden können.
+
+## Zusammenstellungen, Snapshots und Modelle
+
+Jeder Lauf speichert einen `CrewSnapshot` (JSON in `Runs.CrewSnapshot`): Schemaversion, Name der Zusammenstellung, das
+vollständige Schreiberprofil, die Prüfprofile, die Auswertungsstrategie und die Konvergenz-Überschreibung. `ICrewService`
+baut ihn aus den Profilen, die nur im Code stehen: Die Modellmatrix (`ModelMatrix`, `IModelAssignmentService`, D-066) weist
+jeder Rolle mit Slot ein Modell zu, und Modell-Aliasse werden zu konkreten IDs aufgelöst. Von Nutzern änderbare Profile oder
+Vorlagen gibt es nicht mehr. Die Anforderungsprüfung hat keinen Slot und behält eine feste Bindung, auf einem anderen Modell
+als der Schreiber.
 
 ## Datenmodell
 
-Stand Mai 2026 umfasst das Schema **28 Tabellen**, hand-geschriebene Migrationen
-`InitialCreate` + `Step06`/`Step09`–`Step30`. Gruppiert:
+Die Migrationen sind handgeschrieben (`InitialCreate` und die Reihe `StepNN`). Das EF-Core-Modell bildet diese Tabellen ab:
 
-| Gruppe | Tabellen | Eingeführt |
-|---|---|---|
-| Run-Kern | `Runs`, `Iterations`, `Findings`, `Events` | InitialCreate |
-| Crew/Profile | `ReviewerProfiles`, `ExecutorProfiles`, `CrewTemplates` | Step10 |
-| Advisor | `AdvisorProfiles`, `AdvisorConsultations` | Step11 |
-| Grounding | `GroundingProviderProfiles`, `GroundingConsultations` | Step13 |
-| Vector-Store/RAG | `KnowledgeDocuments`, `KnowledgeDocumentChunks` | Step14 |
-| Cost-Tracking | `IterationActorCosts` | Step16 |
-| Template Studio (Code in Stufe 8c entfernt, D-089; Tabellen bleiben) | `TemplateStudioAnalyses`, `StudioSettings` | Step17, Step33 |
-| Multi-User | `Users` | Step20 |
-| OAuth 2.1 | `OAuthClients`, `OAuthAuthorizationCodes`, `OAuthAccessTokens`, `OAuthRefreshTokens`, `OAuthAuditLog` | Step19 |
-| Finalizer | `FinalizerProfiles`, `RunArtifacts`, `FinalizationActorCosts` | Step22 |
-| Learning | `LearningEntries` | Step30 |
+| Gruppe | Tabellen |
+|---|---|
+| Aufträge und Dateien | `Orders`, `Sources`, `OrderSources`, `RunSourceUsages`, `UploadTickets`, `SourceRefusals` |
+| Läufe | `Runs`, `Iterations`, `Findings`, `Events`, `RunWarnings`, `IterationActorCosts` |
+| Klärung und Profil | `OrderIntakeShadows`, `UserProfiles` |
+| Konten und Einstellungen | `Users`, `Providers`, `SiteSettings` |
+| OAuth 2.1 | `OAuthClients`, `OAuthAuthorizationCodes`, `OAuthAccessTokens`, `OAuthRefreshTokens`, `OAuthAuditLog` |
 
-Die vier Run-Kern-Tabellen sind nachfolgend im Detail dokumentiert; die übrigen
-Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-decisions-log_de.md)
-(D-028 ff.) beschrieben. `Runs` trägt zusätzlich Spalten aus späteren Migrationen
-(`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted` (seit D-089 nicht mehr zugeordnet),
-`FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`, `Kind`, `ParentCompositionRunId`,
-`Outcome`, `DeliveredIteration`, `ReportJson`, `OrderId`, `OrderVersion`). Migration Step47 (D-067) ergänzt die
-Tabelle `RunWarnings` und die Spalten `Outcome`, `DeliveredIteration` und `ReportJson`; Step48 (D-069) ergänzt
-`OrderId` und `OrderVersion`.
+**Tabellen entfernter Teile.** Sie sind nicht mehr abgebildet, **bleiben aber in der Datenbank** bis zu einem eigenen
+Aufräumschritt, der nicht zu Etappe 8d gehört und sie entfernen darf: `AdvisorConsultations`, `AdvisorProfiles`,
+`CrewTemplateEmbeddings`, `CrewTemplates`, `ExecutorProfiles`, `FinalizationActorCosts`, `FinalizerProfiles`,
+`GroundingActorCosts`, `GroundingConsultations`, `GroundingProviderProfiles`, `KnowledgeDocumentChunks`,
+`KnowledgeDocuments`, `LearningEntries`, `ReviewerProfiles`, `RunArtifacts`, `StudioSettings`, `TemplateStudioAnalyses`,
+`mcp_server_configs`, `specialization_packs`, `tool_definitions`, `tool_invocations`. Derselbe Schritt darf die nicht
+abgebildeten Spalten `Runs.GroundingCostEur`, `Runs.FinalizerCostEur`, `Runs.FinalizerErrorMessage` und
+`Iterations.AdvisorsTotalCostEur` entfernen (später vielleicht auch `Orders.CrewTemplateName` und
+`Runs.ParentCompositionRunId`), außerdem alte Kompositions- und Learning-Läufe sowie das frühere Export-Volume.
+`Runs.AdvisorRetryAttempted` ist ebenfalls nicht abgebildet. Weil einige dieser Tabellen Vektorspalten enthalten, nutzen die
+Compose-Dateien weiterhin ein Postgres-Image mit `pgvector`.
 
 ### Runs
 
 | Spalte | Typ | Bemerkung |
 |---|---|---|
 | Id | uuid (PK) | |
-| CreatedAt | timestamptz | |
-| StartedAt | timestamptz | nullable |
-| CompletedAt | timestamptz | nullable |
+| CreatedAt / StartedAt / CompletedAt | timestamptz | die letzten beiden nullable |
 | Status | varchar(50) | Pending / Running / Completed / Failed / Aborted |
-| BriefingText | text | |
-| ConfigJson | jsonb | Modell-Auswahl, Budget — als Snapshot bei Erstellung |
-| FinalText | text | nullable, gesetzt wenn Status=Completed |
-| ErrorMessage | text | nullable, gesetzt wenn Status=Failed |
-| TokensTotal | int | accumuliert über alle LLM-Calls |
-| CostTotal | numeric(10,4) | accumuliert |
-| CancellationRequested | bool | true wenn User den Run abbrechen möchte |
-| CrewTemplateName | varchar(100) | nullable; Name des Templates (z.B. `"klassik"`). Null = Custom-Crew-Submit. |
-| CrewSnapshot | jsonb | nullable; vollständig eingebetteter CrewSnapshot zum Zeitpunkt des Submits. |
-| AdvisorRetryAttempted | bool | NOT NULL DEFAULT false; nie geschrieben. Seit Stufe 8c (D-089) nicht mehr im Modell zugeordnet; die Spalte bleibt. |
-| CreatedByUser | text | nullable; Username des erstellenden Nutzers (Run-User-Isolation, D-042). Index `IX_Runs_CreatedByUser` (Step21). |
-| FinalizerCostEur | numeric(10,6) | nullable; akkumulierte Kosten aller Transform-Finalizer-LLM-Calls (Step22). |
-| FinalizerErrorMessage | text | nullable; Fehlermeldung, wenn die Finalizer-Kette teilweise oder vollständig fehlschlug (Step22). |
-| ParentRunId | uuid (FK→Runs) | nullable; selbstreferenziell, kein Cascade — gesetzt, wenn dieser Run aus einem anderen Run fortgesetzt wurde (Step23). |
-| SeedDraftText | text | nullable; letzter Artifact-Text aus der Abschluss-Iteration des Parent-Runs, der als Seed für Iteration 1 dieses Runs verwendet wurde (Step23). |
-| Kind | int | `0 = Standard` (Standard), `1 = Learning` — steuert die beiden Learning-Finalizer; bestehende Rows defaulten auf Standard (Step30). |
-| Outcome | int | nullable; was der Lauf geliefert hat: `0 = Converged`, `1 = DeliveredWithOpenPoints`, `2 = Failed`, `3 = Aborted` (Step47). `NULL`, solange der Lauf aktiv ist, und bei Läufen, die vor Step47 endeten. Siehe [Lauf-Ergebnis](#lauf-ergebnis-outcome-und-runstatus). |
-| DeliveredIteration | int | nullable; Iteration, deren Text ausgeliefert wurde (Step47). |
-| ReportJson | jsonb | nullable; Ergebnisbericht des Direktwegs (`RunReport`, Schema 1: Vorgaben, Prüfergebnisse des ausgelieferten Textes, Platzhalter, genutzte Dateien, Lesebeleg, Vermerke), geschrieben vor dem Ausgang (Step47). `NULL` bei Läufen der anderen Wege. |
-| OrderId | uuid (FK→Orders) | nullable; Auftrag, zu dem der Lauf gehört, `ON DELETE CASCADE` (Step48). `NULL` bei Läufen ohne Auftrag. Index `IX_Runs_OrderId_OrderVersion`. |
-| OrderVersion | int | nullable; Fassung des Auftrags, die der Lauf liefert (Step48). Je Auftrag eindeutig für Standardläufe (`UX_Runs_OrderId_OrderVersion_Standard`, `Kind = 0`). |
+| BriefingText | text | das Briefing, das der Schreiber bekommt |
+| ConfigJson | jsonb | beim Anlegen gespeicherte Konfiguration |
+| FinalText | text | nullable; der gelieferte Text |
+| WordCount | int | nullable; Wörter von `FinalText` |
+| ErrorMessage | text | nullable; ein fester, einfacher Satz für die Person |
+| TokensTotal | int | über die LLM-Aufrufe summiert |
+| CostTotal, TotalCostEur, LlmCostEur | numeric | die letzten beiden nullable; Kostenerfassung |
+| CachedInputTokens, ReasoningTokens | int | nullable; Teilmengen der Tokens |
+| CancellationRequested | bool | gesetzt, wenn die Person abbrechen will |
+| CreatedByUser | text | nullable; Eigentümer (Trennung nach Nutzern, D-042) |
+| CrewTemplateName | varchar(200) | nullable; Name der Zusammenstellung (`direct`, `direct-outline` oder bei alten Läufen eine entfernte) |
+| CrewSnapshot | jsonb | nullable; der Snapshot der Zusammenstellung |
+| Kind | int | `0 = Standard`; `1 = Learning` und `2 = CrewComposition` gibt es nur in alten Zeilen |
+| ParentRunId | uuid | nullable; der Lauf, den dieser fortsetzt oder ändert |
+| SeedDraftText | text | nullable; Text, von dem der erste Durchgang ausgeht |
+| RevisionHint | text | nullable; die gewünschte Änderung |
+| ParentCompositionRunId | uuid | nullable; nur in alten Zeilen |
+| Outcome | int | nullable; `0 = Converged`, `1 = DeliveredWithOpenPoints`, `2 = Failed`, `3 = Aborted`. Siehe [Lauf-Ergebnis](#lauf-ergebnis-outcome-und-runstatus) |
+| DeliveredIteration | int | nullable; Durchgang, dessen Text geliefert wurde |
+| ReportJson | text | nullable; der `RunReport` des Direktwegs |
+| OrderId | uuid (FK→Orders) | nullable; `ON DELETE CASCADE`. Index `IX_Runs_OrderId_OrderVersion` |
+| OrderVersion | int | nullable; je Auftrag eindeutig für Standardläufe (`UX_Runs_OrderId_OrderVersion_Standard`) |
+| FactCheckMode | varchar(20) | nullable; der Modus der Faktenprüfung des Laufs |
 
-### RunWarnings (Step47)
+### RunWarnings
 
-Probleme, die ein Lauf umgangen hat, statt anzuhalten (D-067). Werden mit dem Lauf gelöscht (`ON DELETE CASCADE`).
-
-| Spalte | Typ | Bemerkung |
-|---|---|---|
-| Id | uuid (PK) | |
-| RunId | uuid (FK→Runs) | Index `IX_RunWarnings_RunId` |
-| Iteration | int | nullable; Iteration, in der das Problem auftrat |
-| Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `finalizer` oder `run` (Konstanten in `RunWarningSources`) |
-| Code | varchar(100) | stabiler maschinenlesbarer Code, z. B. `grounding.provider_skipped`, `grounding.scope_unknown`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed`, `run.result_not_saved`, `run.restarted_while_finishing` (Konstanten in `RunWarningCodes`) |
-| Message | text | kurze, einfache englische Erklärung für den Anwender |
-| CreatedAt | timestamptz | |
-
-### Iterations
+Probleme, die ein Lauf umgangen hat, statt anzuhalten (D-067). Werden mit dem Lauf gelöscht.
 
 | Spalte | Typ | Bemerkung |
 |---|---|---|
 | Id | uuid (PK) | |
-| RunId | uuid (FK) | |
-| IterationNumber | int | 1-basiert |
-| ArtifactText | text | Snapshot des Textes nach dieser Iteration |
+| RunId | uuid (FK→Runs) | indiziert |
+| Iteration | int | nullable; Durchgang, in dem das Problem auftrat |
+| Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `run`, `intake` oder `fact-check` (`RunWarningSources`) |
+| Code | varchar(100) | stabiler maschinenlesbarer Code, z.B. `grounding.research_failed`, `grounding.source_warning`, `review.reviewer_failed`, `llm.failover`, `writer.partial_read`, `run.result_not_saved`, `run.restarted_while_finishing` (`RunWarningCodes`, `DirectWarningCodes`). Alte Zeilen können Codes entfernter Teile tragen; sie behalten ihren Text und werden weiter angezeigt |
+| Message | text | kurze, einfache englische Erklärung für die Person |
 | CreatedAt | timestamptz | |
 
-### Findings
-
-| Spalte | Typ | Bemerkung |
-|---|---|---|
-| Id | uuid (PK) | |
-| IterationId | uuid (FK) | |
-| ReviewerName | varchar(200) | |
-| Severity | enum | Critical / Major / Minor / Info |
-| Message | text | |
-| CreatedAt | timestamptz | |
-
-### Events
-
-| Spalte | Typ | Bemerkung |
-|---|---|---|
-| Id | bigint (PK, identity) | |
-| RunId | uuid (FK) | |
-| EventType | varchar(100) | aus Geef-EventSink-Vokabular |
-| PayloadJson | jsonb | |
-| CreatedAt | timestamptz | |
-
-**Indices:**
-- `Runs.Status` (für Background-Polling)
-- `Events.RunId` (für Detail-View)
-- `Iterations.RunId` (für Detail-View)
-
-### FinalizerProfiles (Step22)
-
-| Spalte | Typ | Bemerkung |
-|---|---|---|
-| Name | varchar(100) (PK) | |
-| DisplayName | varchar(200) | |
-| Description | text | nullable |
-| FinalizerType | int | `0 = FileExport` / `1 = MetadataEnrich` / `2 = ExternalSink` (in Stufe 8c ausgemustert, D-089) / `3 = Transform` / `4 = LearningExtract` / `5 = LearningPublish` |
-| Settings | jsonb | typspezifische Konfiguration |
-| IsSystem | bool | true für eingebaute System-Profile |
-| CreatedAt | timestamptz | |
-| UpdatedAt | timestamptz | |
-
-### RunArtifacts (Step22)
-
-| Spalte | Typ | Bemerkung |
-|---|---|---|
-| Id | uuid (PK) | |
-| RunId | uuid (FK→Runs ON DELETE CASCADE) | |
-| FinalizerProfileName | varchar(100) | Name des Finalizer-Profils, das dieses Artifact erzeugt hat |
-| ArtifactType | enum | `File` / `Url` / `Status` |
-| Filename | text | nullable; Dateiname für File-Artifacts |
-| ContentType | text | nullable; MIME-Typ für File-Artifacts |
-| SizeBytes | bigint | nullable; Byte-Größe für File-Artifacts |
-| StorageUri | text | Pfad oder URL zum gespeicherten Artifact |
-| StatusMessage | text | nullable; lesbare Status- oder Fehlermeldung |
-| CreatedAt | timestamptz | |
-
-### FinalizationActorCosts (Step22)
-
-| Spalte | Typ | Bemerkung |
-|---|---|---|
-| Id | uuid (PK) | |
-| RunId | uuid (FK→Runs ON DELETE CASCADE) | |
-| ActorName | varchar(200) | Name des Transform-Finalizer-Akteurs |
-| ModelName | varchar(200) | verwendetes LLM-Modell |
-| InputTokens | int | |
-| OutputTokens | int | |
-| CostEur | numeric(10,6) | nullable |
-| CreatedAt | timestamptz | |
-
-### Neue Spalten auf bestehenden Tabellen (Step22 — Finalizer-Foundation)
-
-| Tabelle | Spalte | Typ | Bemerkung |
-|---|---|---|---|
-| `CrewTemplates` | `FinalizerProfileNames` | jsonb | geordnetes Array von Finalizer-Profil-Name-Strings |
-| `CrewTemplates` | `RunFinalizersOnMaxAttempts` | bool | Standard false; wenn true, laufen Finalizer auch bei Convergence-Failure |
-
-### Neue Spalten auf bestehenden Tabellen (Step23 — Run-Resume)
-
-Siehe `Runs`-Tabelle oben (`ParentRunId`, `SeedDraftText`).
-
-### FinalizerProfiles — Typwerte (Step22 + Step30)
-
-| `FinalizerType`-Wert | Bedeutung | Eingeführt |
-|---|---|---|
-| `0` — `FileExport` | Schreibt den Abschlusstext in eine Datei im konfigurierten Format (md, html, pdf, docx, txt, json) | Step22 |
-| `1` — `MetadataEnrich` | Reichert Run-Metadaten an (Tags, Titelextraktion, …) | Step22 |
-| `2` — `ExternalSink` | In Stufe 8c ausgemustert (D-089): schickte den Abschlusstext an einen Webhook oder eine E-Mail-Adresse; bleibt `[Obsolete]`, damit gespeicherte Zeilen und Snapshots lesbar bleiben, Läufe überspringen ihn mit einer Warnung | Step22 |
-| `3` — `Transform` | Wendet einen LLM-Transformations-Pass auf den Text an (Zusammenfassung, Übersetzung, …) | Step22 |
-| `4` — `LearningExtract` | Extrahiert strukturierte Learnings aus einem abgeschlossenen Run und stößt fire-and-forget einen Learning-Evaluation-Gate-Run an (opt-in; an kein Standard-Template angehängt) | Step30 |
-| `5` — `LearningPublish` | Veröffentlicht genehmigte Learning-Kandidaten im Learning-Store oder markiert abgelehnte. Läuft innerhalb der `learning-evaluation`-Crew | Step30 |
-
-### LearningEntries (Step30)
-
-Der Learning-Store. Physisch getrennt von der kuratierten Wissensbasis (`KnowledgeDocuments`) — ein konstitutiver Schutzmechanismus gegen Model Collapse.
-
-| Spalte | Typ | Bemerkung |
-|---|---|---|
-| Id | uuid (PK) | |
-| Text | text | Der kondensierte, gate-genehmigte Lerntext |
-| SourceRunId | uuid (FK→Runs ON DELETE SET NULL) | Der Standard-Run, der die Extraktion ausgelöst hat |
-| LearningRunId | uuid (FK→Runs ON DELETE SET NULL) | nullable; der Learning-Evaluation-Run, der diesen Eintrag genehmigt/abgelehnt hat |
-| Domain | text | Template-Name des Quell-Runs — für Domänen-Boost-Retrieval |
-| Status | int | `0 = Proposed`, `1 = Approved`, `2 = Rejected` |
-| StructuredFactsJson | text | Maschinen-lesbares JSON der rohen Run-Fakten, vom Extraktor zusammengestellt |
-| OwnerUsername | text | Geerbt vom `CreatedByUser` des Quell-Runs |
-| CreatedAt | timestamptz | |
-| ApprovedAt | timestamptz | nullable; gesetzt, wenn der Publisher den Eintrag als Approved markiert |
-| Embedding | vector(1536) | nullable; berechnet von `IEmbeddingProvider` zum Genehmigungszeitpunkt; als pgvector gespeichert |
-
-**Indizes:**
-- `IX_LearningEntries_Domain_Status` — Composite-BTree für gefilterte Listen-Queries
-- `IX_LearningEntries_Embedding_HNSW` — HNSW-Index mit `vector_cosine_ops` für Cosine-Similarity-Retrieval
-
-**pgvector Raw-SQL-Pattern:** `Pgvector.EFCore` 0.3.0 ist mit Npgsql 10.x inkompatibel — ein string-Value-Converter führt beim INSERT zu `42804: column is of type vector but expression is of type character varying`. Die `Embedding`-Spalte wird daher **von EF Core ignoriert** (`builder.Ignore(e => e.Embedding)` in `LearningEntryConfiguration`); alle Insert- und Cosine-Search-Operationen nutzen raw ADO.NET mit `NpgsqlParameter(NpgsqlDbType.Vector)` — identisch mit dem `VectorSearchRepository`-Muster (D-036). Behoben in D-055 Folgefix 2.
-
-### Neue Spalten auf bestehenden Tabellen (Step30 — Continuous Learning)
-
-| Tabelle | Spalte | Typ | Bemerkung |
-|---|---|---|---|
-| `Runs` | `Kind` | int | `0 = Standard` (Standard), `1 = Learning` |
-
-## Crew-System (PS-5)
-
-Jeder Run verwendet eine **Crew** aus Executor + Reviewers. Profile sind wiederverwendbare Konfigurationsbausteine.
-
-### Neue Tabellen (Migration Step10 + Step11)
-
-| Tabelle | Migration | Inhalt |
-|---|---|---|
-| `ReviewerProfiles` | Step10 | Custom Reviewer-Profile (System-Profile leben als Code-Konstanten in `SystemCrew`). |
-| `ExecutorProfiles` | Step10 | Custom Executor-Profile. |
-| `CrewTemplates` | Step10 | Custom Crew-Templates. |
-| `AdvisorProfiles` | Step11 | Custom Advisor-Profile. |
-| `AdvisorConsultations` | Step11 | Persistierte Advisor-Outputs pro Iteration. |
-| Spalten `ModelSlot`/`ModelDomain` (Executor/Reviewer/Advisor), `Domain` (CrewTemplates) | Step46 | Modellmatrix (D-066): Rolle und Gebiet; verwaltete Profile bekommen ihr Modell beim Snapshot-Bau aus `ModelMatrix` (`IModelAssignmentService`, Application). Nullable `varchar(40)`, toleranter Enum-Konverter. |
-
-### ProfileBasedReviewer / ProfileBasedExecutor
-
-Ersetzen die alten `LlmReviewer` / `LlmExecutionStep`. Verwenden `ILlmClientResolver.ForProfile(provider, model, maxTokens?)` statt Actor-basierter Auflösung.
-
-### EvaluationStrategies
-
-Alle vier Strategien via Geef-SDK: `Parallel`, `Sequential`, `FailFast`, `PriorityOrdered`.
-
-Weitere Details: [`08-crew-system.md`](08-crew-system_de.md).
-
-## Advisor-Pipeline-Schicht (PS-7)
-
-Advisors werden als Decorator um `IExecutionStep` realisiert. Der `AdvisorAwareExecutor` schiebt sich transparent vor jeden Executor-Aufruf, ohne das Geef-SDK zu modifizieren (D-031(a)).
-
-### Decorator-Kette
-
-```
-AtelierPipelineFactory
-  └── AdvisorAwareExecutor (IExecutionStep-Decorator)
-        1. Filtert Advisors nach Trigger (BeforeFirst / BeforeEvery)
-        2. ProfileBasedAdvisor: LLM-Call (plain text), persistiert AdvisorConsultation
-        3. Schreibt Output → context[AtelierContextKeys.AdvisorBlock]
-        4. Delegiert an ProfileBasedExecutor (echter Execution-Step)
-```
-
-### AtelierContextKeys.AdvisorBlock
-
-Der Advisor-Output landet als einzelner Text-Block im `IRunContext`. Format:
-
-```
-[ADVISOR: briefing-clarifier]
-<Advisor-Output-Text>
-
-[ADVISOR: devils-advocate]
-<Advisor-Output-Text>
-```
-
-Executor-System-Prompt kann diesen Block explizit referenzieren. Mehrere Advisors akkumulieren sequenziell (D-031(d)).
-
-### Convergence-Failure-Retry
-
-Der in D-031(e) geplante einmalige Retry mit `OnConvergenceFailure`-Advisors wurde nie verdrahtet: kein Code schrieb `Runs.AdvisorRetryAttempted`. Seit Stufe 8c (D-089) ist die Spalte nicht mehr im Modell zugeordnet; sie bleibt mit dem Standardwert `false` in der Datenbank.
-
-### DB-Erweiterungen (Migration Step11AdvisorSystem)
-
-| Neu | Inhalt |
-|---|---|
-| `AdvisorProfiles` | Custom Advisor-Profile |
-| `AdvisorConsultations` | Persistierter Advisor-Output pro Iteration (RunId, IterationNumber, AdvisorName, OutputText) |
-| `Runs.AdvisorRetryAttempted` | bool, nie geschrieben; seit D-089 nicht zugeordnet |
-
-Weitere Details: [`08-crew-system.md`](08-crew-system_de.md) → Sektion "Advisor-Pässe (PS-7)".
-
-## Mapping auf GEEF-Provider (PS-7-Stand)
-
-| GEEF-Phase | Provider-Implementierung | Verhalten |
-|---|---|---|
-| Grounding | `BriefingGroundingStep` | Schreibt das Briefing in den Context, keine externen Quellen |
-| Pre-Execution | `AdvisorAwareExecutor` (Decorator) | Konsultiert BeforeFirst/BeforeEvery-Advisors; schreibt AdvisorBlock in Context |
-| Execution | `ProfileBasedExecutor` | LLM-Call mit Profil-SystemPrompt + PreviousFindings + AdvisorBlock; Modell aus `ExecutorProfile` |
-| Evaluation | `ProfileBasedReviewer` × N | N Reviewer aus `CrewSnapshot.Reviewers`; Strategie konfigurierbar |
-| Finalize | `IFinalizerExecutor`-Kette | Läuft nach der Konvergenz. Iteriert `snapshot.Finalizers` der Reihe nach. Jeder `IFinalizerExecutor` erzeugt null oder ein `RunArtifact` (File, Url oder Status). Transform-Finalizer können `currentText` aktualisieren. `RunFinalizersOnMaxAttempts=true` lässt Finalizer auch bei Convergence-Failure laufen. Partial-Success-Vertrag: ein fehlschlagender Finalizer schreibt ein Status-Artifact und die Kette läuft weiter; der Run-Status bleibt Completed. Learning-Finalizer (`LearningExtract`, `LearningPublish`) tragen je einen Rekursions-Guard: Der Extraktor überspringt Learning-Runs, der Publisher überspringt Standard-Runs. |
-
-**Grounding-Provider-Typen (ProviderType-String):**
-
-| `ProviderType` | Implementierung | Bemerkung |
-|---|---|---|
-| `tavily` | `TavilyGroundingProvider` | Tavily-Websuche |
-| `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche über kuratierte `KnowledgeDocuments` (pgvector) |
-| `static-context` | `StaticContextGroundingProvider` | Verbatim-Fixtext; Style-Guides, Glossare |
-| `url-fetch` | `UrlFetchGroundingProvider` | Fetcht eine URL mit SSRF-Guard |
-| `news-search`, `academic-search`, `rest-api` | — | In Stufe 8c ausgemustert (D-089); gespeicherte Profile und ältere Snapshots bleiben lesbar, Läufe überspringen sie mit einer Warnung (`GroundingProviderTypes.Retired`) |
-| `learning-retrieval` | `LearningRetrievalGroundingProvider` | Cosine-Similarity-Suche über `Approved`-`LearningEntries`; Domänen-Boost-Ranking (`finalScore = similarity × sameDomainBoost \| crossDomainPenalty`); Citations nutzen `learning://{id}`-Schema; in Templates nach kuratierten Wissens-Providern platzieren |
-
-**Convergence-Policy:** `DefaultConvergencePolicy` aus `ConvergenceOptions`, überschreibbar per `ConvergencePolicyOverride` im CrewTemplate.
-
-**Evaluation-Strategy:** `Parallel` (Standard). Alle vier Strategien wählbar per Template.
-
-## LLM-Provider-Schicht (umgesetzt in Migration M1 und CLI-Provider-Split, D-017/D-032)
-
-Die LLM-Schicht ist **OpenAI-API-konform** implementiert. Drei konfigurierte Provider (Stand CLI-Provider-Split):
-
-| Provider-Name | Endpoint | Abrechnung |
-|---|---|---|
-| `openrouter` | `https://openrouter.ai/api/v1` | Pay-per-Token |
-| `claude-cli` | `http://cli-proxy:8090/v1/claude` | Claude Subscription |
-| `codex-cli`  | `http://cli-proxy:8090/v1/codex`  | Codex Subscription |
-
-Der `cli-proxy`-Side-Container (FastAPI, Python) stellt zwei explizite Endpunkte bereit, die direkt an die jeweilige CLI routen — ohne Model-Name-Heuristik. Ein Legacy-Endpunkt `/v1/chat/completions` bleibt für Backward-Kompatibilität erhalten und loggt eine Deprecation-Warning.
-
-### Abstraktion
-
-```csharp
-public interface ILlmClient
-{
-    Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken);
-}
-```
-
-`OpenAiCompatibleClient` ist die einzige Implementierung im Skeleton. Weitere OpenAI-kompatible Endpoints (OpenAI direkt, lokales Ollama, Together AI) sind durch Anpassen von `LlmOptions.Endpoint` ansprechbar — ohne Code-Änderung.
-
-### Provider-Konfiguration und Modell-Wahl
-
-> **Hinweis:** Das ursprüngliche flache `Llm.Actors`-Schema (ein fester Modell-Eintrag
-> je Akteur in `appsettings.json`) ist seit dem Crew-System (D-028) abgelöst. Modell-
-> und Provider-Wahl sind heute **datengetrieben** Teil der Reviewer-/Executor-/Advisor-
-> **Profile** (siehe [`08-crew-system.md`](08-crew-system_de.md)), nicht der App-Konfiguration.
-
-`appsettings.json` konfiguriert nur noch die **Provider-Endpunkte** (Multi-Provider,
-D-027/D-032):
-
-```json
-{
-  "Llm": {
-    "Providers": {
-      "openrouter": { "Endpoint": "https://openrouter.ai/api/v1", "ApiKey": "" },
-      "claude-cli": { "Endpoint": "http://cli-proxy:8090/v1/claude", "ApiKey": "" },
-      "codex-cli":  { "Endpoint": "http://cli-proxy:8090/v1/codex",  "ApiKey": "" }
-    }
-  }
-}
-```
-
-API-Key-Override via Environment-Variable, z.B. `Llm__Providers__openrouter__ApiKey`
-bzw. `LLM_OPENROUTER_API_KEY` (Env-Fallback). Welcher Akteur welchen Provider und
-welches Modell nutzt, bestimmt das jeweilige Profil im `CrewSnapshot` des Runs
-(`ILlmClientResolver.ForProfile`). Der Leitstern **Modell-Pluralismus** wird damit
-pro Crew/Template ausgespielt: Reviewer laufen bewusst auf Fremd-Modellen relativ zum
-Executor (Default-System-Crew: Executor `claude-cli`, Reviewer überwiegend `codex-cli`).
-
-### Token-Tracking
-
-`LlmTokenUsage` (`InputTokens`, `OutputTokens`) wird pro Iteration vom `ProfileBasedExecutor`/`ProfileBasedReviewer` in den `IRunContext` gesetzt und von `PostgresEventSink` in `Runs.TokensTotal` akkumuliert (Wire-Namen `prompt_tokens`/`completion_tokens` der OpenAI-API). Seit dem Cost-Tracking (Step16) werden zusätzlich pro Akteur und Iteration die Kosten in `IterationActorCosts` persistiert und in `Runs.CostTotal` aggregiert.
+### Iterations, Findings, Events
+
+- `Iterations`: `RunId`, `IterationNumber`, `ArtifactText` (der Text nach dem Durchgang), Kosten- und Token-Spalten von
+  Schreiber und Prüfungen.
+- `Findings`: `IterationId`, `ReviewerName`, `Severity`, `Message`, optional `Category`, `Code` und `Quote`.
+- `Events`: `RunId`, `EventType` (aus dem Vokabular des Geef-Event-Sinks), `PayloadJson`.
+
+## LLM-Provider-Schicht
+
+Provider sind Zeilen der Tabelle `Providers` (System-Provider wie `openrouter`, `claude-cli` und `codex-cli` sowie
+CLI-Provider, die ein Administrator anlegt); `Llm:ProvidersFallback` in der Konfiguration gilt für einen Namen, den der
+Provider-Dienst nicht kennt. `ILlmClientResolver` liefert einen `ILlmClient`: `OpenAiResponsesClient` für Endpunkte auf
+`api.openai.com`, sonst `OpenAiCompatibleClient`. Der Seitencontainer `cli-proxy` (FastAPI, Python) stellt die Abo-CLIs
+hinter OpenAI-kompatiblen Endpunkten bereit, einen je CLI (zum Beispiel `http://cli-proxy:8090/v1/claude`). Ein Aufruf, der
+nicht auf eine andere CLI wechseln darf, verlangt vom Gateway `x-cli-proxy-failover: same-model` (D-090).
+
+Die Prüfungen laufen bewusst auf anderen Modellen als der Schreiber. Der Tokenverbrauch geht über den Pipeline-Kontext in
+`Runs.TokensTotal`; mit `CostTracking:Enabled` werden die Kosten je Akteur und Durchgang in `IterationActorCosts` abgelegt
+und am Lauf summiert. API-Schlüssel kommen aus Umgebungsvariablen; welche Namen änderbare Konfiguration nennen darf,
+begrenzt eine Positivliste (`EnvReference:Allowed` zusätzlich zu einer eingebauten Liste und dem Präfix `ATELIER_SECRET_*`).
 
 ## Schutzmechanismen am Lauf (D-067)
 
-Etappe 0 („Sicherheitsnetz“) macht Probleme sichtbar, statt sie still durchzulassen. Hintergrund:
-[D-067](05-decisions-log_de.md).
-
 ### Lauf-Ergebnis (`Outcome`) und `RunStatus`
 
-`Runs.Status` behält seine Bedeutung. Insbesondere endet ein Lauf, der ohne Konvergenz stoppt, weiterhin
-als `Failed`, auch wenn er einen Text liefert (Statusentscheidung vom 2026-07-17: Best-Effort-Läufe
-behalten `Failed`/`Aborted`). `Runs.Outcome` ist das zusätzliche Anzeigesignal dafür, was der Lauf
-geliefert hat:
+`Runs.Status` behält seine Bedeutung. Ein Lauf, der endet, ohne dass alle Prüfungen bestehen, endet als `Failed`, auch wenn
+er einen Text liefert. `Runs.Outcome` ist das zusätzliche Signal, was der Lauf geliefert hat:
 
 | `Outcome` | Bedeutung |
 |---|---|
-| `Converged` | Alle Reviewer haben zugestimmt; der konvergierte Text und die Ergebnisse der Finalizer sind gespeichert. |
-| `DeliveredWithOpenPoints` | Der Lauf stoppte ohne volle Konvergenz und lieferte seinen besten verfügbaren Entwurf. Status `Failed` (nicht konvergiert) oder `Aborted`, wenn ein kritischer Reviewer-Befund einen Lauf stoppte, der schon einen Text hat; der kritische Befund bleibt offen und steht bei den Befunden. |
-| `Failed` | Der Lauf endete ohne brauchbaren Text, oder sein Ergebnis konnte nicht vollständig gespeichert werden (Warnung `run.result_not_saved`). Ein Text kann trotzdem vorliegen; vollständig ist er dann nicht sicher. |
-| `Aborted` | Vom Anwender abgebrochen oder vom Dienst gestoppt, auch während der Finalizer. Ein vor dem Stopp gespeicherter Text bleibt lesbar (`FinalText`). |
+| `Converged` | Die Prüfungen haben bestanden; Text und Bericht sind gespeichert. |
+| `DeliveredWithOpenPoints` | Der Lauf endete mit offenen Punkten und hat seinen besten verfügbaren Entwurf geliefert. |
+| `Failed` | Der Lauf endete ohne brauchbaren Text, oder sein Ergebnis ließ sich nicht vollständig speichern (Warnung `run.result_not_saved`). Ein Text kann trotzdem vorhanden sein; Vollständigkeit ist nicht garantiert. |
+| `Aborted` | Von der Person abgebrochen oder vom Dienst gestoppt. Ein vorher gespeicherter Text bleibt lesbar. |
 
-`Outcome` bedeutet **„fertig abgelegt, inklusive Finalizer“**: Es wird erst gesetzt, wenn der endgültige
-Text (gegebenenfalls von einem Finalizer umgewandelt) in der Datenbank steht. Ein Client, der ein
-`Outcome` sieht, kann also den endgültigen Text lesen. Der erste Wert gewinnt; spätere Fehler
-überschreiben ihn nicht. `DeliveredIteration` nennt die Iteration, deren Text ausgeliefert wurde. Läufe,
-die vor Step47 endeten, behalten `NULL`. Scheitert ein Lauf, werden auch die Befunde der letzten Iteration
-gespeichert, sodass Detailseite und MCP zeigen, warum er stoppte.
-
-`Status` und `Outcome` können kurz auseinanderliegen: Der Event-Sink setzt `Completed` (oder `Failed`) und
-den Text vor den Finalizern, `Outcome` folgt erst danach. Clients warten deshalb auf `Outcome`, nicht auf
-einen Endstatus; `scripts/atelier-smoke.sh` und der Arm `atelier` von `tools/Eval` tun das. Wird der Dienst
-während der Finalizer hart beendet, setzt der Wiederanlauf beim nächsten Start für Läufe mit bereits
-terminalem Status und leerem `Outcome` ein Ergebnis, sodass kein Client endlos wartet: mit Text `Converged`
-(Status `Completed`) oder `DeliveredWithOpenPoints`, ohne Text `Failed`, dazu die Warnung
-`run.restarted_while_finishing`. Weil ältere Läufe (vor Step47) ebenfalls kein `Outcome` haben, werden nur
-Läufe repariert, die nach dem frühesten Lauf mit `Outcome` endeten; solange kein Lauf ein `Outcome` hat,
-ändert sich nichts. Die Reparatur läuft nach dem Zurücksetzen hängengebliebener `Running`-Läufe und für sich;
-ein Fehler darin verhindert dieses Zurücksetzen nie.
-
-Ein Abbruch oder Dienststopp während der Finalizer endet mit `Outcome = Aborted`, ohne Warnungen „Finalizer
-fehlgeschlagen“. Maßgeblich ist dabei `Outcome`: Der Status eines konvergierten Laufs bleibt `Completed`, ein
-Lauf mit `Failed` (nicht konvergiert) wird `Aborted`. Die Ergebnisse der Finalizer, die vor dem Stopp fertig
-waren, bleiben erhalten (geänderter Text, ihre Artefakte, Kosten); die übrigen Finalizer laufen nicht mehr.
-
-Nur MCP liefert `Outcome` (`get_run_status`, `get_run_result`). Die Weboberfläche liest es nicht: Der Block
-„Warnings“ auf der Detailseite (`RunWarningsBlock`) wählt seinen Einleitungssatz nach `Status` und danach,
-ob ein Text vorliegt.
+`Outcome` bedeutet **fertig und gespeichert**: Es wird gesetzt, wenn der endgültige Text und der Bericht in der Datenbank
+stehen. Der erste Wert gilt. `Status` und `Outcome` können kurz auseinanderfallen, weil der Event-Sink den Status zuerst
+setzt; Clients warten deshalb, bis der Auftrag fertig ist und ein Ergebnis gesetzt ist (wie `scripts/atelier-smoke.sh`).
+Wird der Dienst dazwischen hart gestoppt, setzt die Crash-Wiederherstellung das Ergebnis: mit Text `Converged` (Status
+`Completed`) oder `DeliveredWithOpenPoints`, ohne Text `Failed`, dazu die Warnung `run.restarted_while_finishing`. Läufe aus
+der Zeit vor der Spalte behalten `NULL`; repariert werden nur Läufe, die nach dem frühesten Lauf mit Ergebnis endeten.
 
 ### Warnungen am Lauf
 
-Ein Lauf hält jedes Problem, das er umgeht, als Warnung in `RunWarnings` fest, zum Beispiel:
+Ein Lauf hält jedes umgangene Problem in `RunWarnings` fest: zum Beispiel eine fehlgeschlagene Web-Recherche, eine Warnung
+aus dem Lesen einer Datei, eine Prüfung, die in einem Durchgang nicht abgeschlossen werden konnte, ein Modell, das nicht wie
+geplant zugewiesen werden konnte, oder ein Ausweichen im LLM-Client. `IRunWarningSink` schreibt jede Warnung in einem
+eigenen, kurzlebigen Datenbank-Scope; ein fehlgeschlagener Schreibvorgang wird protokolliert und hält den Lauf nie an. Der
+Dienst ist eine Pflichtabhängigkeit, eine fehlende Registrierung fällt also schon beim Start auf. Der LLM-Client meldet
+Ausweichvorgänge über den mitlaufenden `RunWarningScope`, den der Orchestrator je Lauf öffnet.
 
-- eine übersprungene oder fehlgeschlagene Grounding-Quelle (Anhänge, Websuche, Wissensbasis),
-- einen Reviewer, der in einer Iteration ausfiel,
-- ein Modell, das nicht wie geplant zugewiesen werden konnte,
-- einen Wechsel zu einer anderen Modellfamilie im LLM-Client (Failover),
-- einen Finalizer, der fehlschlug, übersprungen oder nicht ausgeführt wurde.
-
-`IRunWarningSink` (Vertrag in Core, Implementierung `RunWarningSink` in Infrastructure) schreibt jede
-Warnung in einem eigenen kurzlebigen Datenbank-Scope; ein fehlgeschlagener Schreibvorgang wird geloggt
-und hält den Lauf nie an. Überall, wo sie gebraucht wird (Run-Service, Orchestrator, Pipeline-Fabrik,
-Grounding-Schritt), ist sie eine Pflicht-Abhängigkeit; eine fehlende Registrierung scheitert also beim
-Start, statt Warnungen still zu verlieren. Dasselbe gilt für die Grounding-Provider-Fabrik im Orchestrator;
-die Pipeline-Fabrik baut eine Crew mit Quellen nicht, wenn keine Grounding-Provider-Fabrik übergeben wird. Der
-LLM-Client meldet Failover über den ambienten
-`RunWarningScope`, den der Orchestrator je Lauf öffnet.
-
-Warnungen erscheinen auf der Detailseite im Block „Warnings“ (nur wenn vorhanden) und in den MCP-Feldern
-`warnings` und `outcome` von `get_run_status` und `get_run_result`
-([09-endpoint-reference](09-endpoint-reference_de.md#lauf-status-und-ergebnis-warnings-und-outcome)).
-Warnungstexte und die am Lauf gespeicherten Fehlertexte (`ErrorMessage`, Statusmeldungen) sind feste,
-kurze, einfache Sätze für den Anwender, bei Bedarf mit Anzeigenamen; technische Einzelheiten wie
-Ausnahmetexte, Hostnamen, Schlüsselnamen oder Fehlertexte vorgelagerter Dienste gehen nur ins Log. Der Grund,
-aus dem ein Lauf vor dem Bestehen aller Prüfungen endete, ist ein fester Satz je Abbruchgrund
-(`RunStopMessageExtensions`); auch die Überspring-Gründe der Quellen-Sortierung (`GroundingRefiner`) sind feste
-Sätze. Bevor
-etwas Technisches geloggt oder gespeichert wird, ersetzt `SecretRedactionExtensions` (Core,
-`RedactSecrets`, `ToRedactedLogText`) Bruchstücke, die nach Zugangsdaten aussehen (bekannte
-Schlüsselformate, Bearer-Tokens, `name=wert`-Paare mit geheim klingendem Namen, lange undurchsichtige
-Zeichenfolgen), durch `[redacted]`. Ein Name gilt als geheim klingend, wenn sein letzter Teil ein Wort wie
-`key`, `token`, `secret` oder `password` ist (auch `OPENAI_API_KEY`, `x-api-key`, `apiKey`); sein Wert wird nur
-entfernt, wenn er nach einem Geheimnis aussieht (mindestens 12 Zeichen ohne Leerzeichen mit Buchstabe und
-Ziffer) oder ein URL-Parameter ist. Gewöhnliche Sätze wie „Key: Strategic goals“ oder „Basic research“ bleiben
-unverändert.
+Warnungen erscheinen auf der technischen Laufseite und im Feld `warnings` von `get_order_status` und `get_order_result`.
+Warn- und Fehlertexte am Lauf sind feste, kurze, einfache Sätze; technische Einzelheiten gehen nur ins Log. Bevor etwas
+Technisches protokolliert wird, ersetzt `SecretRedactionExtensions` (Core) zugangsdatenähnliche Teile durch `[redacted]`.
 
 ### Laut statt still
 
-| Situation | Verhalten seit D-067 |
+| Situation | Verhalten |
 |---|---|
-| Eine Datenbank-Migration scheitert beim Start | Der Start bricht mit einem kritischen Logeintrag ab (`MigrateDatabaseOrFailAsync`). Der Health-Check `pending-migrations` meldet offene Migrationen. |
-| Der Crew-Snapshot eines Laufs fehlt, ist unlesbar, leer, hat eine unbekannte Version oder keine Executor-, Reviewer- oder Advisor-Liste | `CrewSnapshot.DeserializeForRun` wirft `InvalidCrewSnapshotException`; der Lauf endet `Failed` mit verständlicher Meldung. Einen Rückfall auf die Klassik-Crew gibt es nicht mehr; das tolerante `Deserialize` dient nur der Anzeige. |
-| Eine Crew hat keinen Reviewer | `AtelierPipelineFactory` baut die Pipeline nicht; der Lauf endet `Failed` mit Meldung. Der stille Rückfall `AutoApproveReviewer` ist entfernt. |
-| Ein Grounding-Profil hat einen unbekannten Provider-Typ | Es wird mit einer Warnung übersprungen, statt den Lauf abstürzen zu lassen. |
-| Ein Lauf ohne brauchbaren Crew-Snapshot wird fortgesetzt | `RunService.ResumeRunAsync` lehnt sofort mit `RunNotResumableException` ab (ein einfacher Satz für den Anwender), statt einen Lauf anzulegen, der bis zum Vorbereitungs-Zeitlimit wartet. Die Detailseite blendet „Resume“ für solche Läufe aus und zeigt die Meldung. |
+| Eine Datenbankmigration schlägt beim Start fehl | Der Start bricht mit einem kritischen Logeintrag ab (`MigrateDatabaseOrFailAsync`). Der Health-Check `pending-migrations` meldet offene Migrationen. |
+| Der Snapshot eines Laufs fehlt, ist unlesbar, leer, von unbekannter Version oder ohne Schreiber, Prüfungen oder Advisor-Liste | `CrewSnapshot.DeserializeForRun` wirft `InvalidCrewSnapshotException`; der Lauf endet als `Failed` mit klarer Meldung. Eine Ersatz-Zusammenstellung gibt es nicht; das tolerante `Deserialize` dient nur der Anzeige. |
+| Ein Snapshot hat keine Prüfungen oder nennt eine unbekannte | `AtelierPipelineFactory` baut die Pipeline nicht; der Lauf endet als `Failed` mit Meldung. |
+| Ein Lauf gehört zu einer entfernten Arbeitsweise | Kein Assembler nimmt ihn an; er schlägt mit dem unter [Altdaten](#altdaten-läufe-entfernter-arbeitsweisen) zitierten Satz fehl. |
+| Ein Lauf ohne brauchbaren Snapshot wird fortgesetzt | `RunService.ResumeRunAsync` lehnt mit `RunNotResumableException` ab, statt einen Lauf anzulegen, der nie starten kann. |
+| Der Suchschlüssel fehlt | Eine Warnung mit dem Namen des Schlüssels beim Start (`ResearchKeyGuard`); Werte werden nie protokolliert. |
 
 ### Vorbereitungs-Zeitlimit für Läufe mit Anhängen
 
-Ein Lauf mit Anhängen wird zuerst **ohne** Crew-Snapshot angelegt; der Snapshot wird erst geschrieben, wenn
-alle Anhänge hochgeladen und indiziert sind. Der Orchestrator holt nur `Pending`-Läufe **mit** Snapshot ab;
-ein Lauf kann also nicht mehr vor seinen Anhängen starten. Ein `Pending`-Lauf, der nach
-`Orchestrator:PreparationTimeout` (Standard 15 Minuten) noch keinen Snapshot hat, wird mit der Bitte um
-erneutes Einreichen auf `Failed` gesetzt; ein Neustart des Dienstes räumt ebenso auf. Ein fortgesetzter
-Lauf findet die Anhänge des Laufs, den er fortsetzt (Abstammung über `ParentRunId`/
-`ParentCompositionRunId`). Ein Lauf ohne Anhänge löst keinen Embedding-Aufruf aus.
+Lauf-Anhänge wurden in Etappe 8d (D-091) entfernt; die Dateien eines Auftrags werden gelesen, bevor sein Lauf angelegt wird.
+Die Absicherung selbst bleibt: Der Orchestrator nimmt nur `Pending`-Läufe **mit** Snapshot, und ein `Pending`-Lauf, der nach
+`Orchestrator:PreparationTimeout` (Standard 15 Minuten) noch keinen hat, wird als `Failed` beendet, mit der Bitte, ihn neu
+einzureichen; ein Neustart räumt auf dieselbe Weise auf.
 
-## Aufträge und Quellen (D-069, D-070)
+## MCP-Server
 
-| Tabelle (Step48) | Inhalt |
+Der MCP-Server (`Geef.Atelier.Mcp`) läuft unter `/mcp` über zustandsloses Streamable HTTP mit Bearer-Anmeldung. Er bietet
+zehn Werkzeuge: `submit_order`, `answer_order`, `get_order_status`, `get_order_result`, `list_orders`, `cancel_order`,
+`revise_order`, `export_order`, `prepare_attachment` (nur solange `Uploads:Tickets` auf `On` steht) und `profile`. Die fünf
+Namen `submit_request`, `submit_auto_crew_request`, `get_run_status`, `get_run_result` und `get_run_details` bleiben für
+eine Version als Stummel registriert: Jeder Aufruf scheitert mit einer Meldung, die den Nachfolger nennt. Die Werkzeuge
+rufen `IOrderService` auf, denselben Dienst wie die Webseiten. `McpToolCatalog` registriert die Werkzeuge einzeln, und
+`McpToolBindingCheck` verhindert den Start, wenn ein Werkzeug-Parameter, der ein Dienst ist, nicht registriert ist.
+Einzelheiten: [MCP-Integration](04-mcp-integration_de.md) und [Endpunkt-Referenz](09-endpoint-reference_de.md).
+
+## Konfiguration
+
+Die Einstellungen kommen aus `appsettings.json` und Umgebungsvariablen (`__` statt `:`) und werden beim Start gelesen.
+
+| Abschnitt | Inhalt |
 |---|---|
-| `Orders` | Die Anfrage der Person im Wortlaut, Modus (`Direct`/`Careful`), Eingang (`Web`/`Mcp`/`Legacy`), Zustand (`Analyzing`, `NeedsInput`, `Ready`, `Cancelled`), Besitzer |
-| `Sources` | Eine hochgeladene Datei: extrahierter Text mit Seitenmarken (`[[page N]]`), Zählwerte, Lesequalität, Warnungen, Pfad des aufbewahrten Originals, Ablaufzeit, solange kein Auftrag sie nutzt |
-| `OrderSources` | Welche Quelle zu welchem Auftrag gehört, mit Rolle, Position und Seitenauswahl (`1-40,55`) |
-| `RunSourceUsages` | Welche Datei in welchen Lauf ging, in welchem Modus (`FullText`, `FullTextWithMap`) und mit wie vielen Zeichen |
+| `ConnectionStrings` | Postgres-Verbindung (`DefaultConnection`) |
+| `Llm`, `CliProxy`, `ModelCatalog` | Ersatz-Provider, Zugang zum CLI-Gateway, Modelllisten |
+| `Orchestrator` | Abfrageintervall, parallele Läufe, Abbruchabfrage, Vorbereitungs-Zeitlimit |
+| `Convergence` | Standardwerte der Konvergenzregel |
+| `Sources`, `Uploads` | Grenzen und Aufbewahrung von Dateien; Upload-Tickets |
+| `Orders` | Grenzen und Wartezeiten der Aufträge, Rückfragen (`IntakeMode`), „Extra careful“ (`CarefulOutline`), Text ändern (`Revise`), `TellOnce` |
+| `Intake` | der Klärer und seine Fragen |
+| `Direct` | Notizen des Schreibers, Nachrechnen von Summen in Dateien, Faktenprüfung |
+| `Research`, `Tavily` | Web-Recherche und ihre Grenzen; `Tavily:Endpoint` und `Tavily:ApiKey` |
+| `Mcp` | `Skills` und `Elicitation` (D-088) |
+| `Ui` | `WorkshopForAdminsOnly` |
+| `AtelierUser`, `AtelierMcp`, `OAuth` | erster Administrator, statisches MCP-Token und sein Nutzer, OAuth-Server |
+| `Pricing`, `CostTracking` | Preistabelle und Kostenerfassung |
+| `EnvReference` | zusätzlich erlaubte Namen von Umgebungsvariablen |
+| `Logging`, `AllowedHosts` | Standardeinstellungen von ASP.NET Core |
 
-`Runs.OrderId`/`Runs.OrderVersion` verbinden einen Lauf mit seinem Auftrag. `OrderService` (Application) prüft und
-legt einen Auftrag mit seinem ersten Lauf in einer Transaktion an; `OrderStateResolver` (Core) leitet den
-Anzeigezustand nur aus `Orders.State` und dem aktuellen Lauf ab. Die Größengrenzen kommen aus
-`SourceBudgetPlanner.Classify`, das Startseite, Auftragsdienst (`CheckSourcesAsync`, `SubmitAsync`) und der
-Quellenblock des Schreibers (`SourceBlockRenderer`) teilen; `OrderSourcePrompts` baut die Quellen für Direktweg und
-sorgfältigen Modus gleich.
+Die Schalter der Auftragsfunktionen, ihre ausgelieferten Werte und ihre Ausnahmen je Person stehen im
+[Admin-Leitfaden](14-admin-guide_de.md#funktionen-schalten). Die öffentliche Seite `/how-it-works` liest dieselben Schalter.
 
-Der Orchestrator wählt je Lauf einen `IPipelineAssembler` (Komposition 100, Direktweg 90, Fortsetzung 50,
-Klassik 0). Der Direktweg (`DirectPipelineAssembler`) nutzt die Code-Vorlage `direct` (`SystemCrew.CodeOnly*`; die
-Namen sind wie Systemnamen reserviert): `OrderGroundingStep`, `DirectWriterExecutor`,
-`DeterministicChecksReviewer`, höchstens zwei Durchgänge, Bericht in `Runs.ReportJson`. Einzelheiten: D-069 und
-D-070 im [Decisions-Log](05-decisions-log_de.md).
+`Ui:WorkshopForAdminsOnly` (Standard `true`) blendet das Werkstatt-Menü für Nicht-Administratoren aus; das Menü enthält nur
+„Runs“ und für Administratoren „Providers“. Der Schalter ändert, was gezeigt wird, nicht die Zugriffsrechte.
 
-## Konfigurationsschalter (D-067)
+## Testen und Messen
 
-| Schlüssel | Standard | Wirkung |
-|---|---|---|
-| `Learning:Enabled` | `false` | Schaltet die Learning-Schleife (D-054) ein oder aus. Ist sie aus, kehren die Finalizer `learning-extractor` und `learning-publisher` sofort zurück (kein LLM-Aufruf, kein Eintrag, kein `learning-evaluation`-Lauf, kein Embedding), das Grounding `learning-retrieval` liefert leeren Kontext ohne Embedding, und `/crew/learnings` zeigt, dass Learning pausiert ist. Crews mit diesen Teilen bleiben gültig. |
-| `EnvReference:Allowed` | leere Liste | Zusätzliche Umgebungsvariablen-Namen oder Präfixe (mit `*` am Ende), die Konfiguration nennen darf, zusätzlich zur eingebauten Standardliste und zum Präfix `ATELIER_SECRET_*`. Einzelheiten: [10-tool-system](10-tool-system_de.md#secrets-und-die-allowlist-für-umgebungsvariablen). |
-| `Orchestrator:PreparationTimeout` | `00:15:00` | Wie lange ein `Pending`-Lauf ohne Crew-Snapshot (Anhänge noch in Vorbereitung) bleiben darf, bevor er auf `Failed` gesetzt wird. |
-| `Ui:WorkshopForAdminsOnly` | `true` | Solange an, sehen nur Admins die Einstiege zu den Werkstatt-Seiten: das Menü „Workshop“, den Link zum alten Formular auf der Startseite und „Technical details“ auf der Auftragsseite; die Kontoseiten führen alle anderen zurück zu „My work“. Seiten, Routen und Rechte bleiben unverändert (D-077, Etappe 8a). Rückweg: `Ui__WorkshopForAdminsOnly=false` in der Umgebung. |
+### Ende-zu-Ende-Tests (`tests/Geef.Atelier.Tests/EndToEnd/`)
 
-Die Schalter der Auftragsfunktionen (Fragen, Ändern eines Textes, Recherche, Faktenprüfung, Upload-Ticket, ältere
-MCP-Werkzeuge), ihre ausgelieferten Werte und ihre Ausnahmen je Person stehen im [Leitfaden für die
-Administration](14-admin-guide_de.md#funktionen-schalten). Die öffentliche Seite `/how-it-works` liest dieselben Schalter und
-Ausnahmen (`Web/Display/HowItWorksFeatures.cs`).
-
-`Learning:Enabled` wird genau einmal registriert (`AddLearningSwitch`, Infrastructure); alle Leser
-(Finalizer, Retrieval-Provider, Learnings-Seite) lesen den Schalter über `IOptionsMonitor`, eine Änderung
-erreicht also alle gleich.
-
-Fehlende Grounding-Schlüssel (`Tavily:ApiKey`, der OpenRouter-Schlüssel für Embeddings) werden beim Start
-mit Namen geloggt (`GroundingKeyGuard`); Werte werden nie geloggt.
-
-## Testen und Messen (D-067)
-
-### Ende-zu-Ende-Gerüst (`tests/Geef.Atelier.Tests/EndToEnd/`)
-
-`AtelierEndToEndHost` startet die **echte** Anwendung über `WebApplicationFactory<Program>` gegen eine
-eigene Datenbank je Test auf dem Testcontainers-Postgres der `PostgresFixture`. Migration, DI-Verdrahtung,
-Orchestrator, Grounding, Pipeline, Event-Sink und MCP-Endpunkt sind die der Produktion. Ersetzt wird nur
-externes HTTP:
-
-- `ScriptedLlmEndpoint` vertritt den cli-proxy (OpenAI-Format) und antwortet je Rolle (Executor, Reviewer,
-  Refiner, Query-Extraktor); `LlmTrafficRecorder` zeichnet jeden Anfragekörper auf, auch die
-  Dokumentmodus-Felder `document` und `context_document`.
-- `FakeTavilyEndpoint`, `FakeEmbeddingsEndpoint` und `FakeCliProxyModelsEndpoint` liefern Websuche,
-  deterministische Embeddings und die Modellliste.
-- Alle übrigen benannten HTTP-Clients sind gesperrt und werden protokolliert; kein Test kann versehentlich
-  ins Netz.
-
-Hilfen: `SubmitAsync` (echter `IRunService`), `WaitForTerminalAsync` (wartet auf einen Endstatus mit
-`Outcome`), `QueryAsync`, `CallMcpToolAsync` (echter `/mcp`-Endpunkt mit Bearer-Token).
-`HeldOrchestratorStarter` startet den echten Orchestrator erst nach dem Einreichen.
-
-**Was es beweist:** Ein Auftrag läuft über die echte Verdrahtung vom Einreichen (Web oder MCP) bis zum
-abgelegten Ergebnis, und der Inhalt von Anhängen und Websuche kommt tatsächlich im Executor-Prompt an. Die
-Tests in `PromptWiringEndToEndTests` schlagen fehl, wenn man die Grounding-Reparatur aus D-067 zurücknimmt;
-das wurde durch Zurücknehmen geprüft. Sie sind gewöhnliche Regressionstests ohne eigenes Merkmal.
+`AtelierEndToEndHost` startet die **echte** Anwendung über `WebApplicationFactory<Program>` gegen eine eigene Datenbank je
+Test auf dem Testcontainers-Postgres der `PostgresFixture`. Migration, DI-Verdrahtung, Klärung, Orchestrator, Pipeline,
+Event-Sink und MCP-Endpunkt sind der produktive Code. Nur externes HTTP wird ersetzt: `ScriptedLlmEndpoint` steht für den
+cli-proxy und antwortet je Rolle, `LlmTrafficRecorder` zeichnet die Anfragen auf, `FakeTavilyEndpoint` und
+`FakeCliProxyModelsEndpoint` liefern Websuche und Modellliste, jeder andere benannte HTTP-Client ist gesperrt.
 
 ```bash
 export MSBUILDNODEREUSE=0 DOTNET_CLI_TELEMETRY_OPTOUT=1
 dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "FullyQualifiedName~Geef.Atelier.Tests.EndToEnd"
-dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "FullyQualifiedName~PromptWiringEndToEndTests"
 ```
 
-Die Tests brauchen Docker (Testcontainers) und laufen in einer eigenen Collection ohne Parallelität. Ein
-neuer Pipeline-Weg bekommt hier seinen eigenen Ende-zu-Ende-Test, vom Einstieg bis zum abgelegten Ergebnis.
+Die Tests brauchen Docker und laufen in einer eigenen Sammlung ohne Parallelität. Ein neuer Weg durch das System soll einen
+eigenen Ende-zu-Ende-Test bekommen, vom Eingang bis zum gespeicherten Ergebnis.
 
-### Test gegen die Produktions-Snapshots
+### Test gegen exportierte Snapshots
 
-`ProductionSnapshotFixtureTests` liest jeden exportierten Crew-Snapshot der Produktion über das strenge
-Lesen zur Laufzeit (`CrewSnapshot.DeserializeForRun`) und prüft Schema-Version, Reviewer und den
-Grounding-Weg der Systemprofile. Die Exporte enthalten echte Aufträge und gehören **nie** ins Repository;
-ohne die Variablen wird der Test übersprungen.
+`ProductionSnapshotFixtureTests` liest exportierte Snapshots durch das strenge Lesen zur Laufzeit und prüft, dass jeder
+entweder auf dem Direktweg läuft oder mit dem einfachen Satz oben abgewiesen wird. Die Exporte enthalten echte Aufträge und
+gehören **nie** ins Repository; ohne die Variablen wird der Test übersprungen.
 
 | Variable | Bedeutung |
 |---|---|
 | `ATELIER_SNAPSHOT_FIXTURES` | Verzeichnis mit einem exportierten Snapshot je Lauf (`*.json`). |
-| `ATELIER_SNAPSHOT_FIXTURES_MIN` | Mindestzahl der Dateien im Export (Standard 1). Auf die Zahl der exportierten Läufe setzen, damit ein unvollständiger Export scheitert, statt still durchzugehen. |
+| `ATELIER_SNAPSHOT_FIXTURES_MIN` | Mindestzahl der Dateien im Export (Standard 1), damit ein unvollständiger Export auffällt. |
 
-Vor einem Deploy, der das Lesen der Snapshots berührt, exportiert der Betreiber die aktuellen Snapshots,
-setzt beide Variablen und führt den Test aus (`--filter "FullyQualifiedName~ProductionSnapshotFixtureTests"`).
-Verzeichnis und Anzahl stehen nicht im Repository.
+### Messwerkzeuge und Betriebsskripte
 
-### Messwerkzeug `tools/Eval`
+`tools/Eval` vergleicht das Atelier im blinden Paarvergleich mit anderen Wegen, einen Text zu erzeugen
+([`tools/Eval/README.md`](../tools/Eval/README.md)); echte Aufgaben bleiben außerhalb von Git. `IntakeEval`,
+`FactCheckEval` und `ResearchEval` messen Klärer, Faktenprüfung und Recherche.
 
-Ein Python-Werkzeug, das das Atelier auf einem festen Aufgabenset per blindem Paarvergleich mit anderen
-Wegen vergleicht (zum Beispiel einem rohen Einzelaufruf eines Modells). Aufruf, Umgebungsvariablen,
-Aufgabenformat und Datenschutzregeln: [`tools/Eval/README.md`](../tools/Eval/README.md). Echte Aufträge
-bleiben außerhalb von Git.
-
-### Betriebsskripte
-
-`scripts/atelier-smoke.sh` (Mini-Lauf über MCP nach jedem Deploy) und `scripts/atelier-watch.sh` (Alarm bei
-hängenden Läufen und ungesundem cli-proxy) sind in [`ops/atelier-smoke.md`](ops/atelier-smoke.md) und
+`scripts/atelier-smoke.sh` (ein Mini-Auftrag über MCP nach jedem Deploy: `submit_order`, bei Rückfragen einmal
+überspringen, `get_order_status` bis fertig, `get_order_result`) und `scripts/atelier-watch.sh` (Alarm bei hängenden Läufen
+und ungesundem cli-proxy) sind in [`ops/atelier-smoke.md`](ops/atelier-smoke.md) und
 [`ops/atelier-watch.md`](ops/atelier-watch.md) beschrieben.
 
-## UI-Architektur (Schritt 7)
+## UI-Architektur
 
-### Pages
+**Blazor Server.** Derselbe .NET-Stack wie das Geef SDK und Live-Status ohne eigene Client-Anwendung.
 
-Drei Blazor Server Pages in `src/Geef.Atelier.Web/Components/Pages/`:
+### Wichtigste Seiten
 
-| Route | Komponente | Funktion |
-|---|---|---|
-| `/new` | `New.razor` | Submit-Formular. `EditForm` + `DataAnnotationsValidator`. Redirect zu `/runs/{id}` nach Submit. |
-| `/runs` | `Runs.razor` | Run-Liste. Status-Filter via Query-Parameter. Live-Update über `IRunUpdateFeed.WatchRunList` (eigene Läufe; alle Läufe für Administratoren). |
-| `/runs/{id}` | `RunDetail.razor` | Run-Detail. Live-Update über `IRunUpdateFeed.WatchRunAsync` (nur Besitzer oder Administrator). Cancel-Button für Pending/Running. Zeigt einen Block „Warnings“, wenn der Lauf Warnungen hat (D-067). |
+| Route | Funktion |
+|---|---|
+| `/start` | Neuer Auftrag: Anliegen, Dateien mit Quittungen, „Extra careful“ nur, wenn angeboten |
+| `/work`, `/orders` | „My work“: die Aufträge der Person |
+| `/orders/{id}` | Auftragsseite: Fragen, Fortschritt, Text, offene Punkte, Versionen, Änderungen, Export |
+| `/about-me` | „About me“ (das Profil, das in Texten verwendet wird) |
+| `/runs`, `/runs/{id}` | Technische Laufliste und Laufseite |
+| `/crew/providers…` | Provider-Verwaltung (Administratoren) |
+| `/admin/users`, `/admin/oauth-clients`, `/admin/site-settings` | Verwaltung |
 
-### Live-Updates: `IRunUpdateFeed` und `RunHub` (D-067)
+Die vollständige Liste samt öffentlicher Seiten steht in der
+[Endpunkt-Referenz](09-endpoint-reference_de.md#web-ui---account-endpunkte).
 
-Die Blazor-Seiten (`Runs`, `RunDetail`, das Dashboard auf `Index`) **öffnen keine `HubConnection` mehr**.
-Vor D-067 verbanden sie sich serverseitig mit der öffentlichen URL des eigenen Hubs, ohne das Cookie des
-Nutzers, und wählten ihre Gruppennamen selbst. Jetzt abonnieren sie den prozessinternen
-`IRunUpdateFeed` (`Web/Notifications/`, Implementierung `InProcessRunUpdateFeed`, registriert über
-`AddRunLiveUpdates()`):
+### Live-Updates
 
-- Das Thema leitet der Server aus dem angemeldeten Nutzer ab (`RunUpdateTopics`); der Aufrufer wählt es
-  nie. Ein Lauf-Thema bekommt nur der Besitzer des Laufs oder ein Administrator; Listen- und
-  Dashboard-Thema enthalten die eigenen Läufe, für Administratoren alle.
-- Jeder Abonnent hat eine eigene Warteschlange; Handler laufen nacheinander, gleiche wartende Meldungen
-  werden zusammengefasst, und ein fehlerhafter Abonnent blockiert die anderen nicht. Der Publisher wartet
-  nie auf Abonnenten.
-- Über den Zugriff wird beim Abonnieren entschieden. Ein Abonnement gilt so lange wie der Circuit der
-  Seite, und wie bei jeder Blazor-Server-Seite behält der Circuit die Anmeldung, mit der er geöffnet wurde;
-  eine erneute Prüfung bei Ablauf der Anmeldung ist nicht gebaut (geringes Risiko: Das Lauf-Thema trägt nur
-  eine ID, das Dashboard-Thema über alle Nutzer gibt es nur für Administratoren).
-- Die Detailseite lädt direkt nach dem Abonnieren einmal neu, damit zwischen erstem Laden und Abonnement
-  keine Meldung verloren geht.
+Die Seiten abonnieren den prozessinternen `IRunUpdateFeed` (`Web/Notifications/`, `InProcessRunUpdateFeed`, registriert
+durch `AddRunLiveUpdates()`); einen eigenen SignalR-Hub der Anwendung gibt es nicht.
 
-**`CircuitDataGate`** (`Web/Components/`, je Circuit als Scoped registriert über `AddRunLiveUpdates()`):
-Alle Komponenten eines Circuits teilen sich einen `DbContext`, der nur eine Operation gleichzeitig erlaubt.
-Ein Nachladen durch ein Live-Update und eine Nutzeraktion (Filter, Löschen, Fortsetzen, Abbrechen) könnten
-sich sonst überschneiden. Regel: **Jeder Datenbankzugriff einer Seite mit Live-Updates läuft über
-`DataGate.RunAsync(...)`** (heute `Runs`, `RunDetail`, `Index` und `CancelButton`). Aufrufe dürfen **nicht
-verschachtelt** werden: Eine Aktion im Tor ruft nie eine andere Aktion im Tor auf (das Tor ist ein
-`SemaphoreSlim(1,1)` und würde auf sich selbst warten); Rückrufe wie `OnCancelled` oder ein Nachladen
-laufen nach dem Block im Tor.
+- Das Thema leitet der Server aus dem angemeldeten Nutzer ab (`RunUpdateTopics`). Das Thema eines Laufs oder Auftrags
+  bekommt nur der Eigentümer oder ein Administrator; Listenthemen tragen die eigenen Einträge, für Administratoren alle.
+- Jeder Abonnent hat eine eigene Warteschlange; Handler laufen nacheinander, gleiche wartende Updates werden
+  zusammengefasst, und das Veröffentlichen wartet nie auf Abonnenten.
+- Der Zugriff wird beim Abonnieren entschieden; ein Abonnement gilt so lange wie der Circuit der Seite.
 
-`RunHub` (`Web/Hubs/RunHub.cs`, über `MapRunHub()` auf `/hubs/runs` gemappt) hat in der Anwendung keinen
-Client mehr, und ein externer Client ist nicht bekannt. Er bleibt **bis zum Rückbau Schnitt 2**, der auf seinen Auslöser in
-[D-077](05-decisions-log_de.md#d-077--abschluss-des-umbaus-2026-11-26) wartet ([D-068](05-decisions-log_de.md#d-068--richtung-umbau-auftrag-direktweg-rückfragen-quellen-gedächtnis-2026-11-24))
-und ist bis dahin abgesichert:
+`LiveRunNotifier` setzt die Core-Verträge `IRunNotifier` und `IOrderNotifier` um und veröffentlicht in den Feed; ein Lauf
+eines Auftrags aktualisiert auch die Auftragsthemen. Benachrichtigungen sind Best-Effort.
 
-- **Nur für Angemeldete:** `[Authorize]` am Hub; `MapRunHub()` (`LiveUpdateServiceExtensions`) mappt ihn mit
-  `RequireAuthorization()` und `CloseOnAuthenticationExpiration`. Anonyme Verbindungen werden abgewiesen,
-  und eine Verbindung wird geschlossen, sobald die Anmeldung abläuft, mit der sie geöffnet wurde.
-- **Serverseitig abgeleitete Gruppen:** Gruppennamen kommen aus `Context.User`, nie aus einem Parameter.
-  Einer Lauf-Gruppe tritt nur bei, wem der Lauf gehört (oder ein Administrator); sonst wirft der Hub eine
-  `HubException`. Die Listen- und Dashboard-Gruppen über alle Nutzer gibt es nur für Administratoren. Die
-  früheren Methoden mit Benutzernamen als Parameter sind entfernt.
+**`CircuitDataGate`** (je Circuit): Alle Komponenten eines Circuits teilen sich einen `DbContext`, deshalb läuft jeder
+Datenbankzugriff einer Seite mit Live-Updates durch `DataGate.RunAsync(...)`. Aufrufe dürfen nicht geschachtelt werden.
 
-### `IRunNotifier` / `LiveRunNotifier`
-
-`IRunNotifier` lebt in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) konsumiert den Vertrag — ohne Web-Dependency. `LiveRunNotifier` (`Web/Notifications/`) lebt in Web, Singleton-Lifetime, und veröffentlicht jede Meldung zweimal: in den `IRunUpdateFeed` für die Blazor-Seiten und in die `RunHub`-Gruppen (bis zum Rückbau des Hubs mit Schnitt 2, D-077). Den Besitzer des Laufs ermittelt er selbst (`IRunRepository`, zwischengespeichert) und schickt Listen-Updates nur an Besitzer und Administratoren, nie an alle. Notifier-Aufrufe sind best-effort (`try/catch`).
-
-**Sequenz User-Submit → Live-View:**
-
-```
-Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
-                                                ↓
-                                      RunOrchestratorService (BackgroundService)
-                                        pollt Pending-Läufe mit Snapshot, setzt Running-Claim
-                                                ↓
-                                      Geef-SDK-Pipeline (Grounding → Execution → Evaluation → Finalize)
-                                                ↓
-                                      PostgresEventSink
-                                        (a) schreibt Event in DB
-                                        (b) IRunNotifier.NotifyRunUpdatedAsync
-                                                ↓
-                                      LiveRunNotifier
-                                        → IRunUpdateFeed: Lauf-Thema, Listen-Thema des Besitzers, Admin-Listen-Thema
-                                        → RunHub-Gruppen (bis zum Rückbau, D-077)
-                                                ↓
-                                      Seiten-Callback (WatchRunAsync / WatchRunList)
-                                        → IRunService.GetRunAsync → StateHasChanged
-```
-
-### UI-Komponenten-Library (`Components/UI/`)
-
-9 Komponenten, alle mit scoped `.razor.css`:
-`StatusBadge`, `SeverityBadge`, `RunCard`, `IterationPanel`, `FindingItem`, `RunHeader`, `SubmitForm`, `EmptyState`, `CancelButton`.
-
-**Workflow-Regel:** Semantische UI-Elemente (Buttons, Forms, Badges, Listen) sind Komponenten. Layout-`div`-Tags in Pages erlaubt.
-
-### PS-6 Crew-Verwaltungs-Pages
-
-| URL | Komponente | Beschreibung |
-|---|---|---|
-| `/crew` | `CrewIndex` | Landing-Page mit Überblick über Templates + Profile |
-| `/crew/templates` | `CrewTemplatesIndex` | Liste aller Templates (System + Custom) |
-| `/crew/templates/new` | `CrewTemplateEditor` | Neues Template anlegen |
-| `/crew/templates/{name}` | `CrewTemplateEditor` | Template bearbeiten / System-Template duplizieren |
-| `/crew/profiles/reviewers` | `ReviewerProfilesIndex` | Liste aller Reviewer-Profile |
-| `/crew/profiles/reviewers/new` | `ReviewerProfileEditor` | Neues Reviewer-Profil anlegen |
-| `/crew/profiles/reviewers/{name}` | `ReviewerProfileEditor` | Reviewer-Profil bearbeiten |
-| `/crew/profiles/executors` | `ExecutorProfilesIndex` | Liste aller Executor-Profile |
-| `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Neues Executor-Profil anlegen |
-| `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Executor-Profil bearbeiten |
-| `/crew/learnings` | `LearningsIndex` | Learning-Einträge aus dem Learning-Store auflisten, filtern, genehmigen, ablehnen und löschen (D-054) |
-
-Neue UI-Komponenten (PS-6): `CrewBadge`, `CrewSelector`, `CrewSummary`, `ReviewerPicker`, `ProfileEditorForm`, `Modal`, `DeleteConfirmationModal`.
-
-## Frontend-Stack-Entscheidung
-
-**Blazor Server.** Begründung: derselbe .NET-Stack wie Geef SDK, kein Kontextwechsel; SignalR ist eingebaut und beliefert den Live-Status quasi gratis; Single-User heißt keine Skalierungs-Sorgen; lokale UI-Latenz ist dank Server-Hosting und Reverse-Proxy unkritisch. Falls später ein Wechsel zu Blazor WebAssembly oder React+API nötig wird, bleibt das Backend (`IRunService`, MCP-Server, Pipeline) unverändert.
-
-## Auth-Strategie (umgesetzt in Schritt 8, siehe D-021)
+## Auth-Strategie
 
 ### Web-UI — Cookie-Auth
 
@@ -824,13 +504,6 @@ app.UseAuthorization();
 
 Traefik terminiert TLS und leitet HTTP weiter. Ohne `UseForwardedHeaders` würde `SecurePolicy.Always` in Produktion Cookies blockieren. `KnownIPNetworks.Clear()` öffnet für alle Proxy-IPs (Docker-Netzwerk-invariant).
 
-**RunHub verlangt Anmeldung (seit D-067):**
-
-Bis D-067 hatte `RunHub` kein `[Authorize]`, weil sich die Blazor-Seiten serverseitig ohne Browser-Cookie mit
-ihm verbanden. Die Seiten nutzen jetzt den prozessinternen `IRunUpdateFeed`, deshalb verlangt der Hub eine
-Anmeldung (`[Authorize]`, `MapRunHub()` mit `RequireAuthorization()` und `CloseOnAuthenticationExpiration`);
-siehe [Live-Updates](#live-updates-irunupdatefeed-und-runhub-d-067).
-
 ### Test-Auth-Bypass
 
 `TestAuthenticationHandler` (in `tests/Geef.Atelier.Tests/Web/E2E/`, `internal sealed`) markiert jeden Request als pre-authenticated mit `ClaimTypes.Name = "test-user"`. `WebTestHost.StartAsync(authenticated: true/false)` — `true` aktiviert den Test-Handler, `false` startet echte Cookie-Auth mit BCrypt-wf=4-Hash für LoginFlow/LogoutFlow-Tests. **Der Handler darf nie in `Program.cs` oder dem Web-Projekt referenziert werden.**
@@ -868,7 +541,7 @@ Geef.Atelier.Web/Auth/BearerTokenHandler.cs                → AuthenticationHan
 `BearerTokenHandler` mappt das Outcome auf Claims: `ClaimTypes.Name` ← `Subject`,
 `ClaimTypes.NameIdentifier` ← `ClientId ?? Subject`, und für statisches Bearer-Token
 `ClaimTypes.Role = "admin"`. Damit greift die Run-User-Isolation (D-042) auch über MCP:
-OAuth-Runs gehören dem autorisierenden Nutzer, statische-Token-Runs dem Admin.
+OAuth-Aufträge gehören dem autorisierenden Nutzer, Aufträge mit dem statischen Token `AtelierMcp:StaticTokenUser` oder dem konfigurierten Administrator.
 `ICurrentUserService`/`HttpContextCurrentUserService` exponieren `Username`/`IsAdmin`
 für Service- und MCP-Schicht.
 
@@ -885,90 +558,67 @@ koexistieren ohne Konfigurationsänderung.
 ### Traefik-Flow
 
 ```
-Browser → HTTPS:443 → Traefik (TLS via Let's Encrypt, cert-resolver 'le') → HTTP:8080 → geef-atelier-web container → ASP.NET
+Browser → HTTPS:443 → Traefik (TLS über Let's Encrypt, Cert-Resolver 'le') → HTTP:8080 → Container geef-atelier-web → ASP.NET
 ```
 
-Traefik terminiert TLS und leitet HTTP (Port 8080) an den Container weiter. Der Container selbst exponiert keinen Port nach außen (`ports:` entfällt im Production-Compose).
-
-### TLS und Traefik-Konfiguration
+Traefik terminiert TLS und leitet HTTP (Port 8080) an den Container weiter, der keinen Port nach außen öffnet.
 
 | Parameter | Wert |
 |---|---|
-| Externes Netzwerk | `proxy` (Server-Konvention) |
-| Cert-Resolver | `le` (HTTP-Challenge via `web`-Entry-Point) |
+| Externes Netz | `proxy` |
+| Cert-Resolver | `le` (HTTP-Challenge über den Entry-Point `web`) |
 | Entry-Point (HTTPS) | `websecure` |
-| HTTP→HTTPS-Redirect | Global in `traefik.yml` (kein App-seitiger Redirect-Router) |
-| Middleware-Chain | `chain@file` (secure-headers + compression + rate-limit, Server-Konvention) |
-| `traefik.docker.network` | `proxy` (Pflicht wenn Container in mehreren Netzwerken) |
+| HTTP→HTTPS-Weiterleitung | global in `traefik.yml` (kein eigener Redirect-Router in der App) |
+| Middleware-Kette | `chain@file` (Secure-Header, Kompression, Rate-Limit) |
+| `traefik.docker.network` | `proxy` (Pflicht, wenn ein Container in mehreren Netzen ist) |
 
-### Cookie-SecurePolicy in Production
+`ASPNETCORE_ENVIRONMENT=Production` schaltet `CookieSecurePolicy.Always` ein. `ForwardedHeaders` (vor
+`UseAuthentication`) liest `X-Forwarded-Proto=https`; ohne das würden die Cookies blockiert. Cookie- und Bearer-Anmeldung
+funktionieren hinter dem Proxy gleich.
 
-`ASPNETCORE_ENVIRONMENT=Production` aktiviert `CookieSecurePolicy.Always`. Die `ForwardedHeaders`-Middleware (vor `UseAuthentication` gesetzt, siehe Auth-Strategie-Abschnitt) liest `X-Forwarded-Proto=https` von Traefik und stellt sicher, dass `Request.IsHttps == true` — ohne dies würde `SecurePolicy.Always` Cookies blockieren, weil der Container HTTP sieht, nicht HTTPS.
+### Postgres und Backup
 
-### Multi-Auth über HTTPS
-
-Cookie-Auth für die Web-UI und Bearer-Auth für den MCP-Endpoint (`/mcp`) funktionieren identisch über HTTPS: TLS wird bei Traefik terminiert, der Container empfängt HTTP. Die Auth-Schicht der Anwendung sieht keinen Unterschied zum Dev-Betrieb — lediglich `SecurePolicy.Always` und `SameSite=Strict` sind in Production aktiv.
-
-### Postgres-Strategie (Server-Konvention)
-
-Jede Anwendung auf diesem Server betreibt einen eigenen Postgres-Container im selben Compose-File (`own-Postgres-per-App`-Pattern). Kein geteilter Datenbank-Host — Isolation und einfaches Backup pro App.
-
-### Backup-Strategie (Post-Skeleton Schritt 1)
-
-Der `postgres-backup`-Service (`prodrigestivill/postgres-backup-local:16`) läuft als dritter Container im Production-Stack:
-
-- **Schedule:** täglich 03:00 UTC (`0 3 * * *`)
-- **Retention:** 7 Tages-, 4 Wochen-, 6 Monats-Snapshots
-- **Volume:** `geef-atelier-backups` (Named Volume, unabhängig vom DB-Volume)
-- **Format:** `.sql.gz` (gzip-komprimiertes pg_dump SQL, Compression Level 6)
-- **Restore:** `scripts/restore-backup.sh <datei.sql.gz>` (stoppt `web`, restored, startet `web` neu)
-
-Kein App-Code-Eingriff — reiner Compose-Service. Backup-Container braucht nur das interne `geef-atelier-network` (kein `proxy`).
+Die Compose-Datei betreibt einen eigenen Postgres-Container (Image `pgvector/pgvector:pg16`, siehe
+[Datenmodell](#datenmodell)). Der Dienst `postgres-backup` (`prodrigestivill/postgres-backup-local:16`) schreibt täglich um
+03:00 UTC einen gzip-komprimierten SQL-Dump in das Volume `geef-atelier-backups` (7 tägliche, 4 wöchentliche, 6 monatliche).
+Wiederherstellung: `scripts/restore-backup.sh <datei.sql.gz>`. Hochgeladene Originale liegen auf dem Volume
+`geef-atelier-sources`, außerhalb des Datenbank-Dumps.
 
 ### Reviewer-Kalibrierung
 
-Severity-Taxonomie, Anti-Pattern-Regel und Convergence-Policy-Strategie sind in [`docs/06-reviewer-calibration.md`](06-reviewer-calibration_de.md) beschrieben. Neue Reviewer-Rollen müssen den dort definierten Standard übernehmen.
+[`06-reviewer-calibration.md`](06-reviewer-calibration_de.md) beschreibt die Schweregrade und Regeln für Reviewer-Rollen.
 
 ### Deployment-Ablauf
 
-1. `.env`-File generieren via `openssl rand` + `tools/HashPassword` (gitignored, nie ins Repo).
-2. `docker build --no-cache -t geef-atelier .` im `build/`-Verzeichnis.
-3. `docker compose -f docker-compose.prod.yml up -d` startet App + Postgres; Auto-Migration on Startup (D-010) läuft beim ersten Start.
-4. Traefik erkennt den Container via Docker-Labels, stellt Let's-Encrypt-Zertifikat aus.
-5. Nach jedem Deploy den Mini-Lauf `scripts/atelier-smoke.sh` ausführen ([`ops/atelier-smoke.md`](ops/atelier-smoke.md)); eine gescheiterte Migration hält den Start bereits an (D-067).
+1. Die Datei `.env` anlegen (`openssl rand`, `tools/HashPassword`); sie steht in `.gitignore` und kommt nie ins Repository.
+2. Die Images bauen und den Compose-Stack starten; die Migration läuft beim Start (D-010), eine fehlgeschlagene Migration
+   hält den Start an (D-067).
+3. Traefik erkennt den Container an seinen Labels und stellt das Zertifikat aus.
+4. Nach jedem Deploy `scripts/atelier-smoke.sh` ausführen ([`ops/atelier-smoke.md`](ops/atelier-smoke.md)).
 
-Das nächtliche Selbst-Update des cli-proxy (`scripts/cli-proxy-selfupdate.sh`) baut nur aus dem committeten Stand; bei nicht committeten Änderungen unter `cli-proxy/` setzt es aus und schickt einen Alarm, statt zu bauen (D-067).
+Das nächtliche Selbst-Update des cli-proxy (`scripts/cli-proxy-selfupdate.sh`) baut nur aus dem committeten Stand; bei nicht
+committeten Änderungen unter `cli-proxy/` pausiert es und schickt einen Alarm, statt zu bauen (D-067).
 
 ### Modell-Katalog für CLI-Provider (D-064)
 
-CLI-Provider führen ihre Modell-Liste nicht im Atelier. `ModelCatalog` liest sie über
-`ICliModelSource` / `CliProxyModelSource` aus dem cli-proxy, und zwar über den einen
-provider-gekeyten Endpunkt `GET /v1/cli/{providerName}/models`. Das Gateway meldet die Herkunft —
-`x_source` ist `live`, `static` (keine Live-Quelle vorgesehen, z. B. gemini) oder `degraded`
-(Live-Quelle vorhanden, aber nicht erreichbar) — und für claude zusätzlich eine `x_aliases`-Abbildung
-von `claude-<familie>-latest` auf die konkrete ID, auf die der Alias gerade zeigt.
+CLI-Provider führen ihre Modellliste nicht im Atelier. `ModelCatalog` liest sie über `ICliModelSource` /
+`CliProxyModelSource` vom cli-proxy (`GET /v1/cli/{providerName}/models`). Das Gateway meldet, woher die Liste stammt
+(`x_source`: `live`, `static` oder `degraded`) und bei claude eine `x_aliases`-Zuordnung von `claude-<Familie>-latest` zum
+konkreten Modell.
 
-Daraus folgen drei Eigenschaften des umgebenden Codes:
+* **Die Herkunft ist dreiwertig.** `ModelCatalogSource` unterscheidet `Live`, `StaticByDesign` und `Fallback`.
+* **Die Live-Liste wird mit der gepflegten zusammengeführt**, nie ersetzt.
+* **Die Modellmatrix enthält `*-latest`-Aliasse, Lauf-Snapshots konkrete IDs.** Der Alias wird einmal beim Bau des Snapshots
+  aufgelöst (`CrewSnapshotModelResolver`): Neue Läufe folgen neuen Versionen, ein fortgesetzter Lauf behält das Modell
+  seines Vorgängers.
 
-* **Die Herkunft ist dreiwertig, kein Boolean.** `ModelCatalogSource` unterscheidet `Live`,
-  `StaticByDesign` und `Fallback`, damit die Auswahl bei einem Provider ohne Live-Quelle wahrhaftig
-  bleibt, statt dauerhaft „unerreichbar" zu behaupten.
-* **Die Live-Liste wird mit der kuratierten vereinigt**, nie ersetzt, damit ein bevorzugtes
-  Composer-Modell nicht lautlos aus genau dem Katalog fällt, gegen den es gefiltert wird.
-* **Profile halten `*-latest`-Aliase, Run-Snapshots halten konkrete IDs.** Der Alias wird einmal pro
-  Snapshot in `CrewService.ApplyPacksAsync` aufgelöst — neue Läufe folgen damit neuen Releases,
-  während ein fortgesetzter Lauf auf dem Modell seines Elternlaufs bleibt.
-
-Caching: 24 h nach einem erfolgreichen CLI-Abruf (deckungsgleich mit dem Cache des Gateways), 1 h für
-HTTP-Provider, 5 Minuten nach jedem Fehlschlag. `ModelCatalogWarmUpService` wärmt kurz nach dem Start
-und danach nächtlich jeden aktiven CLI-Provider; `ModelCatalogOptions.CliLiveCatalogEnabled` ist der
-Not-Aus zurück auf die konfigurierten Listen, ohne Redeploy.
+Zwischenspeicher: 24 h für eine erfolgreiche CLI-Abfrage, 1 h für HTTP-Provider, 5 Minuten nach einem Fehler.
+`ModelCatalogWarmUpService` wärmt jeden aktiven CLI-Provider kurz nach dem Start und jede Nacht auf;
+`ModelCatalog:CliLiveCatalogEnabled` schaltet auf die konfigurierten Listen zurück.
 
 ## Observability
 
-Geef bringt vieles eingebaut mit:
-- `IGeefEventSink` für strukturierte Events → Custom-Sink schreibt in DB und SignalR
-- `System.Diagnostics.ActivitySource("Geef.Sdk")` für Distributed Tracing → kann später an OpenTelemetry-Collector angeschlossen werden
-- Middleware-Pipeline für Cross-Cutting (Timeout, ExceptionHandling, Tracing) — alle eingebauten Middleware werden im Skeleton genutzt
-
-Logging via `Microsoft.Extensions.Logging` mit Console-Sink im Skeleton; strukturierte Logs (Serilog mit Postgres-Sink) sind eine spätere Option.
+- `PostgresEventSink` (ein `IGeefEventSink`) schreibt Pipeline-Ereignisse in die Datenbank und löst Live-Updates aus.
+- `System.Diagnostics.ActivitySource("Geef.Sdk")` für verteiltes Tracing; die Pipeline nutzt die Middleware des SDK für
+  Fehlerbehandlung und Tracing.
+- Protokollierung über `Microsoft.Extensions.Logging` auf die Konsole.
