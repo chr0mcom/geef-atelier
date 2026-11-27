@@ -520,8 +520,10 @@ The web interface is Blazor Server (cookie auth). The externally reachable route
 | `/settings/theme` | POST | Cookie, antiforgery field | Theme switch without JavaScript (form field `value`: `vellum`, `noir` or `petrol`), redirect to the referer; `400` without a valid token |
 | `/_blazor` | GET, POST, WebSocket | as the page it belongs to | Live connection of the interactive pages; `400` when the `Origin` header names another host |
 
-**Internal:** `GET /api/internal/providers/cli` returns the active CLI providers to the cli-proxy; when
-`CliProxy:InternalApiToken` is set, it requires the header `X-Internal-Token`.
+**Internal:** `GET /api/internal/providers/cli` returns the active CLI providers to the cli-proxy. It requires the header
+`X-Internal-Token` with the value of `CliProxy:InternalApiToken` (in the Compose setup `ATELIER_INTERNAL_API_TOKEN`, one
+value for both services); a sign-in does not replace it. When the header is missing or wrong, or no value is configured,
+it answers `401`. The gateway then keeps the built-in CLI providers working with its own defaults.
 
 Run and order pages are subject to user isolation (D-042): each user sees only their own entries; the administrator can show
 all users with an explicit toggle. The menu "Workshop" holds only "Runs" and, for administrators, "Providers"; with

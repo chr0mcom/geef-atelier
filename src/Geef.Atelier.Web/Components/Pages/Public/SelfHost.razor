@@ -70,6 +70,7 @@
                 <pre><code>git clone https://github.com/chr0mcom/geef-atelier
 cd geef-atelier
 cp .env.example .env          # fill in passwords, keys and your domain
+openssl rand -hex 32          # put the result in .env as ATELIER_INTERNAL_API_TOKEN
 docker network create proxy   # once, the network your reverse proxy uses
 docker compose up -d --build
 docker compose exec -e HOME=/auth/claude cli-proxy claude auth login
@@ -77,6 +78,7 @@ docker compose exec cli-proxy codex login --device-auth</code></pre>
                 <p class="sh-note">
                     You need Docker and a running Traefik as reverse proxy. The README in the repository explains every step: what
                     Traefik must provide, passwords, the first administrator, signing in the AI tools, backups and restore.
+                    <code>ATELIER_INTERNAL_API_TOKEN</code> is one secret that the app and its AI gateway share.
                     Health check at <code>https://&lt;your-domain&gt;/health</code>.
                 </p>
             </div>

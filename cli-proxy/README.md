@@ -209,6 +209,12 @@ Atelier finds the gateway through its providers `claude-cli` and `codex-cli`; `a
 by the model matrix when a run is created (see [`docs/08-crew-system.md`](../docs/08-crew-system.md#model-matrix-d-066)). With
 `CLI_PROXY_API_KEYS` set, give the web app the same key as `CLI_PROXY_API_KEY` (the Compose file passes it to both).
 
+The gateway fetches the settings of the CLI providers from the web app every minute (`ATELIER_BACKEND_URL`) and sends
+`ATELIER_INTERNAL_API_TOKEN`; set one value in `.env`, the Compose file passes it to both. Without a matching value the web
+app answers 401 and the gateway logs a warning. The built-in providers `claude-cli`, `codex-cli` and `gemini-cli` then
+keep working with the gateway's own defaults, model lists included, until a first sync succeeds; own CLI providers need
+the sync.
+
 ## Concurrency
 
 Each CLI has its own limit of simultaneous calls (`asyncio.Semaphore`); further calls wait. The Compose file sets:

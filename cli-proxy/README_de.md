@@ -193,6 +193,12 @@ nutzt, entscheidet die Modellmatrix beim Anlegen eines Laufs (siehe
 [`docs/08-crew-system_de.md`](../docs/08-crew-system_de.md#modellmatrix-d-066)). Ist `CLI_PROXY_API_KEYS` gesetzt, bekommt die
 Web-App denselben Schlüssel als `CLI_PROXY_API_KEY` (die Compose-Datei reicht ihn an beide).
 
+Das Gateway holt jede Minute die Einstellungen der CLI-Anbieter von der Web-App (`ATELIER_BACKEND_URL`) und sendet dabei
+`ATELIER_INTERNAL_API_TOKEN`; ein Wert in `.env` genügt, die Compose-Datei reicht ihn an beide. Ohne passenden Wert
+antwortet die Web-App mit 401, und das Gateway schreibt eine Warnung. Die eingebauten Anbieter `claude-cli`, `codex-cli`
+und `gemini-cli` laufen dann mit den eigenen Standardwerten des Gateways weiter, samt Modelllisten, bis ein erster
+Abgleich gelingt; eigene CLI-Anbieter brauchen den Abgleich.
+
 ## Concurrency
 
 Jede CLI hat eine eigene Grenze gleichzeitiger Aufrufe (`asyncio.Semaphore`); weitere Aufrufe warten. Die Compose-Datei setzt:

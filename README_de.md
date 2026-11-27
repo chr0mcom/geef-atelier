@@ -241,6 +241,9 @@ dotnet run --project tools/HashPassword -- "DeinPasswort"
 # MCP-Token (64 Hex-Zeichen)
 openssl rand -hex 32
 
+# Gemeinsames Geheimnis von Web-App und KI-Gateway (ein zweiter, eigener Wert)
+openssl rand -hex 32
+
 # Postgres-Passwort
 openssl rand -base64 24
 ```
@@ -256,6 +259,9 @@ ATELIER_USER=<admin-username>
 # die einfachen Anführungszeichen behalten: sonst liest Docker Compose jedes "$" als Variable, und die Anmeldung scheitert
 ATELIER_PASSWORD_HASH='<bcrypt-hash>'
 ATELIER_MCP_TOKEN=<hex-token>
+# ein Wert für Web-App und KI-Gateway: damit holt das Gateway die Einstellungen der CLI-Anbieter (openssl rand -hex 32).
+# Bleibt er leer, lehnt die Web-App diesen Abruf ab; die eingebauten CLI-Anbieter laufen weiter, eigene brauchen den Wert
+ATELIER_INTERNAL_API_TOKEN=<zweiter-hex-token>
 # zugleich die öffentliche Adresse der Installation (OAuth- und Upload-Links: https://<your-domain>)
 ATELIER_DOMAIN=<your-domain>
 

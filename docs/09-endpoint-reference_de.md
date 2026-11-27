@@ -521,8 +521,11 @@ Die Web-Oberfläche ist Blazor Server (Cookie-Auth). Die von außen erreichbaren
 | `/settings/theme` | POST | Cookie, Antiforgery-Feld | Theme-Wechsel ohne JavaScript (Formularfeld `value`: `vellum`, `noir` oder `petrol`), Redirect zum Referer; ohne gültiges Token `400` |
 | `/_blazor` | GET, POST, WebSocket | wie die jeweilige Seite | Live-Verbindung der interaktiven Seiten; nennt der Header `Origin` einen anderen Host, `400` |
 
-**Intern:** `GET /api/internal/providers/cli` liefert dem cli-proxy die aktiven CLI-Provider; ist
-`CliProxy:InternalApiToken` gesetzt, verlangt der Endpunkt den Header `X-Internal-Token`.
+**Intern:** `GET /api/internal/providers/cli` liefert dem cli-proxy die aktiven CLI-Provider. Der Endpunkt verlangt den
+Header `X-Internal-Token` mit dem Wert von `CliProxy:InternalApiToken` (in der Compose-Aufstellung
+`ATELIER_INTERNAL_API_TOKEN`, ein Wert für beide Dienste); eine Anmeldung ersetzt ihn nicht. Fehlt der Header, passt er
+nicht oder ist kein Wert konfiguriert, antwortet er mit `401`. Das Gateway arbeitet dann für die eingebauten
+CLI-Anbieter mit eigenen Standardwerten weiter.
 
 Lauf- und Auftragsseiten unterliegen der Nutzer-Isolation (D-042): Jede Person sieht nur ihre eigenen Einträge; der
 Administrator kann per ausdrücklichem Umschalter alle zeigen. Das Menü „Workshop“ enthält nur „Runs“ und für
