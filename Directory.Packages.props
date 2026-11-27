@@ -3,7 +3,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Geef SDK — stable release, consumed from local feed until nuget.org publish is set up -->
+    <!-- Geef SDK -->
     <PackageVersion Include="Geef.Sdk" Version="1.5.0" />
     <!-- Official OpenAI SDK — used for the Responses API path (pro/reasoning models on openai-direct) -->
     <PackageVersion Include="OpenAI" Version="2.8.0" />

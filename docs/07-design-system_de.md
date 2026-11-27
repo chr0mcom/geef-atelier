@@ -4,7 +4,7 @@
 
 *Letzte Aktualisierung: 2026-11-27 (D-091: mit dem Rückbau entfallene Teile gestrichen, Namen entfernter Aufstellungen; davor 2026-05-17, Mock-Stub-Status auf damaligen Stand gebracht; Tokens/Themes/Typografie unverändert seit PS-3-Design-Translation)*
 
-Das Atelier-Design-System ist aus dem Mockup (`docs/design/atelier-mockups/`) in die Blazor-Server-App übertragen worden (PS-3). Dieser Leitfaden beschreibt Tokens, Themes, Typografie, Komponenten-Inventar und Mock-Stubs für zukünftige Entwicklung.
+Das Atelier-Design-System ist aus einem HTML-Mockup in die Blazor-Server-App übertragen worden (PS-3); das Mockup gehört nicht mehr zum Repository. Dieser Leitfaden beschreibt Tokens, Themes, Typografie, Komponenten-Inventar und Mock-Stubs für zukünftige Entwicklung.
 
 ## Theme-System
 

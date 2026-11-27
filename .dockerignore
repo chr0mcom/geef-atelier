@@ -6,8 +6,17 @@
 **/bin
 **/*.user
 **/TestResults
+**/__pycache__
+.worktrees
+.claude
+.remember
+backup
+reports
+# Markdown at the repository root only; docs/*.md are embedded into the web app
 *.md
 .editorconfig
-geef_*.md
-docker-compose*.yml
+docker-compose*.yml*
 .env*
+.smoke.env
+**/*.bak
+**/*.bak-*
