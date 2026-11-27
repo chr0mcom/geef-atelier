@@ -1,4 +1,4 @@
-namespace Geef.Atelier.Infrastructure.TemplateStudio;
+namespace Geef.Atelier.Infrastructure.Persistence;
 
 /// <summary>Factory that opens a database transaction scoped to a single materialization operation.</summary>
 internal interface IAtomicTransactionFactory
@@ -6,7 +6,7 @@ internal interface IAtomicTransactionFactory
     Task<IAtomicTransaction> BeginAsync(CancellationToken ct = default);
 }
 
-/// <summary>A scoped database transaction for Studio materialization.</summary>
+/// <summary>A scoped database transaction for one materialization.</summary>
 internal interface IAtomicTransaction : IAsyncDisposable
 {
     Task CommitAsync(CancellationToken ct = default);

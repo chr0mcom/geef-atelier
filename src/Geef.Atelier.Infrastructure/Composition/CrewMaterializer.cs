@@ -9,7 +9,7 @@ using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Crew.Specialization;
-using Geef.Atelier.Infrastructure.TemplateStudio;
+using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Infrastructure.Composition;

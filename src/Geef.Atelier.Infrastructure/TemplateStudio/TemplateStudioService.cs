@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.TemplateStudio;
 using Geef.Atelier.Application.Pricing;

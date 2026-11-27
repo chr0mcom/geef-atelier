@@ -8,7 +8,7 @@ using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Composition;
-using Geef.Atelier.Infrastructure.TemplateStudio;
+using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
 
