@@ -47,9 +47,6 @@
                 <dt>@setting.Key</dt>
                 <dd data-testid="detail-setting-@setting.Key.ToLowerInvariant()">@setting.Value</dd>
             }
-
-            <dt>Max Queries per Run</dt>
-            <dd data-testid="detail-max-queries">@(_profile.MaxQueriesPerRun?.ToString() ?? "—")</dd>
         </dl>
     }
 </div>

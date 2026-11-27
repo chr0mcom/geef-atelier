@@ -59,7 +59,6 @@
                 <InputSelect @bind-Value="_form.FinalizerType" disabled="@(!IsNew)" class="form-input" data-testid="input-finalizer-type">
                     <option value="@FinalizerType.FileExport">File Export</option>
                     <option value="@FinalizerType.MetadataEnrich">Metadata Enrichment</option>
-                    <option value="@FinalizerType.ExternalSink">External Sink</option>
                     <option value="@FinalizerType.Transform">AI Transform</option>
                 </InputSelect>
                 @if (!IsNew)
@@ -97,67 +96,6 @@
                     </div>
                     break;
 
-                case FinalizerType.ExternalSink:
-                    <div class="form-section-header">Sink Settings</div>
-                    <div class="form-row">
-                        <label>Sink Type</label>
-                        <InputSelect @bind-Value="_form.SinkKind" class="form-input" data-testid="input-sink-kind">
-                            <option value="webhook">Webhook (HTTP POST)</option>
-                            <option value="email">Email (SMTP)</option>
-                        </InputSelect>
-                    </div>
-                    @if (_form.SinkKind == "webhook")
-                    {
-                        <div class="form-row">
-                            <label>Webhook URL</label>
-                            <InputText @bind-Value="_form.WebhookUrl" class="form-input" placeholder="https://example.com/hook" data-testid="input-webhook-url" />
-                        </div>
-                        <div class="form-row">
-                            <label>Auth Header (optional)</label>
-                            <InputText @bind-Value="_form.WebhookAuthHeader" class="form-input" placeholder="Bearer <token>" data-testid="input-webhook-auth" />
-                            <small class="form-hint">Stored in plain text in the database, never written to logs.</small>
-                        </div>
-                        <div class="form-row">
-                            <label>Content-Type</label>
-                            <InputText @bind-Value="_form.WebhookContentType" class="form-input" placeholder="application/json" data-testid="input-webhook-content-type" />
-                        </div>
-                        <div class="form-row">
-                            <label>Timeout (seconds)</label>
-                            <InputNumber @bind-Value="_form.WebhookTimeout" class="form-input" min="5" max="300" data-testid="input-webhook-timeout" />
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="form-row">
-                            <label>Recipient Email</label>
-                            <InputText @bind-Value="_form.EmailTo" class="form-input" placeholder="recipient@example.com" data-testid="input-email-to" />
-                        </div>
-                        <div class="form-row">
-                            <label>Subject</label>
-                            <InputText @bind-Value="_form.EmailSubject" class="form-input" placeholder="Geef.Atelier — Result" data-testid="input-email-subject" />
-                        </div>
-                        <div class="form-row">
-                            <label class="form-checkbox-label">
-                                <InputCheckbox @bind-Value="_form.EmailAttachAsFile" data-testid="input-email-attach" />
-                                Send as attachment
-                            </label>
-                        </div>
-                        @if (_form.EmailAttachAsFile)
-                        {
-                            <div class="form-row">
-                                <label>Attachment Format</label>
-                                <InputSelect @bind-Value="_form.EmailAttachmentFormat" class="form-input" data-testid="input-email-format">
-                                    <option value="markdown">Markdown (.md)</option>
-                                    <option value="html">HTML (.html)</option>
-                                    <option value="pdf">PDF (.pdf)</option>
-                                    <option value="docx">Word Document (.docx)</option>
-                                    <option value="txt">Plain Text (.txt)</option>
-                                </InputSelect>
-                            </div>
-                        }
-                    }
-                    break;
-
                 case FinalizerType.Transform:
                     <div class="form-section-header">Transform Settings</div>
                     <div class="form-row">
@@ -165,7 +103,7 @@
                         <InputTextArea @bind-Value="_form.SystemPrompt" class="form-input" rows="6"
                             placeholder="Instructions for the AI transform…" data-testid="input-system-prompt" />
                         <small class="form-hint">Tip: end with "Respond in the language of the input text."</small>
-                        <FieldHelp Text="@StudioFieldHelps.FinalizerTransformSystemPrompt" DataTestId="field-help-transform-system-prompt" />
+                        <FieldHelp Text="@FinalizerFieldHelps.TransformSystemPrompt" DataTestId="field-help-transform-system-prompt" />
                     </div>
                     <div class="field" data-testid="transform-model-assignment">
                         <label>Model assignment</label>
@@ -382,23 +320,6 @@
         // MetadataEnrich
         public string EnricherType { get; set; } = MetadataEnrichSettings.FrontMatter;
 
-        // ExternalSink
-        public string SinkKind { get; set; } = WebhookSinkSettings.SinkKindValue;
-
-        [Url(ErrorMessage = "Please enter a valid URL.")]
-        public string? WebhookUrl { get; set; }
-
-        public string WebhookAuthHeader { get; set; } = string.Empty;
-        public string WebhookContentType { get; set; } = "application/json";
-        public int WebhookTimeout { get; set; } = 30;
-
-        [EmailAddress(ErrorMessage = "Please enter a valid email address.")]
-        public string? EmailTo { get; set; }
-
-        public string EmailSubject { get; set; } = "Geef.Atelier — Result";
-        public bool EmailAttachAsFile { get; set; } = false;
-        public string EmailAttachmentFormat { get; set; } = "markdown";
-
         public bool IsSystem { get; set; } = false;
 
         // Transform
@@ -440,26 +361,6 @@
                     var me = MetadataEnrichSettings.From(p.Settings);
                     m.EnricherType = me.EnricherType;
                     break;
-                case FinalizerType.ExternalSink:
-                    var sk = p.Settings.GetValueOrDefault(WebhookSinkSettings.KeySinkKind, WebhookSinkSettings.SinkKindValue);
-                    m.SinkKind = sk;
-                    if (sk == EmailSinkSettings.SinkKindValue)
-                    {
-                        var es = EmailSinkSettings.From(p.Settings);
-                        m.EmailTo = es.ToAddress;
-                        m.EmailSubject = es.Subject;
-                        m.EmailAttachAsFile = es.AttachAsFile;
-                        m.EmailAttachmentFormat = es.AttachmentFormat;
-                    }
-                    else
-                    {
-                        var ws = WebhookSinkSettings.From(p.Settings);
-                        m.WebhookUrl = ws.Url;
-                        m.WebhookAuthHeader = ws.AuthHeader ?? string.Empty;
-                        m.WebhookContentType = ws.ContentType;
-                        m.WebhookTimeout = ws.TimeoutSeconds;
-                    }
-                    break;
                 case FinalizerType.Transform:
                     var ts = TransformSettings.From(p.Settings);
                     m.SystemPrompt = ts.SystemPrompt;
@@ -487,14 +388,6 @@
                     new FileExportSettings(ExportFormat).ToDict(),
                 FinalizerType.MetadataEnrich =>
                     new MetadataEnrichSettings(EnricherType).ToDict(),
-                FinalizerType.ExternalSink when SinkKind == EmailSinkSettings.SinkKindValue =>
-                    new EmailSinkSettings(EmailTo ?? string.Empty, EmailSubject, EmailAttachAsFile, EmailAttachmentFormat).ToDict(),
-                FinalizerType.ExternalSink =>
-                    new WebhookSinkSettings(
-                        WebhookUrl ?? string.Empty,
-                        string.IsNullOrWhiteSpace(WebhookAuthHeader) ? null : WebhookAuthHeader,
-                        WebhookContentType,
-                        WebhookTimeout).ToDict(),
                 FinalizerType.Transform => BuildTransformSettings(),
                 _ => [],
             };

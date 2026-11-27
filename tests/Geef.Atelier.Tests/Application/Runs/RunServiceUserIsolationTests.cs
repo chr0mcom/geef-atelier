@@ -277,7 +277,7 @@ public sealed class RunServiceUserIsolationTests
             => Task.FromResult(runId == run.Id ? details : null);
 
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default)
-            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m, 0, 0m));
+            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m));
 
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
@@ -303,7 +303,7 @@ public sealed class RunServiceUserIsolationTests
             => Task.FromResult<RunDetails?>(null);
 
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default)
-            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m, 0, 0m));
+            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m));
 
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

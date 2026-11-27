@@ -26,7 +26,6 @@ public sealed class GroundingProviderEditorRefinementTests : TestContext
             Description: "desc",
             ProviderType: "tavily",
             ProviderSettings: settings ?? new(),
-            MaxQueriesPerRun: 1,
             IsSystem: false);
 
     private void RegisterServices(GroundingProviderProfile? profile = null)

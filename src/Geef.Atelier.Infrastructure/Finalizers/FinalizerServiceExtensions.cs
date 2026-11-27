@@ -13,11 +13,8 @@ public static class FinalizerServiceExtensions
     {
         services.Configure<FinalizerOptions>(configuration.GetSection("Finalizer"));
 
-        services.AddHttpClient("finalizer-webhook");
-
         services.AddSingleton<IFinalizerExecutor, FileExportFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutor, MetadataEnrichFinalizerExecutor>();
-        services.AddSingleton<IFinalizerExecutor, ExternalSinkFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutor, TransformFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutor, LearningExtractFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutor, LearningPublishFinalizerExecutor>();

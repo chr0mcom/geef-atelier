@@ -176,7 +176,7 @@
                 @foreach (var p in _providers.Take(5))
                 {
                     <li>
-                        <a href="@(p.IsSystem ? $"/crew/providers/view/{p.Name}" : (p.Type == ProviderType.Cli ? $"/crew/providers/edit/cli/{p.Name}" : $"/crew/providers/edit/{p.Name}"))">@p.DisplayName</a>
+                        <a href="@(p.IsSystem ? $"/crew/providers/view/{p.Name}" : (p.Type == ProviderType.Cli ? $"/crew/providers/edit/cli/{p.Name}" : $"/crew/providers/view/{p.Name}"))">@p.DisplayName</a>
                         @if (p.IsSystem) { <span class="crew-badge">System</span> }
                         @if (!p.IsActive) { <span class="text-muted">(inactive)</span> }
                     </li>

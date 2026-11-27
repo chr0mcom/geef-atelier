@@ -48,9 +48,9 @@ Im übergeordneten Infrastruktur-Repository unter `/srv/docker/docs/` liegen die
 
 ## Status
 
-- **Phase:** produktiv. Seit dem Umbau im November 2026 (D-068 bis D-077) ist der Auftrag mit dem Direktweg der Standard; das ältere Crew-System (mit seinen Erweiterungen wie Advisor-Pässen, Grounding, Finalizern, Template Studio und der pausierten Lernschleife) bleibt als „Workshop“ und „Extra careful“ verfügbar.
+- **Phase:** produktiv. Seit dem Umbau im November 2026 (D-068 bis D-077) ist der Auftrag mit dem Direktweg der Standard; das ältere Crew-System (mit seinen Erweiterungen wie Advisor-Pässen, Grounding, Finalizern und der pausierten Lernschleife; Template Studio wurde in Stufe 8c entfernt, D-089) bleibt als „Workshop“ und „Extra careful“ verfügbar.
 - **Letzte Aktualisierung:** 2026-11-26
-- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-077 „Abschluss des Umbaus“). Der Umbau nach D-068 endet mit Etappe 6 und der Abschlussrunde 8a (D-077): Die Etappen 1b, 7, 8 (außer 8a) und 9 sind nicht gebaut, und das alte Crew-, Tool- und Learning-System bleibt bestehen, bis der Auslöser für den Rückbau in D-077 erfüllt ist; die Dokumente kennzeichnen eingefrorene oder zum Rückbau vorgesehene Teile.
+- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-089 „Rückbau, Schnitt 1“). Der Umbau nach D-068 endet mit Etappe 6 und der Abschlussrunde 8a (D-077): Die Etappen 1b, 7, 8 (außer 8a) und 9 sind nicht gebaut, und das alte Crew-, Tool- und Learning-System bleibt bestehen, bis der Auslöser für den Rückbau in D-077 erfüllt ist; der erste Schnitt des Rückbaus (Stufe 8c, D-089) hat die ungenutzten Teile entfernt; die Dokumente kennzeichnen eingefrorene oder zum Rückbau vorgesehene Teile.
 
 ## Konventionen
 

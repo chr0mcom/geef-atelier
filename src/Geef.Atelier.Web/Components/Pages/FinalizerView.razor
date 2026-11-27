@@ -69,48 +69,6 @@
                 }
                 break;
 
-            case FinalizerType.ExternalSink:
-                {
-                    var sinkKind = _profile.Settings.GetValueOrDefault(WebhookSinkSettings.KeySinkKind, WebhookSinkSettings.SinkKindValue);
-                    <h2>Sink Settings</h2>
-                    @if (sinkKind == EmailSinkSettings.SinkKindValue)
-                    {
-                        var s = EmailSinkSettings.From(_profile.Settings);
-                        <dl class="profile-detail">
-                            <dt>Sink Type</dt>
-                            <dd>Email (SMTP)</dd>
-                            <dt>Recipient</dt>
-                            <dd data-testid="view-setting-toaddress">@(string.IsNullOrEmpty(s.ToAddress) ? "—" : s.ToAddress)</dd>
-                            <dt>Subject</dt>
-                            <dd data-testid="view-setting-subject">@s.Subject</dd>
-                            <dt>Attach as File</dt>
-                            <dd data-testid="view-setting-attachasfile">@(s.AttachAsFile ? "Yes" : "No")</dd>
-                            @if (s.AttachAsFile)
-                            {
-                                <dt>Attachment Format</dt>
-                                <dd data-testid="view-setting-attachmentformat">@GetFormatLabel(s.AttachmentFormat)</dd>
-                            }
-                        </dl>
-                    }
-                    else
-                    {
-                        var s = WebhookSinkSettings.From(_profile.Settings);
-                        <dl class="profile-detail">
-                            <dt>Sink Type</dt>
-                            <dd>Webhook (HTTP POST)</dd>
-                            <dt>URL</dt>
-                            <dd data-testid="view-setting-url">@(string.IsNullOrEmpty(s.Url) ? "—" : s.Url)</dd>
-                            <dt>Auth Header</dt>
-                            <dd data-testid="view-setting-authheader">@(s.AuthHeader is not null ? "configured" : "—")</dd>
-                            <dt>Content-Type</dt>
-                            <dd data-testid="view-setting-contenttype">@s.ContentType</dd>
-                            <dt>Timeout (seconds)</dt>
-                            <dd data-testid="view-setting-timeout">@s.TimeoutSeconds</dd>
-                        </dl>
-                    }
-                }
-                break;
-
             case FinalizerType.Transform:
                 {
                     var s = TransformSettings.From(_profile.Settings);
@@ -194,7 +152,6 @@
     {
         FinalizerType.FileExport     => "File Export",
         FinalizerType.MetadataEnrich => "Metadata Enrichment",
-        FinalizerType.ExternalSink   => "External Sink",
         FinalizerType.Transform      => "AI Transform",
         _                            => type.ToString(),
     };

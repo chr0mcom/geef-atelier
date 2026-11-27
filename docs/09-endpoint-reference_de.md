@@ -310,17 +310,6 @@ Listet alle Grounding-Provider-Profile (System + Custom) auf.
     "displayName": "Tavily Refined",
     "description": "...",
     "providerType": "tavily",
-    "maxQueriesPerRun": 3,
-    "isSystem": true,
-    "refinementEnabled": true,
-    "refinementMode": "filter"
-  },
-  {
-    "name": "tavily-news",
-    "displayName": "Tavily News",
-    "description": "...",
-    "providerType": "news-search",
-    "maxQueriesPerRun": 1,
     "isSystem": true,
     "refinementEnabled": true,
     "refinementMode": "filter"
@@ -330,7 +319,6 @@ Listet alle Grounding-Provider-Profile (System + Custom) auf.
     "displayName": "Mein Provider",
     "description": "...",
     "providerType": "vector-store",
-    "maxQueriesPerRun": null,
     "isSystem": false,
     "refinementEnabled": false,
     "refinementMode": null
@@ -343,8 +331,7 @@ Listet alle Grounding-Provider-Profile (System + Custom) auf.
 | `name` | string | Profilbezeichner |
 | `displayName` | string | Anzeigename |
 | `description` | string | Zweckbeschreibung |
-| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, `"news-search"`, `"academic-search"`, `"rest-api"` oder `"learning-retrieval"` |
-| `maxQueriesPerRun` | int? | Max. Anfragen pro Run (null = unbegrenzt) |
+| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"` oder `"learning-retrieval"` (`"news-search"`, `"academic-search"` und `"rest-api"` wurden in Stufe 8c entfernt, D-089; ältere eigene Profile dieser Typen werden weiter gelistet) |
 | `isSystem` | boolean | Eingebautes System-Profil |
 | `refinementEnabled` | boolean | Ob ein KI-Refinement konfiguriert ist |
 | `refinementMode` | string \| null | `"filter"` oder `"synthesize"` (null wenn kein Refinement) |
@@ -676,13 +663,13 @@ extern erreichbaren Routen:
 | `/admin/users` | GET | Cookie (Admin) | Benutzerverwaltung |
 | `/admin/oauth-clients` | GET | Cookie (Admin) | OAuth-Client-Verwaltung |
 | `/account/connected-clients` | GET | Cookie | Selbstverwaltung der eigenen verbundenen OAuth-Clients |
-| `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/studio`, `/crew/knowledge` | GET | Cookie | Crew-/Template-/Profil-/Studio-/Wissensbasis-Verwaltung |
+| `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/knowledge` | GET | Cookie | Crew-/Template-/Profil-/Wissensbasis-Verwaltung |
 | `/start` | GET | Cookie | Startseite für einen neuen Auftrag: Anfrage, Dateien mit Quittung, „Extra careful“ (D-070) |
 | `/u/{uploadId}` | GET | Cookie | Upload-Seite des Upload-Tickets für genau eine Datei, nur für die Besitzerin oder den Besitzer und nur bei `Uploads:Tickets` `On` (D-076) |
 | `/work`, `/orders` | GET | Cookie | „My work“: die Aufträge der Person, neueste Aktivität zuerst (Admins können alle Nutzer zeigen) |
 | `/orders/{id}` | GET | Cookie | Auftragsseite: Fortschritt, Text, offene Punkte, „How it was made“, Versionen |
 | `/runs`, `/runs/{id}`, `/new` | GET | Cookie | Run-Liste, Run-Detail, neuer Auftrag |
-| `/crew/providers/*`, `/tools/*`, `/mcp-servers/*`, `/crew/profiles/grounding-providers/create`, `/crew/profiles/grounding-providers/edit/{name}` | GET | Cookie (Admin) | Provider-, Tool-, MCP-Server- und Grounding-Editoren — seit D-067 nur für Admins, weil sie Geheimnisse beim Namen nennen |
+| `/crew/providers/*`, `/tools/*`, `/crew/profiles/grounding-providers/create`, `/crew/profiles/grounding-providers/edit/{name}` | GET | Cookie (Admin) | Provider- (seit D-089 nur CLI), Tool- und Grounding-Editoren — seit D-067 nur für Admins, weil sie Geheimnisse beim Namen nennen |
 
 Run-bezogene Seiten unterliegen der Run-User-Isolation (D-042): jeder Nutzer sieht
 nur eigene Runs; der Admin kann per explizitem Umschalter systemweit sehen.

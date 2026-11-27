@@ -19,7 +19,7 @@ namespace Geef.Atelier.Tests.EndToEnd;
 
 /// <summary>
 /// Over the real wiring: the "About me" profile reaches the clarifier and every writer briefing (answered, skipped,
-/// started after the deadline), but never an outside search service: Tavily, news and academic search, the embeddings of
+/// started after the deadline), but never an outside search service: Tavily web search, the embeddings of
 /// the learning search (learning switched on), the query shaping and the refinement get only the request as written, and each of
 /// these services is really called. Also for <c>submit_request</c> with an own crew and for a resumed run. A clarified careful
 /// order with the default crew searches nothing at all (D-079).
@@ -33,7 +33,7 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
     private const string AssumptionMarker = "ANNAHMEMARKER Datum bleibt offen";
     private const string Request = "Schreib eine kurze Pressemitteilung über die Eröffnung unseres neuen Standorts in Leipzig.";
 
-    private static readonly string[] ResearchProviders = ["tavily-refined", "tavily-news", "academic-default", "learning-retriever-default"];
+    private static readonly string[] ResearchProviders = ["tavily-refined", "learning-retriever-default"];
 
     private const string AskLength =
         """{"topic":"length","resolution":"ask","user_can_know":true,"web_researchable":false,"impact":"high","assumption":"Etwa 300 Wörter","confidence":"unsure","question":null}""";
@@ -84,9 +84,7 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
     {
         var tavily = calls.Where(c => c.Client == FakeTavilyEndpoint.ClientName).ToList();
         var described = string.Join("; ", calls.Select(c => $"{c.Client} {c.Url}"));
-        Assert.True(tavily.Any(c => !c.Body.Contains("\"news\"", StringComparison.Ordinal)), $"No web search call. {described}");
-        Assert.True(tavily.Any(c => c.Body.Contains("\"news\"", StringComparison.Ordinal)), $"No news search call. {described}");
-        Assert.True(calls.Any(c => c.Client.Contains("academic-", StringComparison.Ordinal)), $"No academic search call. {described}");
+        Assert.True(tavily.Count > 0, $"No web search call. {described}");
         Assert.True(calls.Any(c => c.Client == FakeEmbeddingsEndpoint.ClientName), $"No embeddings call for the learning search. {described}");
     }
 

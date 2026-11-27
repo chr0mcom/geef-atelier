@@ -25,7 +25,6 @@ public sealed class StaticContextGroundingProviderTests
             Description: "",
             ProviderType: GroundingProviderTypes.StaticContext,
             ProviderSettings: BuildSettings(content, label),
-            MaxQueriesPerRun: 1,
             IsSystem: false);
 
     private static Dictionary<string, string> BuildSettings(string? content, string? label)

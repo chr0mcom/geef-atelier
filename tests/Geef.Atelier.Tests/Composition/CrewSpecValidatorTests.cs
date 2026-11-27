@@ -127,6 +127,37 @@ public sealed class CrewSpecValidatorTests
         Assert.Contains(issues, i => i.IsCritical && i.Message.Contains("foreign-tb"));
     }
 
+    // ── Tests: reuse of a profile whose type was retired (stage 8c, D-089) ──
+
+    [Fact]
+    public async Task Reusing_a_grounding_or_finalizer_profile_of_a_retired_type_is_critical()
+    {
+        var validator = MakeValidator(crewService: new RetiredPartsCrewService());
+        var spec = $$"""
+        {
+            "mode": "composed",
+            "executor": {{InlineExecutor}},
+            "reviewers": [{"reuse": "briefing-fidelity"}],
+            "finalizers": [{"reuse": "custom-old-sink"}],
+            "grounding_providers": [{"reuse": "custom-old-papers"}]
+        }
+        """;
+
+        var issues = await validator.ValidateAsync(spec);
+
+        Assert.Contains(issues, i => i.Field == "grounding_providers[0].reuse" && i.IsCritical);
+        Assert.Contains(issues, i => i.Field == "finalizers[0].reuse" && i.IsCritical);
+    }
+
+    private sealed class RetiredPartsCrewService : Geef.Atelier.Tests.Fakes.StubCrewServiceBase
+    {
+        public override Task<GroundingProviderProfile?> GetGroundingProviderProfileAsync(string name, CancellationToken ct = default) =>
+            Task.FromResult<GroundingProviderProfile?>(new GroundingProviderProfile(name, name, "d", "academic-search", [], false));
+
+        public override Task<FinalizerProfile?> GetFinalizerProfileAsync(string name, CancellationToken ct = default) =>
+            Task.FromResult<FinalizerProfile?>(new FinalizerProfile(name, name, "d", (FinalizerType)2, [], false));
+    }
+
     // ── Tests: executor must be inline/specialized (never reused) ──────────
 
     [Fact]
@@ -395,7 +426,6 @@ public sealed class CrewSpecValidatorTests
                     Name: name, DisplayName: name, Description: string.Empty,
                     ProviderType: "static-context",
                     ProviderSettings: new Dictionary<string, string>(),
-                    MaxQueriesPerRun: null,
                     IsSystem: false);
                 return Task.FromResult<GroundingProviderProfile?>(profile);
             }

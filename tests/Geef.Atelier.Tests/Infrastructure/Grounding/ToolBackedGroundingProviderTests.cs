@@ -36,7 +36,6 @@ public sealed class ToolBackedGroundingProviderTests
             Description: "A profile for unit tests.",
             ProviderType: "__tool-backed__",
             ProviderSettings: new Dictionary<string, string>(),
-            MaxQueriesPerRun: 1,
             IsSystem: false,
             ToolName: toolName);
 

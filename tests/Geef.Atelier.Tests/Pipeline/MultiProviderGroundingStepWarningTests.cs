@@ -18,14 +18,34 @@ namespace Geef.Atelier.Tests.Pipeline;
 
 /// <summary>
 /// A skipped grounding provider becomes a run warning, and the five system profiles always run through the
-/// provider-type path, also when an older snapshot still carries their tool name.
+/// provider-type path, also when an older snapshot still carries their tool name. <c>academic-default</c> was retired in
+/// stage 8c (D-089): an older snapshot that still names it is skipped with a warning and never reaches the tool path.
 /// </summary>
 public sealed class MultiProviderGroundingStepWarningTests
 {
     public static TheoryData<string> LegacySystemProfiles => new()
     {
-        "tavily-refined", "tavily-basic", "run-attachments", "knowledge-base-default", "academic-default",
+        "tavily-refined", "tavily-basic", "run-attachments", "knowledge-base-default",
     };
+
+    [Fact]
+    public async Task RetiredSystemProfileFromAnOlderSnapshotIsSkippedWithAWarningAndNeverUsesTheToolPath()
+    {
+        var sink = new RecordingWarningSink();
+        var runId = Guid.NewGuid();
+        var retired = Profile("academic-default", "academic-search", "Academic Search") with { IsSystem = true, ToolName = "academic-search" };
+        var toolExecutor = new CountingToolExecutor();
+        var step = Step([retired, Profile("ok", "ok-type")], [new FixedProvider("ok-type", "OK block")], runId, sink, ToolProvider(toolExecutor));
+
+        var result = await step.RunAsync("briefing", CancellationToken.None);
+
+        Assert.Equal(0, toolExecutor.Calls);
+        Assert.True(result.Context.TryGet(AtelierContextKeys.GroundingContext, out var context));
+        Assert.Contains("OK block", context);
+        var warning = Assert.Single(sink.Warnings);
+        Assert.Equal(RunWarningCodes.GroundingProviderSkipped, warning.Code);
+        Assert.Equal("The source \"Academic Search\" could not be read and was skipped.", warning.Message);
+    }
 
     [Fact]
     public async Task FailingProviderIsSkippedWithAWarningAndTheOthersStillContribute()
@@ -122,7 +142,6 @@ public sealed class MultiProviderGroundingStepWarningTests
         Description: "test",
         ProviderType: providerType,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: null,
         IsSystem: false);
 
     private static ToolDefinition StaticTool() =>

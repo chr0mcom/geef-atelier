@@ -21,14 +21,11 @@ public sealed class AdminOnlyPagesTests : TestContext
     [
         typeof(ProvidersIndex),
         typeof(ProviderTypeSelection),
-        typeof(HttpProviderEditor),
         typeof(CliProviderEditor),
         typeof(ProviderView),
         typeof(ToolsIndex),
         typeof(ToolEditor),
         typeof(ToolView),
-        typeof(McpServersIndex),
-        typeof(McpServerEditor),
         typeof(GroundingProviderEditor),
     ];
 
@@ -104,7 +101,7 @@ public sealed class AdminOnlyPagesTests : TestContext
 
         var hrefs = cut.FindAll("a.nav-link").Select(a => a.GetAttribute("href")).ToList();
         Assert.Contains("/tools", hrefs);
-        Assert.Contains("/mcp-servers", hrefs);
+        Assert.DoesNotContain("/mcp-servers", hrefs);
         Assert.Contains("/crew/providers", hrefs);
     }
 }

@@ -24,8 +24,6 @@ using Geef.Atelier.Infrastructure.Research;
 using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Infrastructure.Sources.Extraction;
 using Geef.Atelier.Infrastructure.Finalizers;
-using Geef.Atelier.Infrastructure.TemplateStudio;
-using Geef.Atelier.Infrastructure.Mcp;
 using Geef.Atelier.Infrastructure.Orders;
 using Geef.Atelier.Infrastructure.Tools;
 using Geef.Atelier.Mcp;
@@ -90,14 +88,10 @@ builder.Services.AddLearningSwitch(builder.Configuration);
 // Tool execution infrastructure (IToolExecutor + IToolSchemaProvider)
 builder.Services.AddToolExecutor();
 
-// MCP client infrastructure (outbound connections to remote MCP servers)
-builder.Services.AddAtelierMcpClient();
-
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection("Pricing"));
 builder.Services.Configure<CostTrackingOptions>(builder.Configuration.GetSection("CostTracking"));
 builder.Services.AddSingleton<IPricingCatalog, PricingCatalog>();
 builder.Services.AddSingleton<DocsService>();
-builder.Services.AddTemplateStudio(builder.Configuration);
 builder.Services.AddFinalizers(builder.Configuration);
 builder.Services.AddCrewComposition();
 

@@ -10,7 +10,6 @@ public sealed class GroundingProviderProfileNewTypesTests
             Description: "",
             ProviderType: "static-context",
             ProviderSettings: settings ?? new(),
-            MaxQueriesPerRun: 1,
             IsSystem: false);
 
     // ── StaticContent / StaticLabel ──────────────────────────────────────────
@@ -160,68 +159,5 @@ public sealed class GroundingProviderProfileNewTypesTests
         });
 
         Assert.True(profile.StripBoilerplate);
-    }
-
-    // ── RecencyDays ──────────────────────────────────────────────────────────
-
-    [Fact]
-    public void RecencyDays_WhenMissing_DefaultsTo7()
-    {
-        var profile = MakeProfile();
-
-        Assert.Equal(7, profile.RecencyDays);
-    }
-
-    [Fact]
-    public void RecencyDays_WhenSet_ReturnsCustomValue()
-    {
-        var profile = MakeProfile(new Dictionary<string, string>
-        {
-            [GroundingProviderProfile.KeyRecencyDays] = "14"
-        });
-
-        Assert.Equal(14, profile.RecencyDays);
-    }
-
-    // ── NewsMaxResults ───────────────────────────────────────────────────────
-
-    [Fact]
-    public void NewsMaxResults_WhenMissing_DefaultsTo5()
-    {
-        var profile = MakeProfile();
-
-        Assert.Equal(5, profile.NewsMaxResults);
-    }
-
-    [Fact]
-    public void NewsMaxResults_WhenSet_ReturnsCustomValue()
-    {
-        var profile = MakeProfile(new Dictionary<string, string>
-        {
-            [GroundingProviderProfile.KeyNewsMaxResults] = "10"
-        });
-
-        Assert.Equal(10, profile.NewsMaxResults);
-    }
-
-    // ── NewsSearchDepth ──────────────────────────────────────────────────────
-
-    [Fact]
-    public void NewsSearchDepth_WhenMissing_ReturnsNull()
-    {
-        var profile = MakeProfile();
-
-        Assert.Null(profile.NewsSearchDepth);
-    }
-
-    [Fact]
-    public void NewsSearchDepth_WhenSet_ReturnsValue()
-    {
-        var profile = MakeProfile(new Dictionary<string, string>
-        {
-            [GroundingProviderProfile.KeyNewsSearchDepth] = "advanced"
-        });
-
-        Assert.Equal("advanced", profile.NewsSearchDepth);
     }
 }

@@ -8,7 +8,6 @@ using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Knowledge;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
-using Geef.Atelier.Infrastructure.TemplateStudio;
 using Geef.Atelier.Infrastructure.Tools;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -50,7 +49,6 @@ services.AddKnowledge(builder.Configuration);
 services.AddCrewComposition();
 services.AddGroundingProviders(builder.Configuration);
 services.AddToolExecutor();
-services.AddTemplateStudio(builder.Configuration);
 
 using var host = builder.Build();
 await using var scope = host.Services.CreateAsyncScope();

@@ -55,7 +55,6 @@ public sealed class FinalizerProfileTests
     [Theory]
     [InlineData(FinalizerType.FileExport)]
     [InlineData(FinalizerType.MetadataEnrich)]
-    [InlineData(FinalizerType.ExternalSink)]
     [InlineData(FinalizerType.Transform)]
     public void FinalizerType_AllValues_AreDistinct(FinalizerType type)
     {

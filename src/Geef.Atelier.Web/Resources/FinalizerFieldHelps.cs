@@ -3,6 +3,11 @@ namespace Geef.Atelier.Web.Resources;
 /// <summary>Field help texts displayed below each field in the Finalizer Editor.</summary>
 public static class FinalizerFieldHelps
 {
+    public const string TransformSystemPrompt =
+        "Instruction for the AI transformation. Be concrete: what should be changed and what not. " +
+        "Example: \"Rewrite the text in a natural, human voice. Avoid AI-typical sentence constructions.\" " +
+        "Always ends with: 'Respond in the language of the input text.'";
+
     public const string TransformProvider =
         "The LLM provider for the text transformation. Only active providers are available for selection.";
 

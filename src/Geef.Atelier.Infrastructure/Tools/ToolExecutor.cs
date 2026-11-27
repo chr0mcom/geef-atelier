@@ -3,15 +3,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Geef.Atelier.Application.Tools;
-using Geef.Atelier.Core.Domain.Mcp;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Domain.Tools;
-using Geef.Atelier.Core.Persistence.Mcp;
 using Geef.Atelier.Core.Persistence.Tools;
-using Geef.Atelier.Infrastructure.Mcp;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using ModelContextProtocol.Protocol;
 
 namespace Geef.Atelier.Infrastructure.Tools;
 
@@ -22,7 +18,6 @@ namespace Geef.Atelier.Infrastructure.Tools;
 /// <list type="bullet">
 ///   <item><see cref="ToolType.StaticContext"/> — returns configured static text (fully wired).</item>
 ///   <item><see cref="ToolType.WebSearch"/> — calls Tavily API (wired in A-T9).</item>
-///   <item><see cref="ToolType.McpTool"/> — connects to the configured MCP server and calls the tool by its original name.</item>
 ///   <item>All other types — return a "NotYetWired" error result.</item>
 /// </list>
 /// When a call throws, the caller (and through it the model) only gets a fixed sentence; the exception goes to the
@@ -31,8 +26,6 @@ namespace Geef.Atelier.Infrastructure.Tools;
 internal sealed class ToolExecutor(
     IServiceScopeFactory scopeFactory,
     IHttpClientFactory httpClientFactory,
-    IMcpServerConfigRepository mcpServerConfigRepository,
-    IAtelierMcpClientFactory mcpClientFactory,
     ILogger<ToolExecutor> logger,
     IEnvReferencePolicy? envReferencePolicy = null) : IToolExecutor
 {
@@ -40,9 +33,6 @@ internal sealed class ToolExecutor(
 
     /// <summary>Error text when a tool call throws for an unexpected reason.</summary>
     internal const string ToolFailedMessage = "The tool could not be run.";
-
-    /// <summary>Error text when the call to an MCP tool fails.</summary>
-    internal const string McpToolFailedMessage = "The MCP tool call failed.";
 
     /// <summary>Error text when the web search fails.</summary>
     internal const string WebSearchFailedMessage = "The web search failed.";
@@ -63,7 +53,6 @@ internal sealed class ToolExecutor(
             {
                 ToolType.StaticContext => ExecuteStaticContext(tool),
                 ToolType.WebSearch     => await ExecuteWebSearchAsync(tool, inputJson, ct),
-                ToolType.McpTool       => await ExecuteMcpToolAsync(tool, inputJson, ct),
                 _ => new ToolExecutionResult(
                     $"Tool type '{tool.ToolType}' not yet wired in ToolExecutor. Use GroundingProvider path.",
                     null,
@@ -139,67 +128,6 @@ internal sealed class ToolExecutor(
             ? v
             : "";
         return new ToolExecutionResult(content, null, null);
-    }
-
-    private async Task<ToolExecutionResult> ExecuteMcpToolAsync(
-        ToolDefinition tool,
-        string inputJson,
-        CancellationToken ct)
-    {
-        if (!tool.Settings.TryGetValue(ToolDefinitionSettingsKeys.McpServerId, out var serverIdStr)
-            || !Guid.TryParse(serverIdStr, out var serverId))
-            return new ToolExecutionResult("", null, "mcp-tool is missing a valid 'mcpServerId' setting.");
-
-        if (!tool.Settings.TryGetValue(ToolDefinitionSettingsKeys.McpOriginalName, out var originalName)
-            || string.IsNullOrWhiteSpace(originalName))
-            return new ToolExecutionResult("", null, "mcp-tool is missing a valid 'mcpOriginalName' setting.");
-
-        var serverConfig = await mcpServerConfigRepository.GetByIdAsync(serverId, ct);
-        if (serverConfig is null)
-            return new ToolExecutionResult("", null, $"MCP server '{serverId}' not found in configuration.");
-
-        if (!serverConfig.IsActive)
-            return new ToolExecutionResult("", null, $"MCP server '{serverConfig.Name}' is inactive.");
-
-        // Parse input JSON to arguments dictionary
-        IReadOnlyDictionary<string, object?>? arguments = null;
-        try
-        {
-            using var doc = JsonDocument.Parse(inputJson);
-            if (doc.RootElement.ValueKind == JsonValueKind.Object)
-            {
-                var dict = new Dictionary<string, object?>(StringComparer.Ordinal);
-                foreach (var prop in doc.RootElement.EnumerateObject())
-                    dict[prop.Name] = prop.Value.Clone();
-                arguments = dict;
-            }
-        }
-        catch
-        {
-            // If parsing fails, pass no arguments
-        }
-
-        try
-        {
-            await using var client = await mcpClientFactory.ConnectAsync(serverConfig, ct);
-            var response = await client.CallToolAsync(originalName, arguments, cancellationToken: ct);
-
-            var sb = new System.Text.StringBuilder();
-            foreach (var content in response.Content)
-            {
-                if (content is TextContentBlock textBlock && !string.IsNullOrEmpty(textBlock.Text))
-                    sb.AppendLine(textBlock.Text);
-            }
-
-            var output = sb.ToString().Trim();
-            return new ToolExecutionResult(output, null, response.IsError == true ? "MCP tool returned an error" : null);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(
-                "ToolExecutor: mcp-tool call failed for tool={ToolName}: {Error}", tool.Name, ex.ToRedactedLogText());
-            return new ToolExecutionResult("", null, McpToolFailedMessage);
-        }
     }
 
     // -------------------------------------------------------------------------

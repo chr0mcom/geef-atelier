@@ -28,9 +28,23 @@ public sealed class GroundingProviderTypesTests
         Assert.Equal("url-fetch", GroundingProviderTypes.UrlFetch);
     }
 
-    [Fact]
-    public void NewsSearch_HasCorrectStringValue()
+    [Theory]
+    [InlineData("news-search")]
+    [InlineData("academic-search")]
+    [InlineData("rest-api")]
+    [InlineData("REST-API")]
+    public void The_types_removed_in_stage_8c_are_retired(string type)
     {
-        Assert.Equal("news-search", GroundingProviderTypes.NewsSearch);
+        Assert.True(type.IsRetiredGroundingType());
+    }
+
+    [Theory]
+    [InlineData("tavily")]
+    [InlineData("url-fetch")]
+    [InlineData("vector-store")]
+    [InlineData(null)]
+    public void The_remaining_types_are_not_retired(string? type)
+    {
+        Assert.False(type.IsRetiredGroundingType());
     }
 }

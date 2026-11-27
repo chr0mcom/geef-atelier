@@ -45,7 +45,6 @@ internal sealed class ToolSchemaProvider : IToolSchemaProvider
             ToolType.UrlFetch        => UrlFetchSchema,
             ToolType.RestApi         => RestApiSchema,
             ToolType.StaticContext   => StaticContextSchema,
-            ToolType.McpTool         => ResolveMcpSchema(tool),
             _                        => GenericSchema
         };
 
@@ -66,19 +65,5 @@ internal sealed class ToolSchemaProvider : IToolSchemaProvider
             return null;
 
         return schema.GetRawText();
-    }
-
-    /// <summary>
-    /// For MCP tools the schema comes from the discovery result stored in
-    /// <see cref="ToolDefinition.LlmSchema"/>. Falls back to the generic schema when
-    /// the stored schema is empty (tool not yet discovered).
-    /// </summary>
-    private static string ResolveMcpSchema(ToolDefinition tool)
-    {
-        if (tool.LlmSchema.ValueKind == JsonValueKind.Object &&
-            tool.LlmSchema.EnumerateObject().Any())
-            return tool.LlmSchema.GetRawText();
-
-        return GenericSchema;
     }
 }

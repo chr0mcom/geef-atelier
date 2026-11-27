@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Sockets;
 using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Crew.Knowledge;
-using Geef.Atelier.Application.Crew.TemplateStudio;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Profiles;
 using Geef.Atelier.Application.Sources;
@@ -117,7 +116,6 @@ internal sealed class WebTestHost : IAsyncDisposable
         builder.Services.TryAddSingleton<IUploadTicketRepository>(sp => sp.GetRequiredService<FakeUploadTickets>());
         builder.Services.TryAddSingleton<IProfileService, FakeProfileService>();
         builder.Services.TryAddScoped<ICurrentUserService, HttpContextCurrentUserService>();
-        builder.Services.TryAddScoped<ITemplateStudioService, UnavailableTemplateStudioService>();
 
         // Orchestrator: fast polling for tests
         builder.Services.Configure<OrchestratorOptions>(o =>

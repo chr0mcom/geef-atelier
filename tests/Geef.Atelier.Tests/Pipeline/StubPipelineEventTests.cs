@@ -1,3 +1,4 @@
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Sdk.Events;

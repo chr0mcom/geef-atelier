@@ -203,7 +203,6 @@ Siehe [docs/08-crew-system_de.md](docs/08-crew-system_de.md).
 | Executor-Profile | `/crew/profiles/executors` |
 | Grounding-Provider | `/crew/profiles/grounding-providers` |
 | Finalizer-Profile | `/crew/profiles/finalizers` |
-| Template Studio (KI-gestützte Template-Erstellung) | `/crew/studio` |
 
 Diese Seiten erreicht man über das Menü „Workshop“, das nur Admins sehen, solange `Ui:WorkshopForAdminsOnly` an ist (ausgeliefert); die Adressen selbst bleiben wie bisher für alle Angemeldeten offen (D-077).
 
@@ -245,7 +244,7 @@ ATELIER_DOMAIN=<your-domain>
 LLM_OPENROUTER_API_KEY=<openrouter-api-key>
 
 # Tavily Web Search (https://tavily.com) — nötig für das Nachschlagen auf dem Standardweg (Research:Mode, ausgeliefert On) und für
-# die Grounding-Profile tavily, news-search und tavily-news; ohne Schlüssel die Recherche mit Research__Mode=Off unter
+# die tavily-Grounding-Profile; ohne Schlüssel die Recherche mit Research__Mode=Off unter
 # services.web.environment in docker-compose.override.yml ausschalten (diese .env-Datei allein erreicht den Webdienst nicht)
 TAVILY_API_KEY=
 ```
@@ -357,7 +356,7 @@ Die Liste hält fest, wie das Projekt gewachsen ist. Sie bleibt zur Nachvollzieh
 
 **Schritt 8 ✅** Cookie-Auth — Single-User-Login, `[Authorize]` auf Pages, Login/Logout, `TestAuthenticationHandler` für E2E-Tests.
 
-**Schritt 9+ ✅** Crew-System, Advisor-Pässe, Template Studio (mit vollständigem Edit-Flow, D-043), Domain-Templates, Grounding-Provider-CRUD, Vector-Store-RAG, PDF-Support, Cost-Tracking.
+**Schritt 9+ ✅** Crew-System, Advisor-Pässe, Template Studio (mit vollständigem Edit-Flow, D-043; in Stufe 8c entfernt, D-089), Domain-Templates, Grounding-Provider-CRUD, Vector-Store-RAG, PDF-Support, Cost-Tracking.
 
 **MCP-OAuth ✅** Self-hosted OAuth 2.1 Authorization Server (RFC 8414/7591/7636/7009/8252) — Authorization-Code-Flow mit Pflicht-PKCE/S256, Opaque Tokens, Refresh-Rotation, Reuse-Detection.
 
@@ -365,15 +364,15 @@ Die Liste hält fest, wie das Projekt gewachsen ist. Sie bleibt zur Nachvollzieh
 
 **Run-User-Isolation ✅** Jeder Nutzer sieht nur seine eigenen Runs; Admin-Override per expliziten Umschaltern. MCP-Runs werden dem autorisierenden OAuth-Nutzer zugeordnet, Claude-Code-CLI-Runs (statisches Token) dem Admin (D-042).
 
-**Finalizer-Pipeline ✅** 5. Profil-Typ — FinalizerProfile mit vier Typen (FileExport, MetadataEnrich, ExternalSink, Transform). 17 System-Profile. RunArtifact-Entity (File mit Download, Url, Status). Download-Endpunkt mit Owner-Check. FinalizerPicker + RunFinalizersOnMaxAttempts im CrewTemplateEditor. RunDetail-Artefakt-Tabelle. Studio-Integration. 2 neue MCP-Tools (D-044, 19. Mai 2026).
+**Finalizer-Pipeline ✅** 5. Profil-Typ — FinalizerProfile mit vier Typen (FileExport, MetadataEnrich, ExternalSink, Transform; ExternalSink in Stufe 8c entfernt, D-089). 17 System-Profile. RunArtifact-Entity (File mit Download, Url, Status). Download-Endpunkt mit Owner-Check. FinalizerPicker + RunFinalizersOnMaxAttempts im CrewTemplateEditor. RunDetail-Artefakt-Tabelle. Studio-Integration. 2 neue MCP-Tools (D-044, 19. Mai 2026).
 
 **Run-Resume ✅** Einen fehlgeschlagenen oder abgebrochenen Run dort fortsetzen, wo er aufgehört hat — Seed-Modus (weiter mit letztem Draft) oder Clean-Modus (neuer Start mit gleichem Briefing). „Fortsetzen"-Button in RunDetail, ResumeRunDialog mit MaxIterations-Override. ParentRunId-Link in RunDetail (PR #18, 19. Mai 2026).
 
 **Grounding-Refinement ✅** Optionaler KI-Filter-Pass nach jedem Grounding-Provider-Fetch — Filter-Modus (pro Quelle keep/drop mit Begründung) und Synthesize-Modus (alle Quellen zu einem kohärenten Text mit `[n]`-Zitaten zusammenfassen). Pro Provider via `LlmBinding` konfigurierbar (D-049/D-050, PR #22, 20. Mai 2026).
 
-**Grounding-Typen ✅** Drei neue Grounding-Provider-Typen neben den bestehenden `tavily` und `vector-store`: `static-context` (kuratierter Fixtext — Style-Guides, Glossare, Markenstimme), `url-fetch` (gezieltes URL-Fetching mit SSRF-Guard, der alle privaten/Cloud-Metadata-IPs blockiert) und `news-search` (Tavily-Newssuche mit Datumsfilter). Neues System-Profil `tavily-news`. Dashboard-Cost-Aggregation umfasst jetzt auch Grounding-Refiner-Kosten (D-051, PR #23, 20. Mai 2026).
+**Grounding-Typen ✅** Drei neue Grounding-Provider-Typen neben den bestehenden `tavily` und `vector-store`: `static-context` (kuratierter Fixtext — Style-Guides, Glossare, Markenstimme), `url-fetch` (gezieltes URL-Fetching mit SSRF-Guard, der alle privaten/Cloud-Metadata-IPs blockiert) und `news-search` (Tavily-Newssuche mit Datumsfilter). Neues System-Profil `tavily-news` (`news-search` und `tavily-news` in Stufe 8c entfernt, D-089). Dashboard-Cost-Aggregation umfasst jetzt auch Grounding-Refiner-Kosten (D-051, PR #23, 20. Mai 2026).
 
-**Tool-System ✅** Zentraler `ToolDefinition`-Katalog + agentic Tool-Use (Pull, `IToolUseRunner`) für Executor/Reviewer/Advisor, Grounding auf dieselben Tools neu aufgebaut (Push), Provider-Capability-Detection, `/tools`-CRUD + `ToolPicker`, `ToolInvocationsBlock`-Audit, Auto-Crew-Tool-Binding und ein MCP-Client (`/mcp-servers` Discovery/Import). Siehe [docs/10-tool-system_de.md](docs/10-tool-system_de.md) (D-060).
+**Tool-System ✅** Zentraler `ToolDefinition`-Katalog + agentic Tool-Use (Pull, `IToolUseRunner`) für Executor/Reviewer/Advisor, Grounding auf dieselben Tools neu aufgebaut (Push), Provider-Capability-Detection, `/tools`-CRUD + `ToolPicker`, `ToolInvocationsBlock`-Audit, Auto-Crew-Tool-Binding und ein MCP-Client (`/mcp-servers` Discovery/Import; in Stufe 8c entfernt, D-089). Siehe [docs/10-tool-system_de.md](docs/10-tool-system_de.md) (D-060).
 
 **Spezialisierungs-Packs ✅** Generische Akteure (Rollen-Prompt + `{specialization}`-Slot) + wiederverwendbare gescopte `SpecializationPack`s, pro Crew gebunden. Effektiver Prompt zur Snapshot-Bauzeit komponiert (CrewSnapshot v3 + Provenienz), in der Audit-UI sichtbar. Die sechs domänen-spezialisierten System-Reviewer wurden zu zwei generischen Rollen + sechs DomainScoped-Packs. `/packs`-CRUD, Scope-Durchsetzung, Composer-Integration (`pack_names`/`packs` + Pack-Katalog-Grounding), Lebenszyklus (Cascade-Delete, Promote/Demote/Clone mit LLM-Generalitäts-Review, Auto-GC). Siehe [docs/11-specialization-packs_de.md](docs/11-specialization-packs_de.md) (D-061).
 
@@ -382,6 +381,8 @@ Die Liste hält fest, wie das Projekt gewachsen ist. Sie bleibt zur Nachvollzieh
 **Etappe 1: Aufträge und Direktweg ✅** Der Auftrag ist die Einheit, die die Person sieht (`/start`, `/work`, `/orders/{id}`); Dateien werden einzeln mit Quittung hochgeladen und als Quellen gehalten; der Direktweg schreibt mit den Dateien im Volltext (ab 150.000 Zeichen mit Karte, ab 600.000 mit Seitenauswahl), prüft das Ergebnis ohne Modell und korrigiert einmal; MCP-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`; Migration Step48 verknüpft bestehende Läufe mit Aufträgen (D-069, D-070, 2026-11-24).
 
 **Etappen 2–6 ✅, Umbau abgeschlossen (D-077)** Rückfragen vor dem Lauf (D-071/D-072), ehrliches Schreiben mit Prüfungen (D-073), Recherche (D-074, nach Messung R3′ eingeschaltet), Ändern eines Ergebnisses (D-075, mit D-078 eingeschaltet) und der vollständige MCP-Auftragsvertrag, Dateien über ein Upload-Ticket (D-076). Etappe 8a: Die Werkstatt-Einstiege sehen nur Admins (`Ui:WorkshopForAdminsOnly`). Nicht gebaut, jeweils mit Auslöser: Etappe 1b (entschärfte Schleife und erster Rückbau), Etappe 7 (Gedächtnis), der Rückbau aus Etappe 8 und Etappe 9 (D-077).
+
+**Rückbau, Schnitt 1 (Stufe 8c, D-089) ✅** Entfernt, was niemand nutzte: Template Studio (seine zwei MCP-Werkzeuge bleiben als Stummel, die `submit_order` nennen), der MCP-Client mit `/mcp-servers` und dem Werkzeugtyp `mcp-tool`, die Grounding-Typen `rest-api`, `academic-search` und `news-search`, der Abschluss `ExternalSink`, der Editor für HTTP-Provider sowie die toten Felder `MaxQueriesPerRun` und `AdvisorRetryAttempted`. Keine Tabelle, Spalte oder Zeile wurde gelöscht; ältere Snapshots bleiben lesbar, Läufe überspringen entfernte Teile mit einer Warnung.
 
 Aktuell: **über 1800 Tests** (grün; vorbestehende Testcontainers-/E2E-Umgebungs-Flakes ausgenommen).
 

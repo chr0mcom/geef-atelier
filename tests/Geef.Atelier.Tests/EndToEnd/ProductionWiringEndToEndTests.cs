@@ -8,12 +8,10 @@ using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Application.Tools;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Core.Persistence;
-using Geef.Atelier.Core.Persistence.Mcp;
 using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Core.Persistence.Sources;
 using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Llm;
-using Geef.Atelier.Infrastructure.Mcp;
 using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Tests.Persistence;
@@ -41,18 +39,12 @@ public sealed class ProductionWiringEndToEndTests(PostgresFixture postgres)
 
         await using var scope = host.Services.CreateAsyncScope();
         var services = scope.ServiceProvider;
-        var groundingProviders = services.GetServices<IGroundingProvider>().ToList();
         var consumers = new object[]
         {
-            services.GetRequiredService<ICrewService>(),
             services.GetRequiredService<IProviderService>(),
             services.GetRequiredService<ILlmClientResolver>(),
             services.GetRequiredService<IModelCatalog>(),
             services.GetRequiredService<IToolExecutor>(),
-            services.GetRequiredService<IAtelierMcpClientFactory>(),
-            services.GetRequiredService<IMcpServerConfigRepository>(),
-            groundingProviders.OfType<RestApiGroundingProvider>().Single(),
-            groundingProviders.OfType<AcademicSearchGroundingProvider>().Single(),
         };
 
         Assert.All(consumers, consumer => Assert.Same(configured, PolicyOf(consumer)));

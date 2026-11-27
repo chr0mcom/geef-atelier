@@ -153,23 +153,16 @@
         }
 
         <div class="editor-actions">
-            @if (_provider.IsSystem)
+            @if (_provider.IsSystem && _provider.Type == ProviderType.Cli)
             {
                 <button type="button" class="btn primary" @onclick="CloneAsCustom" disabled="@_cloning"
                         data-testid="btn-clone">
                     @(_cloning ? "Creating…" : "Clone as Custom")
                 </button>
             }
-            else
+            else if (!_provider.IsSystem && _provider.Type == ProviderType.Cli)
             {
-                @if (_provider.Type == ProviderType.Http)
-                {
-                    <a href="/crew/providers/edit/@_provider.Name" class="btn primary">Edit</a>
-                }
-                else
-                {
-                    <a href="/crew/providers/edit/cli/@_provider.Name" class="btn primary">Edit</a>
-                }
+                <a href="/crew/providers/edit/cli/@_provider.Name" class="btn primary">Edit</a>
             }
         </div>
 
@@ -211,10 +204,7 @@
                 UpdatedAt = DateTimeOffset.UtcNow,
             };
             var created = await ProviderService.CreateCustomAsync(copy);
-            var editRoute = created.Type == ProviderType.Cli
-                ? $"/crew/providers/edit/cli/{Uri.EscapeDataString(created.Name)}"
-                : $"/crew/providers/edit/{Uri.EscapeDataString(created.Name)}";
-            Nav.NavigateTo(editRoute);
+            Nav.NavigateTo($"/crew/providers/edit/cli/{Uri.EscapeDataString(created.Name)}");
         }
         catch (Exception ex)
         {

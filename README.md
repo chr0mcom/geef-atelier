@@ -201,7 +201,6 @@ See [docs/08-crew-system.md](docs/08-crew-system.md).
 | Executor profiles | `/crew/profiles/executors` |
 | Grounding providers | `/crew/profiles/grounding-providers` |
 | Finalizer profiles | `/crew/profiles/finalizers` |
-| Template Studio (AI-assisted template creation) | `/crew/studio` |
 
 These pages are reached through the menu "Workshop", which only administrators see while `Ui:WorkshopForAdminsOnly` is on (shipped); the addresses themselves stay open to every signed-in user as before (D-077).
 
@@ -243,7 +242,7 @@ ATELIER_DOMAIN=<your-domain>
 LLM_OPENROUTER_API_KEY=<openrouter-api-key>
 
 # Tavily web search (https://tavily.com) — needed for looking things up on the standard way (Research:Mode, shipped On) and for
-# the tavily, news-search and tavily-news grounding profiles; without a key switch research off with Research__Mode=Off under
+# the tavily grounding profiles; without a key switch research off with Research__Mode=Off under
 # services.web.environment in docker-compose.override.yml (this .env file alone does not reach the web service)
 TAVILY_API_KEY=
 ```
@@ -355,7 +354,7 @@ The list below records how the project grew. It is kept for provenance; the curr
 
 **Step 8 ✅** Cookie auth — single-user login, `[Authorize]` on pages, login/logout, `TestAuthenticationHandler` for E2E tests.
 
-**Step 9+ ✅** Crew system, advisor passes, Template Studio (with full-field edit, D-043), domain templates, grounding-provider CRUD, vector-store RAG, PDF support, cost tracking.
+**Step 9+ ✅** Crew system, advisor passes, Template Studio (with full-field edit, D-043; removed in stage 8c, D-089), domain templates, grounding-provider CRUD, vector-store RAG, PDF support, cost tracking.
 
 **MCP OAuth ✅** Self-hosted OAuth 2.1 authorization server (RFC 8414/7591/7636/7009/8252) — authorization-code flow with mandatory PKCE/S256, opaque tokens, refresh rotation, reuse detection.
 
@@ -363,15 +362,15 @@ The list below records how the project grew. It is kept for provenance; the curr
 
 **Run-user isolation ✅** Each user sees only their own runs; admin override via explicit toggles. MCP runs are attributed to the authorizing OAuth user, Claude Code CLI runs (static token) to the admin (D-042).
 
-**Finalizer pipeline ✅** 5th profile type — FinalizerProfile with four types (FileExport, MetadataEnrich, ExternalSink, Transform). 17 system profiles. RunArtifact entity (File with download, Url, Status). Download endpoint with owner check. FinalizerPicker + RunFinalizersOnMaxAttempts in CrewTemplateEditor. RunDetail artifact table. Studio integration. 2 new MCP tools (D-044, 2026-05-19).
+**Finalizer pipeline ✅** 5th profile type — FinalizerProfile with four types (FileExport, MetadataEnrich, ExternalSink, Transform; ExternalSink removed in stage 8c, D-089). 17 system profiles. RunArtifact entity (File with download, Url, Status). Download endpoint with owner check. FinalizerPicker + RunFinalizersOnMaxAttempts in CrewTemplateEditor. RunDetail artifact table. Studio integration. 2 new MCP tools (D-044, 2026-05-19).
 
 **Run-Resume ✅** Resume a failed or aborted run from where it left off — Seed mode (continue from last draft) or Clean mode (fresh start with same briefing). "Fortsetzen" button in RunDetail, ResumeRunDialog with MaxIterations override. ParentRunId link shown in RunDetail (PR #18, 2026-05-19).
 
 **Grounding Refinement ✅** Optional AI filter pass after every grounding provider fetch — Filter mode (keep/drop per source with reasoning) and Synthesize mode (merge all sources into a coherent text with `[n]` citations). Configurable per provider via `LlmBinding` (D-049/D-050, PR #22, 2026-05-20).
 
-**Grounding Types ✅** Three new grounding-provider types alongside the existing `tavily` and `vector-store` providers: `static-context` (curated fixed text — style guides, glossaries, brand voice), `url-fetch` (fetch specific URLs with SSRF guard blocking all private/cloud-metadata IPs), and `news-search` (Tavily news topic with date filter). New system profile `tavily-news`. Dashboard cost aggregation now includes Grounding Refiner costs (D-051, PR #23, 2026-05-20).
+**Grounding Types ✅** Three new grounding-provider types alongside the existing `tavily` and `vector-store` providers: `static-context` (curated fixed text — style guides, glossaries, brand voice), `url-fetch` (fetch specific URLs with SSRF guard blocking all private/cloud-metadata IPs), and `news-search` (Tavily news topic with date filter). New system profile `tavily-news` (`news-search` and `tavily-news` removed in stage 8c, D-089). Dashboard cost aggregation now includes Grounding Refiner costs (D-051, PR #23, 2026-05-20).
 
-**Tool System ✅** Central `ToolDefinition` catalogue + agentic tool-use (Pull, `IToolUseRunner`) for executor/reviewer/advisor, grounding rebuilt on the same tools (Push), provider capability detection, `/tools` CRUD + `ToolPicker`, `ToolInvocationsBlock` audit, Auto-Crew tool binding, and an MCP client (`/mcp-servers` discovery/import). See [docs/10-tool-system.md](docs/10-tool-system.md) (D-060).
+**Tool System ✅** Central `ToolDefinition` catalogue + agentic tool-use (Pull, `IToolUseRunner`) for executor/reviewer/advisor, grounding rebuilt on the same tools (Push), provider capability detection, `/tools` CRUD + `ToolPicker`, `ToolInvocationsBlock` audit, Auto-Crew tool binding, and an MCP client (`/mcp-servers` discovery/import; removed in stage 8c, D-089). See [docs/10-tool-system.md](docs/10-tool-system.md) (D-060).
 
 **Specialization Packs ✅** Generic actors (role prompt + `{specialization}` slot) + reusable scoped `SpecializationPack`s bound per crew. Effective prompt composed at snapshot-build time (CrewSnapshot v3 + provenance), audit UI shows it. The six domain-specialized system reviewers became two generic roles + six DomainScoped packs. `/packs` CRUD, scope enforcement, composer integration (`pack_names`/`packs` + pack-catalog grounding), lifecycle (cascade-delete, promote/demote/clone with LLM generality review, auto-GC). See [docs/11-specialization-packs.md](docs/11-specialization-packs.md) (D-061).
 
@@ -380,6 +379,8 @@ The list below records how the project grew. It is kept for provenance; the curr
 **Stage 1: orders and direct path ✅** The order is the unit the person sees (`/start`, `/work`, `/orders/{id}`); files are uploaded one by one with a receipt and kept as sources; the direct path writes with the files in full text (with a map above 150,000 characters, page choice above 600,000), checks the result without a model and corrects once; MCP tools `submit_order`, `get_order_status`, `get_order_result`; migration Step48 links existing runs to orders (D-069, D-070, 2026-11-24).
 
 **Stages 2–6 ✅, rebuild completed (D-077)** Questions before the run (D-071/D-072), honest writing with checks (D-073), research (D-074, switched on after measurement R3′), changing a result (D-075, switched on with D-078) and the full MCP order contract, files over an upload ticket (D-076). Stage 8a: the workshop entries are shown to administrators only (`Ui:WorkshopForAdminsOnly`). Not built, each waiting for a trigger: stage 1b (defused loop and first removal cut), stage 7 (memory), the removal of stage 8 and stage 9 (D-077).
+
+**Cleanup, cut 1 (stage 8c, D-089) ✅** Removed code nobody used: Template Studio (its two MCP tools stay as stubs that name `submit_order`), the MCP client with `/mcp-servers` and the tool type `mcp-tool`, the grounding types `rest-api`, `academic-search` and `news-search`, the `ExternalSink` finishing step, the editor for HTTP providers, and the dead fields `MaxQueriesPerRun` and `AdvisorRetryAttempted`. No table, column or row was dropped; older snapshots stay readable and runs skip removed parts with a warning.
 
 Currently: **over 1800 tests** (green; pre-existing Testcontainers/E2E env flakes excluded).
 

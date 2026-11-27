@@ -48,9 +48,9 @@ The cross-cutting process rules live in the parent infrastructure repository und
 
 ## Status
 
-- **Phase:** in production. Since the rebuild of November 2026 (D-068 to D-077) the default is the order with the direct path; the older crew system (with its extensions such as advisor passes, grounding, finalizers, Template Studio and the paused learning loop) stays available as "Workshop" and "Extra careful".
+- **Phase:** in production. Since the rebuild of November 2026 (D-068 to D-077) the default is the order with the direct path; the older crew system (with its extensions such as advisor passes, grounding, finalizers and the paused learning loop; Template Studio was removed in stage 8c, D-089) stays available as "Workshop" and "Extra careful".
 - **Last updated:** 2026-11-26
-- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-077 "completion of the rebuild"). The rebuild following D-068 ends with stage 6 and the closing round 8a (D-077): stages 1b, 7, 8 (apart from 8a) and 9 are not built, and the older crew, tool and learning systems stay in place until the removal trigger in D-077 is met; documents mark parts that are frozen or due for removal.
+- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-089 "cleanup, cut 1"). The rebuild following D-068 ends with stage 6 and the closing round 8a (D-077): stages 1b, 7, 8 (apart from 8a) and 9 are not built, and the older crew, tool and learning systems stay in place until the removal trigger in D-077 is met; the first cut of the removal (stage 8c, D-089) took out the parts nobody used; documents mark parts that are frozen or due for removal.
 
 ## Conventions
 

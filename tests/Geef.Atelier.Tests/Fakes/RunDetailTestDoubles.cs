@@ -45,7 +45,7 @@ internal sealed class StubRunService(RunDetails details, IReadOnlyList<Geef.Atel
             Warnings: warnings));
 
     public Task<WelcomeStats> GetWelcomeStatsAsync(string? user, CancellationToken ct = default) =>
-        Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));
+        Task.FromResult(new WelcomeStats(0, 0, 0, 0));
 
     public Task<Guid> ResumeRunAsync(ResumeOptions options, string? user, CancellationToken ct = default) =>
         throw new NotImplementedException();

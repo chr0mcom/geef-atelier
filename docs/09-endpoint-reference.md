@@ -310,17 +310,6 @@ Lists all grounding-provider profiles (system + custom).
     "displayName": "Tavily Refined",
     "description": "...",
     "providerType": "tavily",
-    "maxQueriesPerRun": 3,
-    "isSystem": true,
-    "refinementEnabled": true,
-    "refinementMode": "filter"
-  },
-  {
-    "name": "tavily-news",
-    "displayName": "Tavily News",
-    "description": "...",
-    "providerType": "news-search",
-    "maxQueriesPerRun": 1,
     "isSystem": true,
     "refinementEnabled": true,
     "refinementMode": "filter"
@@ -330,7 +319,6 @@ Lists all grounding-provider profiles (system + custom).
     "displayName": "My Provider",
     "description": "...",
     "providerType": "vector-store",
-    "maxQueriesPerRun": null,
     "isSystem": false,
     "refinementEnabled": false,
     "refinementMode": null
@@ -343,8 +331,7 @@ Lists all grounding-provider profiles (system + custom).
 | `name` | string | Profile identifier |
 | `displayName` | string | Human-readable name |
 | `description` | string | Purpose description |
-| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, `"news-search"`, `"academic-search"`, `"rest-api"`, or `"learning-retrieval"` |
-| `maxQueriesPerRun` | int? | Max queries per run (null = unlimited) |
+| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"` or `"learning-retrieval"` (`"news-search"`, `"academic-search"` and `"rest-api"` were removed in stage 8c, D-089; older custom profiles of these types are still listed) |
 | `isSystem` | boolean | Built-in system profile |
 | `refinementEnabled` | boolean | Whether AI refinement is configured |
 | `refinementMode` | string \| null | `"filter"` or `"synthesize"` (null when not enabled) |
@@ -674,13 +661,13 @@ externally reachable routes:
 | `/admin/users` | GET | Cookie (admin) | User management |
 | `/admin/oauth-clients` | GET | Cookie (admin) | OAuth client management |
 | `/account/connected-clients` | GET | Cookie | Self-service for one's own connected OAuth clients |
-| `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/studio`, `/crew/knowledge` | GET | Cookie | Crew/template/profile/Studio/knowledge-base management |
+| `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/knowledge` | GET | Cookie | Crew/template/profile/knowledge-base management |
 | `/start` | GET | Cookie | Start page for a new order: request, files with receipts, "Extra careful" (D-070) |
 | `/u/{uploadId}` | GET | Cookie | Upload page of the upload ticket for exactly one file, only for its owner and only with `Uploads:Tickets` `On` (D-076) |
 | `/work`, `/orders` | GET | Cookie | "My work": the person's orders, newest activity first (admins can show all users) |
 | `/orders/{id}` | GET | Cookie | Order page: progress, text, open points, "How it was made", versions |
 | `/runs`, `/runs/{id}`, `/new` | GET | Cookie | Run list, run detail, new job |
-| `/crew/providers/*`, `/tools/*`, `/mcp-servers/*`, `/crew/profiles/grounding-providers/create`, `/crew/profiles/grounding-providers/edit/{name}` | GET | Cookie (admin) | Provider, tool, MCP server and grounding editors — admin-only since D-067 because they reference secrets by name |
+| `/crew/providers/*`, `/tools/*`, `/crew/profiles/grounding-providers/create`, `/crew/profiles/grounding-providers/edit/{name}` | GET | Cookie (admin) | Provider (CLI only since D-089), tool and grounding editors — admin-only since D-067 because they reference secrets by name |
 
 Run-related pages are subject to run-user isolation (D-042): each user sees
 only their own runs; the admin can see system-wide via an explicit toggle.
@@ -757,7 +744,7 @@ Downloads an artifact file that was produced by a finalizer during a run. Only a
 
 ## Transform-Finalizer LLM-Binding
 
-Custom Transform-Finalizer profiles can configure the LLM that powers the transformation. When creating or editing a finalizer profile via `materialize_template_proposal` or the UI, the `settings` object for Transform-type finalizers may include these optional keys:
+Custom Transform-Finalizer profiles can configure the LLM that powers the transformation. When creating or editing a finalizer profile in the UI, the `settings` object for Transform-type finalizers may include these optional keys:
 
 | Key | Type | Description |
 |-----|------|-------------|

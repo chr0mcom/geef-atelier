@@ -1,6 +1,5 @@
-using Geef.Atelier.Infrastructure.Persistence;
 
-namespace Geef.Atelier.Infrastructure.TemplateStudio;
+namespace Geef.Atelier.Infrastructure.Persistence;
 
 internal sealed class EfAtomicTransactionFactory(AtelierDbContext db) : IAtomicTransactionFactory
 {

@@ -130,7 +130,6 @@ public sealed class MultiProviderGroundingStepTests
         Description: "",
         ProviderType: name,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: null,
         IsSystem: false);
 
     private sealed class PassThroughGroundingStep(string notes) : IGroundingStep

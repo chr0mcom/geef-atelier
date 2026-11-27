@@ -22,7 +22,7 @@ public sealed class GroundingProviderEditorCreateTests : TestContext
         Dictionary<string, string>? settings = null) =>
         new(Name: name, DisplayName: name + " Display", Description: "desc",
             ProviderType: providerType, ProviderSettings: settings ?? new(),
-            MaxQueriesPerRun: 1, IsSystem: isSystem);
+            IsSystem: isSystem);
 
     [Fact]
     public void RendersDataTestIdGroundingProviderEditor()
@@ -108,20 +108,6 @@ public sealed class GroundingProviderEditorCreateTests : TestContext
         var cut = RenderComponent<GroundingProviderEditor>();
 
         Assert.Empty(cut.FindAll("[data-testid='tavily-key-warning']"));
-    }
-
-    [Fact]
-    public void MaxQueriesPerRun_DefaultsToOne()
-    {
-        Services.AddSingleton<ICrewService>(new StubCrewService());
-        Services.AddSingleton<IProviderService>(new FakeProviderService());
-        Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
-        this.AddTestAuthorization().SetAuthorized("test-user");
-
-        var cut = RenderComponent<GroundingProviderEditor>();
-
-        var maxInput = cut.Find("[data-testid='input-max-queries']");
-        Assert.Equal("1", maxInput.GetAttribute("value"));
     }
 
     [Fact]

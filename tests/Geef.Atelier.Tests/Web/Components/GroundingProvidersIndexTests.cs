@@ -18,7 +18,7 @@ public sealed class GroundingProvidersIndexTests : TestContext
         Dictionary<string, string>? settings = null) =>
         new(Name: name, DisplayName: name + " Display", Description: "desc",
             ProviderType: providerType, ProviderSettings: settings ?? new(),
-            MaxQueriesPerRun: 1, IsSystem: isSystem);
+            IsSystem: isSystem);
 
     [Fact]
     public void EmptyList_ShowsEmptyStateText()

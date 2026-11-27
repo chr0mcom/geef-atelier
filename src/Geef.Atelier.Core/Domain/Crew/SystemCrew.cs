@@ -201,7 +201,6 @@ public static class SystemCrew
         Description: "Returns the current catalog of system and custom crew profiles and templates. Used by the crew-composer executor to apply Reuse-First before composing new profiles.",
         ProviderType: GroundingProviderTypes.CrewCatalog,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>Tool catalog grounding provider — lists all registered tools for tool-binding awareness in auto-crew composition.</summary>
@@ -211,7 +210,6 @@ public static class SystemCrew
         Description: "Lists all registered tools in the central tool catalogue. Used by the crew-composer executor so it can bind tools to actor profiles by name.",
         ProviderType: GroundingProviderTypes.ToolCatalog,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>Pack catalog grounding provider — lists reusable specialization packs for pack-binding awareness in auto-crew composition.</summary>
@@ -221,7 +219,6 @@ public static class SystemCrew
         Description: "Lists the reusable specialization packs (General + DomainScoped). Used by the crew-composer executor so it can reuse existing packs by name instead of inventing new ones.",
         ProviderType: GroundingProviderTypes.PackCatalog,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>Static-context grounding provider embedding the binding crew design rules.</summary>
@@ -265,7 +262,6 @@ public static class SystemCrew
                 "Anti-pattern: \"technically correct\" != critical. If correct but could be more precise -> minor at most.",
             [GroundingProviderProfile.KeyStaticLabel] = "Crew Design Rules",
         },
-        MaxQueriesPerRun: 1,
         IsSystem: true,
         ToolName: "static-context");
 
@@ -404,7 +400,6 @@ public static class SystemCrew
             ["MinRelevanceScore"] = "0.4",
             ["ExtractQuery"] = "true",
         },
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>System grounding-provider profile for Tavily Advanced web-search with LLM-based citation filtering (1 credit/search, ~10 sources).</summary>
@@ -426,7 +421,6 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyRefinementMaxTokens]   = "2048",
             [GroundingProviderProfile.KeyRefinementMode]        = "0",
         },
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>System grounding-provider profile for the full knowledge base (vector-store, Top-5 results, no tag filter).</summary>
@@ -436,7 +430,6 @@ public static class SystemCrew
         Description: "Searches the full knowledge base for briefing-relevant passages using semantic similarity. Returns the top 5 most similar chunks.",
         ProviderType: "vector-store",
         ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "global" },
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>System grounding-provider profile for run-local attachments uploaded with the briefing.</summary>
@@ -446,46 +439,6 @@ public static class SystemCrew
         Description: "Uses documents uploaded with the briefing as a grounding source. Activated automatically when attachments are present.",
         ProviderType: "vector-store",
         ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "run-local" },
-        MaxQueriesPerRun: 1,
-        IsSystem: true);
-
-    /// <summary>System grounding-provider profile for scientific papers via Semantic Scholar with LLM-based relevance filtering.</summary>
-    public static readonly GroundingProviderProfile AcademicDefaultProfile = new(
-        Name: "academic-default",
-        DisplayName: "Academic Search (Semantic Scholar + AI-filtered)",
-        Description: "Semantic Scholar search for scientific papers, filtered by an LLM refiner to retain only the most relevant results.",
-        ProviderType: GroundingProviderTypes.AcademicSearch,
-        ProviderSettings: new Dictionary<string, string>
-        {
-            [GroundingProviderProfile.KeyAcademicSource]             = "semantic-scholar",
-            [GroundingProviderProfile.KeyAcademicMaxPapers]          = "5",
-            [GroundingProviderProfile.KeyRefinementProvider]         = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Provider,
-            [GroundingProviderProfile.KeyRefinementModel]            = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Model,
-            [GroundingProviderProfile.KeyModelSlot] = nameof(ModelSlot.GroundingRefiner),
-            [GroundingProviderProfile.KeyRefinementMaxTokens]        = "2048",
-            [GroundingProviderProfile.KeyRefinementMode]             = "0",
-        },
-        MaxQueriesPerRun: 1,
-        IsSystem: true);
-
-    /// <summary>System grounding-provider profile for recent news via Tavily news topic with LLM-based noise filtering.</summary>
-    public static readonly GroundingProviderProfile TavilyNewsProfile = new(
-        Name: "tavily-news",
-        DisplayName: "Tavily News (recent + AI-filtered)",
-        Description: "Recent news via Tavily news topic (last 7 days), filtered by an LLM refiner to remove noise.",
-        ProviderType: GroundingProviderTypes.NewsSearch,
-        ProviderSettings: new Dictionary<string, string>
-        {
-            [GroundingProviderProfile.KeyRecencyDays]         = "7",
-            [GroundingProviderProfile.KeyNewsMaxResults]      = "5",
-            [GroundingProviderProfile.KeyNewsSearchDepth]     = "basic",
-            [GroundingProviderProfile.KeyRefinementProvider]  = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Provider,
-            [GroundingProviderProfile.KeyRefinementModel]     = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Model,
-            [GroundingProviderProfile.KeyModelSlot] = nameof(ModelSlot.GroundingRefiner),
-            [GroundingProviderProfile.KeyRefinementMaxTokens] = "2048",
-            [GroundingProviderProfile.KeyRefinementMode]      = "0",
-        },
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>
@@ -503,7 +456,6 @@ public static class SystemCrew
             ["crossDomainPenalty"] = "0.5",
             ["maxLearnings"]       = "4",
         },
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>All system reviewer profiles, indexed by name.</summary>
@@ -610,8 +562,6 @@ public static class SystemCrew
             [TavilyRefinedProfile.Name]              = TavilyRefinedProfile,
             [KnowledgeBaseDefaultProfile.Name]       = KnowledgeBaseDefaultProfile,
             [RunAttachmentsProfile.Name]             = RunAttachmentsProfile,
-            [TavilyNewsProfile.Name]                 = TavilyNewsProfile,
-            [AcademicDefaultProfile.Name]            = AcademicDefaultProfile,
             [LearningRetrieverDefaultProfile.Name]   = LearningRetrieverDefaultProfile,
             // Auto-Crew grounding providers
             [CrewCatalogDefaultProfile.Name]         = CrewCatalogDefaultProfile,
@@ -648,9 +598,16 @@ public static class SystemCrew
     public static bool IsSystemAdvisorName(string name) =>
         AdvisorProfiles.ContainsKey(name);
 
-    /// <summary>True when the supplied name matches a system grounding-provider profile.</summary>
+    /// <summary>
+    /// Names of system grounding-provider profiles whose type was retired in stage 8c (D-089). They are no longer offered, but their
+    /// stored rows stay protected like every system profile: they cannot be renamed, changed or deleted.
+    /// </summary>
+    public static readonly IReadOnlySet<string> RetiredGroundingProviderNames =
+        new HashSet<string>(["academic-default", "tavily-news"], StringComparer.Ordinal);
+
+    /// <summary>True when the supplied name matches a system grounding-provider profile, including the retired ones.</summary>
     public static bool IsSystemGroundingProviderName(string name) =>
-        GroundingProviderProfiles.ContainsKey(name) || name == OrderSourcesProfile.Name;
+        GroundingProviderProfiles.ContainsKey(name) || name == OrderSourcesProfile.Name || RetiredGroundingProviderNames.Contains(name);
 
     // ── System Finalizer Profiles ──────────────────────────────────────────────────
 
@@ -728,37 +685,6 @@ public static class SystemCrew
         Description: "Computes a Flesch Reading Ease score and appends a brief readability summary to the final text.",
         FinalizerType: FinalizerType.MetadataEnrich,
         Settings: new Dictionary<string, string> { [MetadataEnrichSettings.KeyEnricherType] = MetadataEnrichSettings.ReadingLevel },
-        IsSystem: true);
-
-    // ─ ExternalSink (2 profiles) ───────────────────────────────────────────────
-
-    public static readonly FinalizerProfile WebhookSinkProfile = new(
-        Name: "webhook-sink",
-        DisplayName: "Webhook Sink",
-        Description: "POSTs the final text as JSON to a configured webhook URL. Customize URL and optional auth header in settings.",
-        FinalizerType: FinalizerType.ExternalSink,
-        Settings: new Dictionary<string, string>
-        {
-            [WebhookSinkSettings.KeySinkKind] = WebhookSinkSettings.SinkKindValue,
-            [WebhookSinkSettings.KeyUrl] = "",
-            [WebhookSinkSettings.KeyContentType] = "application/json",
-            [WebhookSinkSettings.KeyTimeoutSeconds] = "30",
-        },
-        IsSystem: true);
-
-    public static readonly FinalizerProfile EmailSinkProfile = new(
-        Name: "email-sink",
-        DisplayName: "E-Mail Sink",
-        Description: "Sends the final text to a configured e-mail address via SMTP. SMTP credentials are resolved from environment variables at runtime.",
-        FinalizerType: FinalizerType.ExternalSink,
-        Settings: new Dictionary<string, string>
-        {
-            [EmailSinkSettings.KeySinkKind] = EmailSinkSettings.SinkKindValue,
-            [EmailSinkSettings.KeyToAddress] = "",
-            [EmailSinkSettings.KeySubject] = "Geef.Atelier — Run Result",
-            [EmailSinkSettings.KeyAttachAsFile] = "false",
-            [EmailSinkSettings.KeyAttachmentFormat] = "markdown",
-        },
         IsSystem: true);
 
     // ─ Transform (6 profiles) ──────────────────────────────────────────────────
@@ -884,9 +810,6 @@ public static class SystemCrew
             [AddFrontMatterProfile.Name]      = AddFrontMatterProfile,
             [AddWordCountFooterProfile.Name]  = AddWordCountFooterProfile,
             [AddReadingLevelProfile.Name]     = AddReadingLevelProfile,
-            // ExternalSink
-            [WebhookSinkProfile.Name]         = WebhookSinkProfile,
-            [EmailSinkProfile.Name]           = EmailSinkProfile,
             // Transform
             [AntiAiVoiceProfile.Name]         = AntiAiVoiceProfile,
             [ToneFormalizationProfile.Name]   = ToneFormalizationProfile,
@@ -901,9 +824,16 @@ public static class SystemCrew
             [CrewMaterializerProfile.Name]    = CrewMaterializerProfile,
         };
 
-    /// <summary>True when the supplied name matches a system finalizer profile.</summary>
+    /// <summary>True when the supplied name matches a system finalizer profile, including the retired ones.</summary>
     public static bool IsSystemFinalizerName(string name) =>
-        FinalizerProfiles.ContainsKey(name);
+        FinalizerProfiles.ContainsKey(name) || RetiredFinalizerNames.Contains(name);
+
+    /// <summary>
+    /// Names of system finalizer profiles whose type was retired in stage 8c (D-089). They are no longer offered, but their stored rows
+    /// stay protected like every system profile: they cannot be renamed, changed or deleted.
+    /// </summary>
+    public static readonly IReadOnlySet<string> RetiredFinalizerNames =
+        new HashSet<string>(["webhook-sink", "email-sink"], StringComparer.Ordinal);
 
     /// <summary>Ensures the supplied name carries the <c>"custom-"</c> prefix; idempotent.</summary>
     public static string EnsureCustomPrefix(string name) =>
@@ -979,7 +909,6 @@ public static class SystemCrew
         Description: "Passes the files attached to the order in full text.",
         ProviderType: GroundingProviderTypes.OrderSources,
         ProviderSettings: new Dictionary<string, string>(),
-        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>

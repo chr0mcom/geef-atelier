@@ -183,7 +183,7 @@ public sealed class LearningExtractFinalizerRecursionGuardTests
             => Task.FromResult(false);
 
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken ct = default)
-            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m, 0, 0m));
+            => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m));
 
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
@@ -231,7 +231,7 @@ public sealed class LearningExtractFinalizerRecursionGuardTests
         public Task<bool> CancelRunAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<RunDetails?> GetRunDetailsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) => Task.FromResult<RunDetails?>(null);
         public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) => Task.FromResult<RunWithGroundingViewModel?>(null);
-        public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken cancellationToken = default) => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m, 0, 0m));
+        public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken cancellationToken = default) => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m));
         public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default) => Task.FromResult(Guid.NewGuid());
         public Task<bool> DeleteRunAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) => Task.FromResult(false);
     }

@@ -245,7 +245,7 @@ public sealed class ModelAssignmentServiceTests
                     [GroundingProviderProfile.KeyRefinementProvider] = "deepseek",
                     [GroundingProviderProfile.KeyRefinementModel] = "deepseek/deepseek-v4-flash",
                     [GroundingProviderProfile.KeyModelSlot] = "GroundingRefiner",
-                }, 1, false),
+                }, false),
             ],
             Finalizers:
             [

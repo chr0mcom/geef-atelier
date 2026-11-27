@@ -11,13 +11,14 @@ public static class CompositionServiceExtensions
     /// <summary>
     /// Registers crew composition infrastructure services:
     /// <see cref="ICrewSpecValidator"/>, <see cref="ICrewMaterializer"/>,
-    /// <see cref="ICrewTemplateEmbeddingRepository"/>, and <see cref="CrewComposerExecutor"/>.
+    /// <see cref="ICrewTemplateEmbeddingRepository"/>, <see cref="CrewComposerExecutor"/> and the transaction factory the materializer uses.
     /// </summary>
     public static IServiceCollection AddCrewComposition(this IServiceCollection services)
     {
         services.AddScoped<ICrewSpecValidator, CrewSpecValidator>();
         services.AddScoped<ICrewTemplateEmbeddingRepository, CrewTemplateEmbeddingRepository>();
         services.AddScoped<ICrewMaterializer, CrewMaterializer>();
+        services.AddScoped<IAtomicTransactionFactory, EfAtomicTransactionFactory>();
         services.AddScoped<IPackGeneralityReviewer, PackGeneralityReviewer>();
         return services;
     }

@@ -17,8 +17,6 @@ using Geef.Atelier.Infrastructure.Persistence.Crew.Learning;
 using Geef.Atelier.Infrastructure.Persistence.Entities;
 using Geef.Atelier.Infrastructure.Persistence.Providers;
 using Geef.Atelier.Infrastructure.Persistence.SiteSettings;
-using Geef.Atelier.Infrastructure.Persistence.StudioSettings;
-using Geef.Atelier.Infrastructure.Persistence.TemplateStudio;
 using Microsoft.EntityFrameworkCore;
 
 namespace Geef.Atelier.Infrastructure.Persistence;
@@ -65,15 +63,11 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
 
     public DbSet<CrewTemplateEmbedding> CrewTemplateEmbeddings => Set<CrewTemplateEmbedding>();
 
-    internal DbSet<TemplateStudioAnalysisEntity> TemplateStudioAnalyses => Set<TemplateStudioAnalysisEntity>();
-
     internal DbSet<AtelierUser> Users => Set<AtelierUser>();
 
     internal DbSet<ProviderEntity> Providers => Set<ProviderEntity>();
 
     internal DbSet<SiteSettingsEntity> SiteSettings => Set<SiteSettingsEntity>();
-
-    internal DbSet<StudioSettingsEntity> StudioSettings => Set<StudioSettingsEntity>();
 
     internal DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
     internal DbSet<OAuthAuthorizationCode> OAuthAuthorizationCodes => Set<OAuthAuthorizationCode>();
@@ -84,7 +78,6 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<ToolDefinitionEntity> ToolDefinitions => Set<ToolDefinitionEntity>();
     internal DbSet<ToolInvocation> ToolInvocations => Set<ToolInvocation>();
 
-    internal DbSet<McpServerConfigEntity> McpServerConfigs => Set<McpServerConfigEntity>();
 
     internal DbSet<SpecializationPackEntity> SpecializationPacks => Set<SpecializationPackEntity>();
 

@@ -584,20 +584,6 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
             null,
             d.CreatedAt)));
 
-        // Materialized templates (studio analyses)
-        var templates = await db.TemplateStudioAnalyses.AsNoTracking()
-            .Where(a => a.MaterializedTemplateName != null)
-            .OrderByDescending(a => a.CreatedAt)
-            .Take(2)
-            .Select(a => new { a.MaterializedTemplateName, a.CreatedAt })
-            .ToListAsync(ct);
-        entries.AddRange(templates.Select(a => new DayBookEntry(
-            DayBookKind.TemplateCreated,
-            DayBookFormatter.GetVerb(DayBookKind.TemplateCreated),
-            a.MaterializedTemplateName!,
-            null,
-            a.CreatedAt)));
-
         return entries
             .OrderByDescending(e => e.At)
             .Take(12)

@@ -27,7 +27,6 @@
                 <tr>
                     <th>Name</th>
                     <th>Type</th>
-                    <th>Max Queries/Run</th>
                     <th>Description</th>
                     <th></th>
                 </tr>
@@ -41,7 +40,6 @@
                             @if (p.IsSystem) { <span class="crew-badge">System</span> }
                         </td>
                         <td>@ReviewerDisplay.GetGroundingProviderTypeDisplay(p.ProviderType)</td>
-                        <td>@(p.MaxQueriesPerRun?.ToString() ?? "—")</td>
                         <td>
                             @if (!string.IsNullOrEmpty(p.Description))
                             {

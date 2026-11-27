@@ -40,12 +40,6 @@ public sealed class RunEntity
     /// </summary>
     public string? CrewSnapshot { get; init; }
 
-    /// <summary>
-    /// Set to true when an advisor-driven convergence-failure recovery pass has been attempted for this run.
-    /// Prevents infinite retry loops: only one advisor retry is permitted per run.
-    /// </summary>
-    public bool AdvisorRetryAttempted { get; init; }
-
     // Cost tracking — null for runs before Step16 migration or when CostTracking:Enabled=false.
     public decimal? TotalCostEur { get; set; }
     public decimal? LlmCostEur { get; set; }

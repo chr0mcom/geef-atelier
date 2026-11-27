@@ -14,7 +14,7 @@ namespace Geef.Atelier.Tests.Pipeline;
 public sealed class AtelierPipelineFactoryRequiresGroundingFactoryTests
 {
     private static readonly GroundingProviderProfile Source = new(
-        "web", "Web", "d", "tavily", new Dictionary<string, string>(), MaxQueriesPerRun: null, IsSystem: false);
+        "web", "Web", "d", "tavily", new Dictionary<string, string>(), IsSystem: false);
 
     [Fact]
     public void BuildWithSourcesButWithoutFactoryThrows()

@@ -27,7 +27,6 @@ public sealed class GroundingProviderEditorModelAssignmentTests : Bunit.TestCont
         Description: "d",
         ProviderType: "tavily",
         ProviderSettings: settings,
-        MaxQueriesPerRun: 1,
         IsSystem: false);
 
     private static Dictionary<string, string> Refined(string provider, string model, bool managed)

@@ -63,13 +63,17 @@ public sealed class GroundingProviderEditorNewTypesTests : TestContext
         Assert.Contains("url-fetch", select.InnerHtml);
     }
 
-    [Fact]
-    public void TypeDropdown_ContainsNewsSearchOption()
+    [Theory]
+    [InlineData("news-search")]
+    [InlineData("academic-search")]
+    [InlineData("rest-api")]
+    public void TypeDropdown_NoLongerOffersRetiredTypes(string retired)
     {
         SetupServices();
         var cut = RenderComponent<GroundingProviderEditor>();
         var select = cut.Find("[data-testid='input-provider-type']");
-        Assert.Contains("news-search", select.InnerHtml);
+        Assert.DoesNotContain(retired, select.InnerHtml);
+        Assert.Empty(cut.FindAll("[data-testid='retired-type-notice']"));
     }
 
     // ── static-context ────────────────────────────────────────────────────────
@@ -92,16 +96,6 @@ public sealed class GroundingProviderEditorNewTypesTests : TestContext
         cut.Find("[data-testid='input-static-content']");
     }
 
-    [Fact]
-    public void StaticContext_HidesMaxQueriesPerRunField()
-    {
-        SetupServices();
-        var cut = RenderComponent<GroundingProviderEditor>();
-        cut.Find("[data-testid='input-provider-type']").Change("static-context");
-        // input-max-queries is hidden for static-context (always 1, no user input)
-        Assert.Throws<Bunit.ElementNotFoundException>(() => cut.Find("[data-testid='input-max-queries']"));
-    }
-
     // ── url-fetch ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -120,44 +114,6 @@ public sealed class GroundingProviderEditorNewTypesTests : TestContext
         var cut = RenderComponent<GroundingProviderEditor>();
         cut.Find("[data-testid='input-provider-type']").Change("url-fetch");
         cut.Find("[data-testid='input-max-content-per-url']");
-    }
-
-    [Fact]
-    public void UrlFetch_ShowsMaxQueriesPerRunField()
-    {
-        SetupServices();
-        var cut = RenderComponent<GroundingProviderEditor>();
-        cut.Find("[data-testid='input-provider-type']").Change("url-fetch");
-        cut.Find("[data-testid='input-max-queries']");
-    }
-
-    // ── news-search ───────────────────────────────────────────────────────────
-
-    [Fact]
-    public void NewsSearch_ShowsRecencyDaysField()
-    {
-        SetupServices();
-        var cut = RenderComponent<GroundingProviderEditor>();
-        cut.Find("[data-testid='input-provider-type']").Change("news-search");
-        cut.Find("[data-testid='input-recency-days']");
-    }
-
-    [Fact]
-    public void NewsSearch_ShowsNewsMaxResultsField()
-    {
-        SetupServices();
-        var cut = RenderComponent<GroundingProviderEditor>();
-        cut.Find("[data-testid='input-provider-type']").Change("news-search");
-        cut.Find("[data-testid='input-news-max-results']");
-    }
-
-    [Fact]
-    public void NewsSearch_ShowsMaxQueriesPerRunField()
-    {
-        SetupServices();
-        var cut = RenderComponent<GroundingProviderEditor>();
-        cut.Find("[data-testid='input-provider-type']").Change("news-search");
-        cut.Find("[data-testid='input-max-queries']");
     }
 
     // ── Stub ──────────────────────────────────────────────────────────────────

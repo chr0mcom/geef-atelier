@@ -9,7 +9,8 @@ internal static class GroundingPathSelection
     /// <summary>
     /// System profiles whose tool binding is broken (knowledge-base and academic-search are not wired in the tool
     /// executor, and web-search read a key name the container does not set). They always run through the
-    /// provider-type path until the tool path is removed.
+    /// provider-type path until the tool path is removed. <c>academic-default</c> was retired in stage 8c (D-089) but stays
+    /// listed, so older snapshots that still carry it take the provider-type path and are skipped with a warning.
     /// </summary>
     public static readonly IReadOnlySet<string> ProviderTypePathSystemProfiles = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -17,7 +18,7 @@ internal static class GroundingPathSelection
         SystemCrew.TavilyBasicProfile.Name,
         SystemCrew.RunAttachmentsProfile.Name,
         SystemCrew.KnowledgeBaseDefaultProfile.Name,
-        SystemCrew.AcademicDefaultProfile.Name,
+        "academic-default",
     };
 
     /// <summary>True when <paramref name="profile"/> is executed by the tool-backed provider.</summary>

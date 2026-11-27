@@ -39,6 +39,20 @@ public sealed class FinalizerEditorTests : TestContext
     }
 
     [Fact]
+    public void Create_TypeDropdown_NoLongerOffersTheRetiredSink()
+    {
+        Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
+        this.AddTestAuthorization().SetAuthorized("user");
+
+        var cut = RenderComponent<FinalizerEditor>();
+
+        var options = cut.Find("[data-testid='input-finalizer-type']").InnerHtml;
+        Assert.DoesNotContain("ExternalSink", options);
+        Assert.Contains("MetadataEnrich", options);
+    }
+
+    [Fact]
     public void Create_DefaultType_ShowsFileExportFields()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
@@ -63,29 +77,6 @@ public sealed class FinalizerEditorTests : TestContext
         var cut = RenderComponent<FinalizerEditor>(p => p.Add(e => e.Name, "custom-enrich"));
 
         cut.Find("[data-testid='input-enricher-type']");
-    }
-
-    [Fact]
-    public void Edit_ExistingExternalSink_ShowsSinkFields()
-    {
-        var settings = new WebhookSinkSettings("https://example.com/hook", null, "application/json", 30).ToDict();
-        var profile = new FinalizerProfile(
-            Name: "custom-webhook",
-            DisplayName: "Webhook",
-            Description: "test",
-            FinalizerType: FinalizerType.ExternalSink,
-            Settings: settings,
-            IsSystem: false,
-            CreatedAt: DateTimeOffset.UtcNow,
-            UpdatedAt: DateTimeOffset.UtcNow);
-        var crew = new StubCrewService(profile);
-        Services.AddSingleton<ICrewService>(crew);
-        Services.AddSingleton<IProviderService>(new FakeProviderService());
-        this.AddTestAuthorization().SetAuthorized("user");
-
-        var cut = RenderComponent<FinalizerEditor>(p => p.Add(e => e.Name, "custom-webhook"));
-
-        cut.Find("[data-testid='input-sink-kind']");
     }
 
     [Fact]

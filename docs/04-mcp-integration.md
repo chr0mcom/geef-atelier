@@ -2,7 +2,7 @@
 
 *[Deutsch](04-mcp-integration_de.md) · **English***
 
-*Last updated: 2026-11-27 (D-086: server instructions at most 3,900 characters in every combination of switches, details of changing, the result and the export in the tool descriptions; MCP SDK exactly 2.4.0, transport explicitly stateless, older clients and long silent answers; before 2026-11-26, D-083: `profile` saves four About me fields, `aboutMeMissing` and `fromAboutMe` in `get_order_result`, server instruction on it behind `Orders:TellOnce`; upload ticket shipped `On` corrected; stage 6: files over the upload ticket with `prepare_attachment` and `uploadIds` behind `Uploads:Tickets`, counting of refused attachments; stage 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`, `latestVersion`/`earlierOpenPoints`/`fromVersion` in `get_order_result`, older tools behind `Mcp:LegacyTools`; stage 3: `get_order_result` with what was checked, open points, the writer's assumptions and quotes from the files; stage 1: order tools, `submit_request` as a shell, server instructions, `list_learnings` admin only; before that 2026-11-22, D-066: `ModelSlot`/`ModelDomain`/`Domain` in the list tools; before that 2026-05-22, D-052: academic-search und rest-api als neue providerType-Werte in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
+*Last updated: 2026-11-27 (D-089: Template Studio removed, `analyze_template_proposal` and `materialize_template_proposal` are stubs, `list_grounding_provider_profiles` without `maxQueriesPerRun`; D-086: server instructions at most 3,900 characters in every combination of switches, details of changing, the result and the export in the tool descriptions; MCP SDK exactly 2.4.0, transport explicitly stateless, older clients and long silent answers; before 2026-11-26, D-083: `profile` saves four About me fields, `aboutMeMissing` and `fromAboutMe` in `get_order_result`, server instruction on it behind `Orders:TellOnce`; upload ticket shipped `On` corrected; stage 6: files over the upload ticket with `prepare_attachment` and `uploadIds` behind `Uploads:Tickets`, counting of refused attachments; stage 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`, `latestVersion`/`earlierOpenPoints`/`fromVersion` in `get_order_result`, older tools behind `Mcp:LegacyTools`; stage 3: `get_order_result` with what was checked, open points, the writer's assumptions and quotes from the files; stage 1: order tools, `submit_request` as a shell, server instructions, `list_learnings` admin only; before that 2026-11-22, D-066: `ModelSlot`/`ModelDomain`/`Domain` in the list tools; before that 2026-05-22, D-052: academic-search und rest-api als neue providerType-Werte in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
 
 ## Why MCP
 
@@ -165,7 +165,7 @@ Cancels a running run. Returns `true` if the cancellation was triggered; `false`
 
 **Output:** `bool` (`true` | `false`)
 
-### Further tools (crew, knowledge base, Template Studio)
+### Further tools (crew, knowledge base)
 
 Besides the order and run tools the server offers further tools, among them:
 
@@ -176,8 +176,8 @@ Besides the order and run tools the server offers further tools, among them:
 | `list_advisor_profiles` | List advisor profiles (system + custom); since D-066 includes `ModelSlot`/`ModelDomain` |
 | `list_grounding_provider_profiles` | List grounding-provider profiles (incl. `refinementEnabled` / `refinementMode`) |
 | `list_knowledge_documents` | List global knowledge-base documents |
-| `analyze_template_proposal` | Analyze a task description, produce a template proposal (persisted) |
-| `materialize_template_proposal` | Materialize a reviewed proposal as a custom template + profiles |
+| `analyze_template_proposal` | Stub since stage 8c (D-089): Template Studio was removed; every call returns an error that names `submit_order` |
+| `materialize_template_proposal` | Stub since stage 8c (D-089), like `analyze_template_proposal` |
 | `list_run_artifacts` | List all RunArtifacts produced by finalizers for a completed run |
 | `download_run_artifact` | Download the binary content of a File artifact as Base64 |
 
@@ -194,76 +194,14 @@ Full parameter/schema details: [`09-endpoint-reference.md`](09-endpoint-referenc
 | `name` | string | Profile identifier |
 | `displayName` | string | Human-readable name |
 | `description` | string | Purpose description |
-| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, or `"news-search"` |
-| `maxQueriesPerRun` | int? | Maximum queries this provider may issue per run |
+| `providerType` | string | e.g. `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, `"learning-retrieval"` |
 | `isSystem` | boolean | Whether this is a built-in system profile |
 | `refinementEnabled` | boolean | Whether KI-Refinement is configured for this provider |
 | `refinementMode` | string \| null | `"filter"` or `"synthesize"` (null when `refinementEnabled` is false) |
 
-#### `analyze_template_proposal`
+#### `analyze_template_proposal` and `materialize_template_proposal` (stubs)
 
-Runs a meta-LLM that analyzes the task description and produces a structured `TemplateStudioAnalysis` persisted in the DB.
-
-**Input:** `{ "task_description": "string" }`
-
-**Output:** `TemplateStudioAnalysis` — includes `id` (UUID, needed for `materialize_template_proposal`), a `proposed_template` (DisplayName, Description, EvaluationStrategy, optional `evaluation_strategy_reasoning`, optional `finalizer_profile_names` array, optional `finalizer_reasoning`), and two lists:
-
-- `proposed_new_profiles` — crew/advisor/grounding/executor profiles. Each carries: `profile_type` (`"reviewer"` | `"advisor"` | `"grounding_provider"` | `"executor"`), Name, DisplayName, Description, Provider, Model, MaxTokens, SystemPrompt, plus type-specific optional fields (ReviewerFocus, AdvisorMode, AdvisorTrigger, GroundingProviderType, GroundingProviderSettings) and optional LLM reasoning fields (`model_reasoning`, `system_prompt_reasoning`, `overall_reasoning`, `mode_reasoning`, `trigger_reasoning`).
-- `proposed_new_finalizer_profiles` — finalizer profile proposals. Each carries: `name`, `display_name`, `description`, `finalizer_type` (`"FileExport"` | `"MetadataEnrich"` | `"ExternalSink"` | `"Transform"`), `settings` (object), `finalizer_type_reasoning` (optional string).
-
-Missing fields are filled from `appsettings TemplateStudio:Defaults` server-side.
-
-Backwards-compatible: old inputs without finalizer fields continue to work, defaulting to no finalizers.
-
-#### `materialize_template_proposal`
-
-Atomically writes all new profiles and the crew template to the DB in a single transaction.
-
-**Input:**
-```json
-{
-  "analysis_id": "uuid",
-  "final_template": {
-    "display_name": "...", "description": "...", "evaluation_strategy": "Sequential",
-    "executor_profile_name": "...", "reviewer_profile_names": ["..."],
-    "advisor_profile_names": ["..."], "grounding_provider_profile_names": ["..."],
-    "finalizer_profile_names": ["..."],
-    "finalizer_reasoning": "optional string"
-  },
-  "final_new_profiles": [
-    {
-      "profile_type": "reviewer", "name": "custom-my-reviewer",
-      "display_name": "...", "system_prompt": "...", "provider": "openrouter",
-      "model": "openai/gpt-4o-mini", "max_tokens": 16384
-    }
-  ],
-  "final_new_finalizer_profiles": [
-    {
-      "name": "custom-my-exporter", "display_name": "...", "description": "...",
-      "finalizer_type": "FileExport", "settings": {}
-    },
-    {
-      "name": "custom-my-transform", "display_name": "Mein Transform", "description": "...",
-      "finalizer_type": "Transform",
-      "settings": {
-        "Provider": "openrouter",
-        "Model": "openai/gpt-4o-mini",
-        "MaxTokens": "8192",
-        "SystemPrompt": "...",
-        "Temperature": "0.5"
-      }
-    }
-  ]
-}
-```
-
-`final_new_profiles` contains only profiles the user chose to create fresh (CreateNew mode). Profiles in UseExisting mode appear only by name in `final_template.*_profile_names`. `final_new_finalizer_profiles` follows the same pattern for finalizer profiles. A `max_tokens` below the hard floor (`StudioDefaults.MinMaxTokens = 10000`) is clamped up server-side; omitting it applies the `TemplateStudio:Defaults` value (Reviewer/Advisor 16384, Executor 60000). Omitting `finalizer_profile_names` or `final_new_finalizer_profiles` is backwards-compatible (no finalizers attached).
-
-**Grounding-Provider-Typen:** `providerType` (bzw. `GroundingProviderType` im Proposal) kann folgende Werte haben: `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, `"news-search"`. Jeder Typ erwartet typ-spezifische Settings-Keys (siehe `08-crew-system.md` Provider-Typen-Tabelle).
-
-**Grounding-Provider-Refinement keys in `groundingProviderSettings`:** The `GroundingProviderSettings` dict for a `grounding_provider` profile accepts all KI-Refinement keys (`refinementProvider`, `refinementModel`, `refinementMaxTokens`, `refinementTemperature`, `refinementMode`, `refinementInstructions`) as flat string entries. All keys are optional and backwards-compatible — profiles without these keys behave exactly as before (no refinement pass).
-
-**Output:** `{ "created_template_name": "custom-..." }` — the name of the materialized template, ready to pass to `submit_request` as `crew_template`.
+Template Studio was removed in stage 8c (D-089). Both tools stay listed among the older tools while `Mcp:LegacyTools` is on, because clients keep tool lists cached; they take an optional string and every call returns a tool error: "This tool was removed together with the template studio. To get a text written, call submit_order with the request." The stored analyses and the studio settings stay in the database.
 
 #### `list_run_artifacts`
 

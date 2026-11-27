@@ -147,7 +147,6 @@ public sealed class PromptWiringEndToEndTests(PostgresFixture postgres)
                 [GroundingProviderProfile.KeyStaticContent] = $"{marker}: background fact {suffix}.",
                 [GroundingProviderProfile.KeyStaticLabel] = $"E2E {suffix}",
             },
-            MaxQueriesPerRun: 1,
             IsSystem: false,
             ToolName: toolName), CancellationToken.None);
     }

@@ -19,7 +19,7 @@ public sealed class GroundingProviderViewTests : TestContext
         Dictionary<string, string>? settings = null) =>
         new(Name: name, DisplayName: name + " Display Name", Description: "A test description.",
             ProviderType: providerType, ProviderSettings: settings ?? new(),
-            MaxQueriesPerRun: 1, IsSystem: isSystem);
+            IsSystem: isSystem);
 
     [Fact]
     public void RendersDataTestIdGroundingProviderView()

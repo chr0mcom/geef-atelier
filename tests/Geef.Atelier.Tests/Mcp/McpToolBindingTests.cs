@@ -50,7 +50,7 @@ public sealed class McpToolBindingTests
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => check.StartAsync(CancellationToken.None));
 
         Assert.Contains("SubmitOrderTool.SubmitOrder(currentUser: ICurrentUserService)", error.Message);
-        Assert.Contains("AnalyzeTemplateProposalTool.AnalyzeTemplateProposal(studioService: ITemplateStudioService)", error.Message);
+        Assert.Contains("ListAdvisorProfilesTool.ListAdvisorProfiles(crewService: ICrewService)", error.Message);
     }
 
     [Fact]

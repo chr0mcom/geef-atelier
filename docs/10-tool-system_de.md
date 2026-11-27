@@ -14,10 +14,10 @@
 >   `ProfileBasedReviewer` und `ProfileBasedAdvisor` ohne `IToolUseRunner`. Akteure mit `ToolNames`-Bindings
 >   laufen deshalb wie alle anderen als Einzelaufruf. Die Bindings werden gespeichert und geprüft, wirken
 >   aber nicht.
-> - **Nur ein Teil der Tool-Typen ist ausführbar.** `ToolExecutor` führt `static-context`, `web-search`
->   und `mcp-tool` aus; alle anderen Typen liefern einen Fehler „not yet wired“.
+> - **Nur ein Teil der Tool-Typen ist ausführbar.** `ToolExecutor` führt `static-context` und `web-search`
+>   aus (bis Stufe 8c, D-089, auch `mcp-tool`); alle anderen Typen liefern einen Fehler „not yet wired“.
 > - **Die fünf System-Grounding-Profile laufen wieder über den Provider-Typ-Weg.** `tavily-basic`,
->   `tavily-refined`, `run-attachments`, `knowledge-base-default` und `academic-default` haben keinen
+>   `tavily-refined`, `run-attachments`, `knowledge-base-default` und `academic-default` (in Stufe 8c ausgemustert, D-089) haben keinen
 >   `ToolName` mehr und laufen über ihren typspezifischen Grounding-Provider, auch wenn ein älterer
 >   Snapshot noch einen `ToolName` trägt (siehe [A-T9](#a-t9--grounding-neuaufbau-auf-zentrale-tools)).
 >   Nur eigene Profile mit `ToolName` nutzen noch den `ToolBackedGroundingProvider`.
@@ -68,13 +68,12 @@ public sealed record ToolDefinition(
 
 ### Secrets und die Allowlist für Umgebungsvariablen
 
-Seit D-067 läuft jeder Umgebungsvariablen-Name, den eine vom Nutzer bearbeitbare Konfiguration nennen kann, über `IEnvReferencePolicy` (`Application/Security/`). Das betrifft Tool-`SecretRef`, Provider-`ApiKeyEnv`/`EndpointEnvOverride`, MCP-Server-`AuthHeaderEnv` und die Grounding-Einstellungen `authHeaderEnv`/`apiKeyEnv`.
+Seit D-067 läuft jeder Umgebungsvariablen-Name, den eine vom Nutzer bearbeitbare Konfiguration nennen kann, über `IEnvReferencePolicy` (`Application/Security/`). Das betrifft Tool-`SecretRef`, und Provider-`ApiKeyEnv`/`EndpointEnvOverride` (MCP-Server-`AuthHeaderEnv` und die Grounding-Einstellungen `authHeaderEnv`/`apiKeyEnv` sind mit dem MCP-Client und den Typen `rest-api`/`academic-search` in Stufe 8c entfallen, D-089).
 
 - **Erlaubte Namen:** eine eingebaute Standardliste (`EnvReferenceOptions.DefaultAllowed`: die verwendeten Provider- und Tavily-Schlüsselnamen) plus das Präfix `ATELIER_SECRET_*` für neue Geheimnisse. Weitere Namen oder Präfixe (mit `*` am Ende) kommen aus dem Konfigurationsschlüssel `EnvReference:Allowed` (ein Array; es ergänzt die Standardliste und ersetzt sie nie). Infrastruktur-Geheimnisse (Datenbank, MCP-Token, cli-proxy-Schlüssel, Admin-Passwort) stehen bewusst nicht auf der Liste.
-- **Beim Speichern:** Ein nicht erlaubter Name wird mit Meldung abgelehnt (Provider-, Tool-, MCP-Server- und Grounding-Editor, auch beim Repository-Schreibweg des MCP-Editors).
+- **Beim Speichern:** Ein nicht erlaubter Name wird mit Meldung abgelehnt (Provider- und Tool-Editor).
 - **Zur Laufzeit:** Ein nicht erlaubter Name wird nie gelesen; der Aufruf läuft ohne den Wert weiter, und im Log steht eine Warnung ohne Wert. Das schützt auch Altzeilen aus der Zeit vor der Allowlist.
-- **Template Studio** entfernt `authHeaderEnv`/`apiKeyEnv` mit einer Warnung aus Vorschlägen.
-- **Editoren:** Provider-, Tool-, MCP-Server- und Grounding-Editor sind nur für Admins.
+- **Editoren:** Provider-, Tool- und Grounding-Editor sind nur für Admins.
 
 Für ein neues Geheimnis entweder einen Namen mit dem Präfix `ATELIER_SECRET_` wählen oder den Namen in `EnvReference:Allowed` eintragen.
 
@@ -90,7 +89,7 @@ Für ein neues Geheimnis entweder einen Namen mit dem Präfix `ATELIER_SECRET_` 
 | `RestApi` | `rest-api` | Generischer HTTP-Aufruf mit JSONPath-Extraktion |
 | `StaticContext` | `static-context` | Gibt konfigurierten Festtext zurück |
 | `LearningRetrieval` | `learning-retrieval` | Atelier-Learning-Loop-Abruf |
-| `McpTool` | `mcp-tool` | Aus einem MCP-Server entdeckt |
+| `McpTool` | `mcp-tool` | Mit dem MCP-Client in Stufe 8c ausgemustert (D-089); die Konstante bleibt `[Obsolete]`, kein Werkzeug dieses Typs läuft |
 
 ### Zugriffsklasse (`ToolAccessClass`)
 
@@ -114,7 +113,6 @@ Für ein neues Geheimnis entweder einen Namen mit dem Präfix `ATELIER_SECRET_` 
 | `staticContent` | Festtext für `static-context`-Tools |
 | `refinementBinding` / `refinementMode` / `refinementInstructions` | Grounding-Verfeinerungs-Pass |
 | `domainBoost` | Domänen-Priorisierung beim Learning-Retrieval |
-| `mcpServerId` | MCP-Tool — GUID des `McpServerConfig`-Eintrags |
 | `mcpOriginalName` | MCP-Tool — Originalname des Tools auf dem Server |
 
 ---
@@ -139,10 +137,9 @@ Für ein neues Geheimnis entweder einen Namen mit dem Präfix `ATELIER_SECRET_` 
                     ├── rest-api       → HttpClient + JSONPath
                     ├── static-context → Festtext
                     ├── learning-retrieval → LearningRepository
-                    └── mcp-tool       → AtelierMcpClientFactory → McpClient
 ```
 
-Entwurf nach D-060. Ist-Zustand (D-067): Der PULL-Zweig ist nicht mit der Pipeline verdrahtet, den PUSH-Zweig nutzen nur eigene Grounding-Profile mit `ToolName`, und `ToolExecutor` führt nur `static-context`, `web-search` und `mcp-tool` aus.
+Entwurf nach D-060. Ist-Zustand (D-067): Der PULL-Zweig ist nicht mit der Pipeline verdrahtet, den PUSH-Zweig nutzen nur eigene Grounding-Profile mit `ToolName`, und `ToolExecutor` führt nur `static-context` und `web-search` aus (`mcp-tool` bis Stufe 8c, D-089).
 
 ---
 
@@ -248,7 +245,7 @@ D-060 sah vor, dass jedes Grounding-Profil über `ToolName` auf `GroundingProvid
 
 **Ist-Zustand (D-067):** Für die System-Profile war der Tool-Pfad kaputt (Wissensbasis und akademische Suche sind im `ToolExecutor` nicht verdrahtet, und die Websuche las einen Schlüsselnamen, den der Container nicht setzt). Anhänge, Websuche und Wissensbasis erreichten deshalb still keinen Prompt. Seit Etappe 0 gilt:
 
-- Die fünf System-Profile `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` und `academic-default` tragen in `SystemCrew` keinen `ToolName`; Migration Step47 leert einen gespeicherten `ToolName` genau für diese Zeilen.
+- Die fünf System-Profile `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` und `academic-default` (in Stufe 8c ausgemustert, D-089; bleibt für ältere Snapshots in der Regel) tragen in `SystemCrew` keinen `ToolName`; Migration Step47 leert einen gespeicherten `ToolName` genau für diese Zeilen.
 - `GroundingPathSelection.UsesToolPath()` schickt ein Profil nur dann auf den Tool-Pfad, wenn es einen `ToolName` hat **und** nicht zu diesen fünf System-Profilen gehört. Ältere Lauf-Snapshots, die noch einen `ToolName` tragen, nehmen deshalb ebenfalls den Provider-Typ-Weg (wichtig beim Fortsetzen eines Laufs).
 - Ein übersprungener oder fehlgeschlagener Grounding-Provider wird zur Warnung am Lauf statt zu stillem leeren Kontext; ein fehlschlagendes Tool wirft jetzt einen Fehler, statt ein leeres Ergebnis zu liefern.
 - `ToolInvocation.Sequence` wird in der Datenbank vergeben (mit Wiederholung bei Konflikt), das Audit schreibt in einem eigenen Scope; ein fehlgeschlagener Audit-Eintrag verwirft das Tool-Ergebnis nicht mehr.
@@ -324,86 +321,9 @@ Alle eindeutigen Tool-Namen werden in einer einzigen DB-Abfrage batch-geladen (k
 
 ---
 
-## Phase C — MCP-Client
+## Phase C — MCP-Client (entfernt)
 
-### C-T1 — `McpServerConfig` + `AtelierMcpClientFactory`
-
-`Core/Domain/Mcp/McpServerConfig.cs`:
-```csharp
-public sealed record McpServerConfig
-{
-    public Guid Id { get; init; }
-    public string Name { get; init; }            // Anzeigename
-    public string Url { get; init; }             // MCP-Server-Endpunkt-URL
-    public string? AuthHeaderEnv { get; init; }  // ENV-Variablen-Name für den Bearer-Token
-    public bool IsActive { get; init; }
-    public DateTimeOffset UpdatedAt { get; init; }
-}
-```
-
-`AuthHeaderEnv` enthält ausschließlich den Variablennamen. Zur Verbindungszeit liest `AtelierMcpClientFactory` den Wert über `IEnvReferencePolicy` (nur erlaubte Namen, siehe [Secrets](#secrets-und-die-allowlist-für-umgebungsvariablen)) und setzt ihn als `Authorization: Bearer <Token>`.
-
-> Der MCP-Client (diese Phase) gehört zum in D-068 vorgesehenen Rückbau.
-
-`IAtelierMcpClientFactory.ConnectAsync(config, ct)`:
-1. URL validieren (`Uri.TryCreate`, absolut)
-2. URL durch `IUrlSafetyValidator` prüfen (SSRF-Schutz — blockiert private IPs, localhost, Link-Local, interne Hostnamen)
-3. `HttpClient` aus der Named-Factory `"mcp-client"` erzeugen
-4. Optional `Authorization`-Header aus der ENV-Variable setzen (Allowlist gilt)
-5. `HttpClientTransport` → `McpClient.CreateAsync`
-
-Gibt einen verbundenen `McpClient` zurück (implementiert `IAsyncDisposable`).
-
-DB-Tabelle: `mcp_server_configs` (Migration Step41).
-
-### C-T2 — Tool-Discovery und Katalog-Import
-
-`IMcpToolDiscoveryService.DiscoverAsync(config, ct)` verbindet sich mit dem MCP-Server, ruft `tools/list` ab und mappt jeden `McpClientTool` auf einen `ToolDefinition`-Kandidaten:
-
-| `ToolDefinition`-Feld | Quelle |
-|---|---|
-| `Name` | Bereinigt aus `McpClientTool.Name` (Kleinbuchstaben-Kebab-Case, nur `[a-z0-9-]`, max. 64 Zeichen) |
-| `DisplayName` | `McpClientTool.Title ?? McpClientTool.Name` |
-| `Description` | `McpClientTool.Description` |
-| `ToolType` | `"mcp-tool"` |
-| `Settings["mcpServerId"]` | `config.Id.ToString()` |
-| `Settings["mcpOriginalName"]` | `McpClientTool.Name` (Original, unbereinigt) |
-| `LlmSchema` | `McpClientTool.JsonSchema` (das `JsonElement` aus der Server-Tool-Beschreibung) |
-| `AccessClass` | `ReadOnly` (konservativer Standard) |
-| `IsSystem` | `false` |
-
-Die zurückgegebenen Definitionen sind zunächst nur Kandidaten — noch nicht persistiert. Der "Importieren"-Button in der UI ruft `IToolDefinitionService.SaveAsync` auf.
-
-**`/mcp-servers`-UI** — neue Blazor-Seiten:
-- `/mcp-servers` — Tabelle aller Server-Konfigurationen; pro Zeile: "Bearbeiten", "Löschen", "Tools entdecken"
-- `/mcp-servers/create` und `/mcp-servers/edit/{Id:guid}` — CRUD-Formular (Name, URL, AuthHeaderEnv, IsActive)
-- "Tools entdecken" startet `IMcpToolDiscoveryService.DiscoverAsync` und zeigt die Ergebnisse direkt an; bereits importierte Tools sind markiert; "Importieren" ruft `SaveAsync` auf
-
-### C-T3 — `mcp-tool`-Ausführung + Mutating-Opt-in
-
-**`ToolExecutor` mcp-tool-Zweig:**
-1. `Settings["mcpServerId"]` lesen → `McpServerConfig` aus DB laden
-2. Sicherheitsprüfung: Server muss aktiv sein
-3. `Settings["mcpOriginalName"]` lesen (Fallback: `tool.Name`)
-4. `inputJson` in ein `Dictionary<string, JsonElement>` von Argumenten parsen
-5. `await using var client = await mcpClientFactory.ConnectAsync(serverConfig, ct)`
-6. `var response = await client.CallToolAsync(originalName, args, ct)`
-7. Alle nicht-leeren `response.Content[].Text`-Einträge zusammenführen, in `[MCP Tool Result]`-Delimitern einschließen
-
-Verbindungsfehler und Tool-Ausführungsfehler werden abgefangen und als `ToolExecutionResult` mit gesetztem `Error` zurückgegeben (keine Exception). Jeder Aufruf wird in `tool_invocations` protokolliert.
-
-**Mutating-Opt-in** — `CrewSpecArtifact.AllowMutatingTools` (Standard: `false`):
-
-```json
-{
-  "allow_mutating_tools": true,
-  "executor": { "tool_names": ["mcp-schreib-tool"] }
-}
-```
-
-Wenn `allow_mutating_tools` fehlt oder `false` ist, blockiert der Validator jedes Mutating-Tool-Binding mit einem Critical-Finding. Bei `true` sind Mutating-Tools erlaubt. Die UI zeigt einen roten Gefahren-Badge auf jeder `ToolDefinition` mit `AccessClass = Mutating` — sowohl im Editor als auch in der Detailansicht.
-
----
+Der MCP-Client (`McpServerConfig`, `AtelierMcpClientFactory`, Werkzeugsuche, die Seiten unter `/mcp-servers` und der `mcp-tool`-Zweig von `ToolExecutor`) wurde in Stufe 8c entfernt (D-089). Der eigene MCP-Server von Atelier (`/mcp`) ist nicht betroffen. Die Tabelle `mcp_server_configs` bleibt in der Datenbank.
 
 ## Datenbankänderungen
 
@@ -413,7 +333,7 @@ Wenn `allow_mutating_tools` fehlt oder `false` ist, blockiert der Validator jede
 | `Step38ToolNamesOnProfiles` | 38 | Neue JSON-Spalte `ToolNames` in `ExecutorProfiles`, `ReviewerProfiles`, `AdvisorProfiles`, `FinalizerProfiles` |
 | `Step39ToolNameOnGroundingProfiles` | 39 | Neue Spalte `ToolName` in `GroundingProviderProfiles` |
 | `Step40SystemToolsSeed` | 40 | Idempotenter Upsert von 9 System-`ToolDefinition`s beim Start |
-| `Step41McpServerConfigs` | 41 | Neue Tabelle: `mcp_server_configs` |
+| `Step41McpServerConfigs` | 41 | Neue Tabelle: `mcp_server_configs` (Code in Stufe 8c entfernt, D-089; die Tabelle bleibt) |
 | `Step47EngineHonesty` | 47 | Leert `ToolName` an den fünf System-Grounding-Profilen (D-067); die übrigen Teile von Step47 stehen in [02-architecture](02-architecture_de.md#runs) |
 
 **Keine bestehenden Daten wurden gelöscht.** Alle Migrationen fügen nur neue Tabellen und Spalten hinzu. Die `Down()`-Methoden (Rollback-Pfad) enthalten `DROP`-Anweisungen, werden beim normalen Deploy aber nicht ausgeführt.
@@ -423,8 +343,8 @@ Wenn `allow_mutating_tools` fehlt oder `false` ist, blockiert der Validator jede
 ## Sicherheitshinweise
 
 - **Secrets** — `SecretRef` enthält nur den ENV-Variablen-Namen. Der eigentliche API-Key/Token wird niemals in der DB, im `CrewSnapshot`, in Logs oder einem UI-Feld gespeichert. Nur Namen auf der Allowlist (`IEnvReferencePolicy`, `EnvReference:Allowed`, Präfix `ATELIER_SECRET_*`) werden beim Speichern angenommen und zur Laufzeit gelesen.
-- **Editoren nur für Admins** — Tools, MCP-Server, Provider und Grounding-Profile können nur Administratoren anlegen oder ändern.
-- **SSRF** — `IUrlSafetyValidator` blockiert private IP-Bereiche, `localhost`, Link-Local und interne Hostnamen vor jedem HTTP-Aufruf aus einer `ToolDefinition` heraus (url-fetch, rest-api, mcp-tool).
+- **Editoren nur für Admins** — Tools, Provider und Grounding-Profile können nur Administratoren anlegen oder ändern.
+- **SSRF** — `IUrlSafetyValidator` blockiert private IP-Bereiche, `localhost`, Link-Local und interne Hostnamen vor jedem HTTP-Aufruf aus einer `ToolDefinition` heraus (url-fetch; rest-api und mcp-tool sind in Stufe 8c entfallen, D-089).
 - **Mutating-Zugriff** — `ToolAccessClass.Mutating` ist standardmäßig gesperrt. Der Betreiber muss `allow_mutating_tools: true` explizit pro Spec setzen. Die UI hebt Mutating-Tools mit einem roten Gefahren-Badge hervor.
 - **Per-Turn-Cap** — der agentic Loop läuft nie unbegrenzt. Standard: 5 Tool-Aufrufe pro Akteur-Turn. Cap-Erreicht-Status wird als `ToolInvocationOutcome.CapReached` auditiert.
 - **Per-Tool-Timeout** — Standard: 30 Sekunden pro Tool-Aufruf. Timeouts werden auditiert.
@@ -443,11 +363,6 @@ dotnet watch --project src/Geef.Atelier.Web
 
 # System-Tools werden automatisch beim Start geseedet (Migration Step40)
 # Navigation zu /tools zeigt die 9 System-Tool-Definitionen
-
-# MCP-Server hinzufügen (manuell)
-# Navigation zu /mcp-servers → "Neuen Server hinzufügen"
-# URL eingeben, optional AuthHeaderEnv auf den Namen einer ENV-Variable setzen
-# "Tools entdecken" → gewünschte Tools importieren
 ```
 
 ---
@@ -457,29 +372,21 @@ dotnet watch --project src/Geef.Atelier.Web
 | Schicht | Pfad | Beschreibung |
 |---|---|---|
 | Core | `Core/Domain/Tools/ToolDefinition.cs` | Zentrale Definition + Settings-Schlüssel |
-| Core | `Core/Domain/Tools/ToolType.cs` | 9 Typ-Konstanten |
+| Core | `Core/Domain/Tools/ToolType.cs` | 8 Typ-Konstanten (plus das ausgemusterte `mcp-tool`) |
 | Core | `Core/Domain/Tools/ToolAccessClass.cs` | ReadOnly / Mutating |
 | Core | `Core/Domain/Tools/ToolInvocation.cs` | Audit-Record |
 | Core | `Core/Persistence/Tools/IToolDefinitionRepository.cs` | CRUD-Interface |
 | Core | `Core/Persistence/Tools/IToolInvocationRepository.cs` | Append-only-Interface |
-| Core | `Core/Domain/Mcp/McpServerConfig.cs` | MCP-Server-Verbindungskonfiguration |
-| Core | `Core/Persistence/Mcp/IMcpServerConfigRepository.cs` | CRUD-Interface |
 | Application | `Application/Tools/IToolExecutor.cs` | Einheitliches Ausführungs-Interface |
 | Application | `Application/Tools/IToolSchemaProvider.cs` | LLM-Schema-Generierung |
 | Infrastructure | `Infrastructure/Tools/ToolExecutor.cs` | Dispatcher für alle 9 Typen |
 | Infrastructure | `Infrastructure/Pipeline/ToolUseRunner.cs` | Agentic-Mehrfach-Turn-Loop |
-| Infrastructure | `Infrastructure/Mcp/IAtelierMcpClientFactory.cs` | MCP-Client-Factory-Interface |
-| Infrastructure | `Infrastructure/Mcp/AtelierMcpClientFactory.cs` | SSRF + Auth + McpClient |
-| Infrastructure | `Infrastructure/Mcp/IMcpToolDiscoveryService.cs` | tools/list → ToolDefinition |
-| Infrastructure | `Infrastructure/Mcp/McpToolDiscoveryService.cs` | Discovery-Implementierung |
 | Infrastructure | `Infrastructure/Grounding/ToolCatalogGroundingProvider.cs` | B-T2 Katalog-Grounding |
 | Infrastructure | `Infrastructure/Composition/CrewSpecValidator.cs` | Step 8 Tool-Binding-Prüfungen |
 | Infrastructure | `Infrastructure/Persistence/Migrations/` | Step37–Step41 |
 | Web | `Web/Components/Pages/ToolsIndex.razor` | `/tools`-Liste |
 | Web | `Web/Components/Pages/ToolEditor.razor` | Tool anlegen / bearbeiten |
 | Web | `Web/Components/Pages/ToolView.razor` | Read-only-Detailansicht |
-| Web | `Web/Components/Pages/McpServersIndex.razor` | `/mcp-servers`-Liste + Discovery |
-| Web | `Web/Components/Pages/McpServerEditor.razor` | MCP-Server anlegen / bearbeiten |
 | Web | `Web/Components/UI/ToolPicker.razor` | Wiederverwendbarer Akteur-Tool-Picker |
 | Web | `Web/Components/UI/ToolInvocationsBlock.razor` | Run-Detail-Audit-Block |
 | Core | `Core/Domain/Crew/Composition/CrewSpecArtifact.cs` | `AllowMutatingTools`-Flag |
