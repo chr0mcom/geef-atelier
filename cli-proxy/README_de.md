@@ -11,9 +11,9 @@ Geef.Atelier Web ──► POST /v1/claude/chat/completions ──► CLI-Proxy 
                  ──► POST /v1/codex/chat/completions  ──► CLI-Proxy ──► codex CLI
 ```
 
-Der Proxy hängt am internen `geef-atelier-network` UND am gemeinsamen Portfolio-Netz `proxy` — damit kann **jede** App ihn als OpenAI-kompatibles Gateway unter `http://cli-proxy:8090` nutzen. Kein Traefik-Routing, nicht öffentlich exponiert.
+Der Proxy hängt am internen `geef-atelier-network` UND am gemeinsamen Docker-Netz `proxy` — damit kann **jede** App ihn als OpenAI-kompatibles Gateway unter `http://cli-proxy:8090` nutzen. Kein Traefik-Routing, nicht öffentlich exponiert.
 
-## Nutzung aus anderen Apps (portfolio-weites Gateway)
+## Nutzung aus anderen Apps
 
 Jeder Container im gemeinsamen `proxy`-Docker-Netz kann diesen Proxy als Drop-in-OpenAI-Endpoint ansprechen — Abo-gedeckt, keine Pro-Token-Abrechnung. Ein OpenAI-SDK einfach auf `http://cli-proxy:8090/v1/claude` oder `http://cli-proxy:8090/v1/codex` zeigen lassen (beliebiger `api_key`, sofern `CLI_PROXY_API_KEYS` nicht gesetzt ist):
 
@@ -21,7 +21,7 @@ Jeder Container im gemeinsamen `proxy`-Docker-Netz kann diesen Proxy als Drop-in
 from openai import OpenAI
 client = OpenAI(base_url="http://cli-proxy:8090/v1/codex", api_key="unused")
 print(client.chat.completions.create(
-    model="gpt-5.5", messages=[{"role": "user", "content": "ping"}]).choices[0].message.content)
+    model="gpt-sol-latest", messages=[{"role": "user", "content": "ping"}]).choices[0].message.content)
 ```
 
 Hängt eine App noch nicht am `proxy`-Netz, ergänzen:
@@ -34,8 +34,6 @@ networks:
   proxy:
     external: true
 ```
-
-Vollständige Cross-App-Anleitung: [`/srv/docker/docs/cli-proxy-openai-gateway.md`](../../../docs/cli-proxy-openai-gateway.md).
 
 ## Endpoints
 
@@ -135,82 +133,72 @@ Bei eingeschalteter Suche entscheidet das Modell selbst, ob es aktuelle Informat
 
 **Kosten:** Die Websuche läuft über das Abo (Claude / Codex), nicht pro Suche abgerechnet — kein Tavily-artiges Per-Request-Billing auf dem CLI-Pfad.
 
-**Scope / Einschränkung:** Die vom Modell gesuchten Quellen werden intern verarbeitet und **nicht** in `GroundingConsultation` / RunDetail erfasst. Es gibt keine Citation- oder Nachvollziehbarkeits-Spur für die CLI-Websuche — das bleibt Aufgabe des Tavily-Grounding-Providers (explizite, deterministische Vor-Briefing-Anreicherung). Beide ergänzen sich, sind kein Entweder-oder. OpenRouter-geroutete Akteure (single-shot) können keine agentische Websuche durchführen.
+**Scope / Einschränkung:** Die vom Modell gesuchten Quellen werden intern verarbeitet und nirgends festgehalten. Geef.Atelier nutzt diesen Weg nicht: Seine Recherche ist ein eigener Schritt mit eigenem Suchschlüssel (D-074).
 
 ## Setup (Production)
 
-### 1. Images bauen
+Der Proxy gehört zum Compose-Stack von Geef.Atelier. Alle Befehle im Wurzelverzeichnis des Repositorys ausführen.
+
+### 1. Bauen und starten
 
 ```bash
-cd /srv/docker/websites/geef_atelier
-docker compose build --no-cache cli-proxy
+docker network create proxy   # einmal, falls das gemeinsame Netz noch nicht existiert
+docker compose up -d --build cli-proxy
 ```
 
-### 2. Container starten
+### 2. Claude CLI anmelden
 
 ```bash
-docker compose up -d cli-proxy
+docker compose exec -e HOME=/auth/claude cli-proxy claude auth login
+# Den Anweisungen im Browser folgen
 ```
 
-### 3. Claude CLI authentifizieren
+`HOME` ist wichtig: Der Proxy startet claude mit `HOME=/auth/claude`. Eine Anmeldung ohne diese Angabe landet im Container unter
+`/root`, wirkt nicht und geht mit dem nächsten Container verloren.
+
+### 3. Codex CLI anmelden
 
 ```bash
-docker exec -it geef-atelier-cli-proxy bash
-claude auth login
-# Folge den Browser-Anweisungen; Token landet in /auth/claude/
-exit
+docker compose exec cli-proxy codex login --device-auth
 ```
 
-Das Auth-Volume `geef-atelier-cli-auth` persistiert die Tokens über Container-Restarts.
+`CODEX_HOME=/auth/codex` ist im Container gesetzt. Das Auth-Volume `geef-atelier-cli-auth` hält beide Anmeldungen über
+Neustarts.
 
-### 4. Codex CLI authentifizieren
+### 4. Optional: ein zweites Claude-Konto
+
+Unter einem eigenen Home anmelden. Der Proxy nutzt es dann als zweite Stufe vor codex und für Modelle, die nur dieses Konto
+führt (siehe oben):
 
 ```bash
-docker exec -it geef-atelier-cli-proxy bash
-codex auth login
-exit
+docker compose exec -e HOME=/auth/claude-alt cli-proxy claude auth login
 ```
 
-### 5. Health prüfen
+### 5. Prüfen
 
 ```bash
-docker exec geef-atelier-cli-proxy curl -s localhost:8090/health
-# {"status":"ok","cli_status":{"claude":"ready","codex":"ready"}}
+docker compose exec -e HOME=/auth/claude cli-proxy claude auth status --text
+docker compose exec cli-proxy codex login status
+docker compose exec cli-proxy curl -s localhost:8090/health
 ```
+
+In `/health` heißt `cli_status` `ready` nur, dass eine CLI installiert ist, nicht dass sie angemeldet ist; was mit echten
+Aufrufen geschah, zeigen `failover` und `claude_accounts`.
 
 ## Konfiguration (Geef.Atelier)
 
-In `appsettings.json` / Umgebungsvariablen:
-
-```json
-{
-  "Llm": {
-    "Providers": {
-      "claude-cli": {
-        "Endpoint": "http://cli-proxy:8090/v1/claude",
-        "ApiKey": ""
-      },
-      "codex-cli": {
-        "Endpoint": "http://cli-proxy:8090/v1/codex",
-        "ApiKey": ""
-      }
-    }
-  }
-}
-```
-
-> **Hinweis:** `appsettings.json` konfiguriert nur die Provider-Endpunkte. Welcher
-> Akteur welchen Provider und welches Modell nutzt, bestimmen seit dem Crew-System
-> die Reviewer-/Executor-/Advisor-**Profile** (siehe
-> [`docs/08-crew-system.md`](../docs/08-crew-system_de.md)) — nicht mehr ein
-> `Llm.Actors`-Block.
+Atelier erreicht das Gateway über seine Provider `claude-cli` und `codex-cli`; `appsettings.json` nennt ihre Endpunkte unter
+`Llm:ProvidersFallback` (`http://cli-proxy:8090/v1/claude` und `/v1/codex`). Welche Rolle welchen Provider und welches Modell
+nutzt, entscheidet die Modellmatrix beim Anlegen eines Laufs (siehe
+[`docs/08-crew-system_de.md`](../docs/08-crew-system_de.md#modellmatrix-d-066)). Ist `CLI_PROXY_API_KEYS` gesetzt, bekommt die
+Web-App denselben Schlüssel als `CLI_PROXY_API_KEY` (die Compose-Datei reicht ihn an beide).
 
 ## Concurrency
 
-Standard: 2 gleichzeitige Aufrufe pro CLI (via `asyncio.Semaphore`). Anpassbar über Umgebungsvariablen:
+Jede CLI hat eine eigene Grenze gleichzeitiger Aufrufe (`asyncio.Semaphore`); weitere Aufrufe warten. Die Compose-Datei setzt:
 
 ```
-CLAUDE_MAX_CONCURRENT=2
+CLAUDE_MAX_CONCURRENT=6
 CODEX_MAX_CONCURRENT=2
 ```
 
