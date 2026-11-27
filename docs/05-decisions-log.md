@@ -3489,18 +3489,26 @@ while it is not loaded. Today the model passes on the questions itself and may l
 - Only in `submit_order`, only with `needs_input`, only when the client negotiated 2026-07-28 (`IsMrtrSupported`, stateless through MRTR
   and `InputRequiredException`) and announces `elicitation.form`. Otherwise `needs_input` as before. `get_order_status` and
   `answer_order` stay unchanged.
-- Form: per question one choice with its options and "You decide", a field for own words only with `allowFreeText` (length
-  `Intake:MaxFreeTextChars`), the question about the file to improve with `revisionFile`; nothing required, nothing preselected; a fixed
-  message with "Skipping is fine" and "Atelier never asks for passwords, PINs, TANs, keys, card or account numbers".
-- Never a form for questions, options or file names that sound like a secret, hold links, web or mail addresses or hidden characters,
-  or are too long (240/120/120): the guard of the clarifier without its exception for matching requests, plus a stricter word list
-  (English and German). Question texts partly come from file content and would look like a question by Atelier in the form.
+- The form is **made only of choices**: per question its options and "You decide", the question about the file to improve with
+  `revisionFile`; nothing required, nothing preselected. **No text input** anywhere (test: the schema never holds a free text field); own
+  words go through the chat, as the fixed message says ("To answer in your own words, close this form and tell your assistant."),
+  together with "Atelier never asks for passwords, PINs, TANs, keys, card or account numbers".
+- **What the filter promises:** it keeps the common forms out, not all of them. No form for orders whose language is not German or
+  English or whose question texts hold letters outside the Latin script, and none for questions, options or file names with words for
+  secrets (on the normalized text, also written apart such as "Pass-Wort", "P.I.N.", "Karten-Nummer"), links and addresses (also "punkt
+  de"/"dot com", bare IP addresses, `.md`/`.zip` in a question, `tel:`/`sms:`), phone and other digit runs of seven digits or more,
+  requests to call or reply by SMS, hidden characters or texts that are too long (240/120/120); plus the guard of the clarifier without
+  its exception. Question texts partly come from file content and would look like a question by Atelier in the form. What the filter
+  misses shows at most as a choice question; nothing can be typed in. False alarms (such as "Login") only lead to `needs_input` as before
+  (log line "MCP form of submit_order not sent: {Reason}" as a measure).
 - `requestState`: signed and encrypted with the data protection keys, bound to order, user, client (OAuth client), hash of the
   arguments and question ids, with an expiry; it carries the receipts and notices of the first call so that none of them is lost. The
   second call **never** creates an order; a foreign, forged or other-arguments value → tool error that tells nothing about the order;
   an order that no longer waits → its current state, nothing answered again.
 - Cancel, decline, expiry, unusable answers, changed questions → `needs_input` as before, with a sentence in front; for decline with a
-  pointer to `skip=true`. "You decide" and empty questions → "decide for me", open as D-081 says.
+  pointer to `skip=true`. "You decide" and empty questions → "decide for me", open as D-081 says. A form that is **accepted but entirely
+  empty** counts as closed (`needs_input`), so that a client which accepts forms by itself does not take the question away from the
+  person.
 - **Origin.** May the server claim "user"? No: it cannot see who fills in the form (clients may answer forms automatically, for
   example through hooks). New origin `AnswerOrigin.Form` (wire `form`, accepted from no client through `answer_order`), on the web
   "(chosen in a form of your assistant)". For the writer and the fact check it counts like an answer of the person (no mark in the
@@ -3518,7 +3526,8 @@ while it is not loaded. Today the model passes on the questions itself and may l
 - Elicitation runs through MRTR, which the SDK supports for stateless servers only since 2.0; older revisions never get a form.
   Clients may show forms differently (title, description, order); check the display on the real client.
 - **Rollback:** an older image does not know the origin `Form`; for orders answered through a form it does not read the stored answers
-  (empty list). After a rollback, do not change or continue such orders. Without the switch on, no such orders come about.
+  (empty list). Without the switch on, no such orders come about. **Once `Mcp:Elicitation=On` has held, the rollback image is this D-088
+  image with the switch `Off`, not the image before it.** If one has to go further back anyway, do not change or continue such orders.
 
 **Tests.** Unit tests for building the form, the filter, reading the answers, the state value (round trip, expiry, forgery, foreign
 purpose and keys, argument hash), the flow (foreign user, client, arguments, foreign order, repeated call, cancel, decline, invalid,

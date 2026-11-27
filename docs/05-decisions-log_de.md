@@ -3621,18 +3621,26 @@ Herkunft falsch setzen.
 - Nur in `submit_order`, nur bei `needs_input`, nur wenn der Client 2026-07-28 ausgehandelt hat (`IsMrtrSupported`, zustandslos über
   MRTR und `InputRequiredException`) und `elicitation.form` meldet. Sonst `needs_input` wie bisher. `get_order_status` und `answer_order`
   bleiben unverändert.
-- Formular: je Frage ein Auswahlfeld mit ihren Optionen und „You decide“, ein Feld für eigene Worte nur bei `allowFreeText` (Länge
-  `Intake:MaxFreeTextChars`), die Frage nach der zu verbessernden Datei bei `revisionFile`; nichts Pflicht, nichts vorausgewählt; feste
-  Nachricht mit „Skipping is fine“ und „Atelier never asks for passwords, PINs, TANs, keys, card or account numbers“.
-- Nie ein Formular für Fragen, Optionen oder Dateinamen, die nach Geheimnissen klingen, Links, Web- oder Mailadressen oder versteckte
-  Zeichen enthalten oder zu lang sind (240/120/120): Schutz des Klärers ohne dessen Ausnahme für passende Aufträge, dazu eine strengere
-  Wortliste (Deutsch und Englisch). Fragetexte stammen teils aus Dateiinhalten und sähen im Formular wie eine Frage von Atelier aus.
+- Formular **nur aus Auswahlfeldern**: je Frage ihre Optionen und „You decide“, die Frage nach der zu verbessernden Datei bei
+  `revisionFile`; nichts Pflicht, nichts vorausgewählt. **Keine Texteingabe**, nirgends (Test: das Schema enthält in keinem Fall ein
+  freies Textfeld); eigene Worte gehen über den Chat, die feste Nachricht sagt es („To answer in your own words, close this form and
+  tell your assistant.“) und dass Atelier nie nach Passwörtern, PINs, TANs, Schlüsseln, Karten- oder Kontonummern fragt.
+- **Zusage zum Filter:** Er hält die gängigen Formen fern, nicht alle. Kein Formular bei Aufträgen, deren Sprache nicht Deutsch oder
+  Englisch ist oder deren Fragetexte andere als lateinische Buchstaben enthalten, und bei Fragen, Optionen oder Dateinamen mit Wörtern
+  für Geheimnisse (auf dem normalisierten Text, auch getrennt geschrieben wie „Pass-Wort“, „P.I.N.“, „Karten-Nummer“), Links und
+  Adressen (auch „punkt de“/„dot com“, nackte IP-Adressen, `.md`/`.zip` im Fragetext, `tel:`/`sms:`), Telefon- und anderen Ziffernfolgen
+  ab sieben Ziffern, Aufforderungen anzurufen oder per SMS zu antworten, versteckten Zeichen oder zu langen Texten (240/120/120);
+  dazu der Schutz des Klärers ohne dessen Ausnahme. Fragetexte stammen teils aus Dateiinhalten und sähen im Formular wie eine Frage von
+  Atelier aus. Was der Filter übersieht, erscheint höchstens als Auswahlfrage; eingeben lässt sich nichts. Fehlalarme (z. B. „Login“)
+  führen nur zum bisherigen `needs_input` (Log-Zeile „MCP form of submit_order not sent: {Reason}“ als Kennzahl).
 - `requestState`: mit den Data-Protection-Schlüsseln signiert und verschlüsselt, gebunden an Auftrag, Nutzer, Client (OAuth-Client),
   Hash der Argumente und Frage-Kennungen, mit Ablauf; er trägt die Quittungen und Hinweise des ersten Aufrufs mit, damit nichts davon
   verloren geht. Der zweite Aufruf legt **nie** einen Auftrag an; fremder, gefälschter oder zu anderen Argumenten gehörender Wert →
   Werkzeugfehler ohne Auskunft über den Auftrag; wartet der Auftrag nicht mehr → aktueller Zustand, nichts erneut beantwortet.
 - Abbruch, Ablehnung, Ablauf, unbrauchbare Antworten, geänderte Fragen → `needs_input` wie bisher, mit einem Satz davor; bei Ablehnung
-  mit dem Hinweis auf `skip=true`. „You decide“ und leere Fragen → „entscheide du“, offen nach D-081.
+  mit dem Hinweis auf `skip=true`. „You decide“ und leere Fragen → „entscheide du“, offen nach D-081. Ein **angenommenes, aber ganz
+  leeres** Formular gilt als geschlossen (`needs_input`), damit ein Client, der Formulare selbsttätig annimmt, der Person die Rückfrage
+  nicht nimmt.
 - **Herkunft.** Darf der Server „user“ behaupten? Nein: Er sieht nicht, wer das Formular ausfüllt (Clients können Formulare
   automatisch beantworten, etwa über Hooks). Neue Herkunft `AnswerOrigin.Form` (Draht `form`, von keinem Client über `answer_order`
   annehmbar), im Web „(chosen in a form of your assistant)“. Für Schreiber und Faktenprüfung zählt sie wie eine Antwort der Person
@@ -3650,8 +3658,9 @@ Herkunft falsch setzen.
 - Elicitation läuft über MRTR, das das SDK für zustandslose Server erst seit 2.0 kann; ältere Revisionen bekommen nie ein Formular.
   Clients können Formulare verschieden darstellen (Titel, Beschreibung, Reihenfolge); Darstellung ist am echten Client zu prüfen.
 - **Rückweg:** Ein älteres Image kennt die Herkunft `Form` nicht; für Aufträge, die über ein Formular beantwortet wurden, liest es die
-  gespeicherten Antworten nicht (leere Liste). Nach einem Rückweg solche Aufträge nicht ändern oder fortsetzen. Ohne eingeschalteten
-  Schalter entstehen keine solchen Aufträge.
+  gespeicherten Antworten nicht (leere Liste). Ohne eingeschalteten Schalter entstehen keine solchen Aufträge. **Sobald
+  `Mcp:Elicitation=On` einmal galt, ist das Rückweg-Image dieses D-088-Image mit Schalter `Off`, nicht das Image davor.** Wer trotzdem
+  weiter zurück muss: solche Aufträge danach nicht ändern oder fortsetzen.
 
 **Tests.** Einheitentests für Formularaufbau, Filter, Lesen der Antworten, Zustandswert (Rundweg, Ablauf, Fälschung, fremder Zweck und
 Schlüssel, Argument-Hash), Ablauf (fremder Nutzer, Client, Argumente, fremder Auftrag, Doppelaufruf, Abbruch, Ablehnung, ungültig,
