@@ -18,7 +18,8 @@ namespace Geef.Atelier.Tests.Domain.Crew;
 /// </para>
 /// <para>
 /// Since stage 8d (D-091) only the direct path runs. Every snapshot must still be readable, so old runs keep their pages. A snapshot
-/// of the direct path must be accepted by <see cref="DirectPipelineAssembler"/> and name only checks this version has; every other
+/// of the direct path must be accepted by <see cref="DirectPipelineAssembler"/> and name only checks this version has (a stored
+/// <c>direct-outline</c> snapshot may also name its removed check, which the assembler leaves out); every other
 /// snapshot must be refused with the plain sentence <see cref="PipelineAssemblerSelector.RetiredSetupMessage"/> instead of running
 /// as something else. The test reports how many snapshots fall into each group.
 /// </para>
@@ -59,7 +60,8 @@ public sealed class ProductionSnapshotFixtureTests(ITestOutputHelper output)
                 direct++;
                 if (selector.Select(run, snapshot) is not DirectPipelineAssembler)
                     problems.Add($"{name}: a direct snapshot is not built by the direct assembler");
-                foreach (var reviewer in snapshot.Reviewers.Where(r => !SystemCrew.CodeOnlyReviewerProfiles.ContainsKey(r.Name)))
+                foreach (var reviewer in snapshot.Reviewers.Where(r => !SystemCrew.CodeOnlyReviewerProfiles.ContainsKey(r.Name)
+                             && !(snapshot.TemplateName == SystemCrew.RetiredOutlineTemplateName && r.Name == SystemCrew.RetiredRequestCheckName)))
                     problems.Add($"{name}: names the check '{reviewer.Name}', which this version does not have");
                 continue;
             }
