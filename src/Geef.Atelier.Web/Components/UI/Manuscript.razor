@@ -13,16 +13,12 @@
                 <IconCopy Size="13" />
                 @(_copied ? "Copied" : "Copy text")
             </button>
-            <button class="btn small ghost coming-soon" disabled title="Export coming soon">
-                <IconDownload Size="13" />
-                Export
-            </button>
         </div>
     </div>
     <div class="manuscript">
         <div class="colophon">
             <span>Geef.Atelier — Manuscript @RunId</span>
-            <span>Iteration @ShownIteration · @(RunStatus == RunStatus.Completed ? "Approved" : RunStatus.ToString())</span>
+            <span>Round @ShownIteration · @(RunStatus == RunStatus.Completed ? "Approved" : RunStatus.ToString())</span>
         </div>
         <MarkdownView Markdown="@FinalText" Class="body-text" />
     </div>
@@ -40,8 +36,8 @@
     bool   FromEarlierRound => Run.DeliveredIteration is { } delivered && delivered != IterationCount;
     int    ShownIteration   => FromEarlierRound ? Run.DeliveredIteration!.Value : IterationCount;
     string RoundLine => FromEarlierRound
-        ? $"Text from iteration {Run.DeliveredIteration} of {IterationCount}"
-        : $"After {IterationCount} iteration{(IterationCount != 1 ? "s" : "")}";
+        ? $"Text from round {Run.DeliveredIteration} of {IterationCount}"
+        : $"After {IterationCount} round{(IterationCount != 1 ? "s" : "")}";
     int    WordCount   => FinalText.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
 
     string Title

@@ -38,7 +38,7 @@
             </div>
 
             <div class="form-field">
-                <label>Max. Iterations</label>
+                <label>Max. rounds</label>
                 <input type="number"
                        data-testid="resume-max-iterations"
                        class="input-narrow"
@@ -46,7 +46,7 @@
                        max="30"
                        value="@_maxIterations"
                        @onchange="e => int.TryParse(e.Value?.ToString(), out _maxIterations)" />
-                <FieldHelp Text="Maximum number of iterations the AI should run." />
+                <FieldHelp Text="Maximum number of rounds the AI should run." />
             </div>
         </ChildContent>
         <Actions>

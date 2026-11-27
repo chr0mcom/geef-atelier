@@ -110,7 +110,7 @@ public sealed class CrewSummaryTests : TestContext
         cut.Find("[data-testid='crew-summary-toggle']").Click();
 
         var body = cut.Find("[data-testid='crew-summary-body']");
-        Assert.Contains("MaxIterations=5", body.TextContent);
+        Assert.Contains("MaxRounds=5", body.TextContent);
         Assert.Contains("AbortOnCritical=True", body.TextContent);
     }
 

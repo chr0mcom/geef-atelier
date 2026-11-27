@@ -4,7 +4,7 @@
 
 <div class="iter @(_open ? "open" : "") @(IsLast ? "active" : "")">
     <div class="iter-head" @onclick="Toggle" role="button" tabindex="0" aria-expanded="@_open">
-        <div class="num">i.<span class="label">Iteration</span> @Iteration.IterationNumber</div>
+        <div class="num">r.<span class="label">Round</span> @Iteration.IterationNumber</div>
         <div class="summary">@Iteration.ArtifactText[..Math.Min(120, Iteration.ArtifactText.Length)]…</div>
         <div class="findings-count">
             @if (_critCount > 0) { <span class="pill crit">@_critCount crit</span> }
@@ -36,7 +36,7 @@
     {
         var nonInfo = Findings.Count(f => f.Severity != FindingSeverity.Info);
         <div class="evolution">
-            ↓ <strong>Carried into iteration @(Iteration.IterationNumber + 1):</strong>
+            ↓ <strong>Carried into round @(Iteration.IterationNumber + 1):</strong>
             @nonInfo finding@(nonInfo != 1 ? "s" : "") requiring revision.
         </div>
     }

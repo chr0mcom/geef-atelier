@@ -6,7 +6,7 @@ namespace Geef.Atelier.Tests.Web.Components;
 
 /// <summary>
 /// When the stored text comes from an earlier round than the last one (the best-effort text of a run without approval), the manuscript says which
-/// round it is instead of "After N iterations"; otherwise it reads as before.
+/// round it is instead of "After N rounds"; otherwise it reads as before.
 /// </summary>
 public sealed class ManuscriptDeliveredRoundTests : TestContext
 {
@@ -25,9 +25,19 @@ public sealed class ManuscriptDeliveredRoundTests : TestContext
     {
         var cut = RenderComponent<Manuscript>(p => p.Add(m => m.Run, Run(1)).Add(m => m.IterationCount, 3));
 
-        Assert.Contains("Text from iteration 1 of 3", cut.Markup);
-        Assert.Contains("Iteration 1 ·", cut.Markup);
-        Assert.DoesNotContain("After 3 iterations", cut.Markup);
+        Assert.Contains("Text from round 1 of 3", cut.Markup);
+        Assert.Contains("Round 1 ·", cut.Markup);
+        Assert.DoesNotContain("After 3 rounds", cut.Markup);
+    }
+
+    [Fact]
+    public void The_manuscript_offers_copying_only_and_says_round()
+    {
+        var cut = RenderComponent<Manuscript>(p => p.Add(m => m.Run, Run(null)).Add(m => m.IterationCount, 1));
+
+        Assert.Equal("Copy text", Assert.Single(cut.FindAll("button")).TextContent.Trim());
+        Assert.DoesNotContain("Export", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("iteration", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -37,7 +47,7 @@ public sealed class ManuscriptDeliveredRoundTests : TestContext
     {
         var cut = RenderComponent<Manuscript>(p => p.Add(m => m.Run, Run(deliveredIteration)).Add(m => m.IterationCount, 3));
 
-        Assert.Contains("After 3 iterations", cut.Markup);
-        Assert.Contains("Iteration 3 ·", cut.Markup);
+        Assert.Contains("After 3 rounds", cut.Markup);
+        Assert.Contains("Round 3 ·", cut.Markup);
     }
 }
