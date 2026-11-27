@@ -147,19 +147,20 @@ internal sealed class OrderService(
         if (order is null)
             return null;
 
+        var viewer = viewerUsername ?? requestingUsername;
+        var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
+        var givenAnswers = showProfile ? GivenAnswers(order) : null;
         var orderRuns = await orders.ListRunsAsync(orderId, ct);
         var current = OrderStateResolver.SelectCurrentRun(orderRuns);
         var display = OrderStateResolver.Resolve(order.State, current?.ToRunState(time.GetUtcNow()));
         if (current is null)
-            return new OrderResult(orderId, display, null, null, null, null, [], [], [], [], NoteFor(display), UncorrectedAssumptions(order));
+            return new OrderResult(orderId, display, null, null, null, null, [], [], [], [], NoteFor(display), UncorrectedAssumptions(order), GivenAnswers: givenAnswers);
 
         var shown = OrderStateResolver.SelectShownRun(orderRuns);
         var run = shown ?? current;
         var report = run.ReportJson is null ? null : RunReportJson.TryParse(run.ReportJson);
         var usages = await sources.ListRunUsagesAsync(run.Id, ct);
         var hasText = !string.IsNullOrWhiteSpace(run.FinalText);
-        var viewer = viewerUsername ?? requestingUsername;
-        var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
         var lookedUp = string.IsNullOrWhiteSpace(order.ResearchJson)
             ? null
             : OrderResearchLines.Build(ResearchJson.TryParse(order.ResearchJson), report?.LookedUp == true, showSearchWords: showProfile, hasText: hasText);
@@ -184,7 +185,8 @@ internal sealed class OrderService(
             LatestVersion: current.OrderVersion,
             AssumptionsVersion: string.IsNullOrWhiteSpace(run.RevisionHint) ? null : FirstVersion(orderRuns),
             LengthNotice: hasText && run.GrewBeyondItsBase() ? RevisionLines.LongerThanBefore : null,
-            UnansweredQuestions: UnansweredQuestions(run));
+            UnansweredQuestions: UnansweredQuestions(run),
+            GivenAnswers: givenAnswers);
         if (showProfile && hasText)
             result = await WithAboutMeAsync(result, order, run, ct);
         return report is null || !hasText ? result : result.WithReport(report, showProfile);
@@ -554,6 +556,13 @@ internal sealed class OrderService(
     /// <summary>The first version of the order: the lowest version of its standard runs, 1 when none has one.</summary>
     private static int FirstVersion(IReadOnlyList<RunEntity> orderRuns) =>
         orderRuns.Where(r => r.Kind == RunKind.Standard && r.OrderVersion is not null).Select(r => r.OrderVersion!.Value).DefaultIfEmpty(1).Min();
+
+    private static IReadOnlyList<OrderGivenAnswer>? GivenAnswers(OrderEntity order)
+    {
+        var record = IntakeRecordJson.TryParse(order.ClarifyJson);
+        var given = OrderGivenAnswers.From(record?.Questions, record?.Assumptions, IntakeRecordJson.ParseAnswers(order.AnswersJson));
+        return given.Count > 0 ? given : null;
+    }
 
     private static IReadOnlyList<IntakeAssumption>? UncorrectedAssumptions(OrderEntity order)
     {

@@ -306,7 +306,7 @@ public sealed class GetOrderResultHonestyTests
         var names = root.EnumerateObject().Select(p => p.Name).ToList();
         Assert.Equal(
             ["assumptions", "checks", "factCheck", "unbackedPassages", "sourceIssues", "openPoints", "writerAssumptions", "sourceQuotes", "notesNotShown", "lookedUp",
-                "latestVersion", "earlierOpenPoints", "assumptionsVersion", "lengthNotice", "unansweredQuestions", "fromAboutMe", "aboutMeMissing"],
+                "latestVersion", "earlierOpenPoints", "assumptionsVersion", "lengthNotice", "unansweredQuestions", "fromAboutMe", "aboutMeMissing", "givenAnswers"],
             names.SkipWhile(n => n != "assumptions").ToList());
         Assert.Equal(["checked", "changed", "toReview", "limits"], root.GetProperty("checks").EnumerateObject().Select(p => p.Name));
         Assert.Equal(["state", "filesCompared"], root.GetProperty("factCheck").EnumerateObject().Select(p => p.Name));

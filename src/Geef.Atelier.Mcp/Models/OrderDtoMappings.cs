@@ -107,7 +107,12 @@ internal static class OrderDtoMappings
             string.IsNullOrWhiteSpace(result.LengthNotice) ? null : result.LengthNotice,
             result.UnansweredQuestions() is { Count: > 0 } unanswered ? unanswered : null,
             result.FromAboutMe is { Count: > 0 } fromAboutMe ? fromAboutMe.Select(t => t.ToWire()).ToList() : null,
-            result.TellOnce is { Count: > 0 } tellOnce ? tellOnce.Select(t => t.ToWire()).ToList() : null);
+            result.TellOnce is { Count: > 0 } tellOnce ? tellOnce.Select(t => t.ToWire()).ToList() : null,
+            result.GivenAnswers is { Count: > 0 } given ? given.ToDtos() : null);
+
+    /// <summary>The given answers as they appear in MCP answers.</summary>
+    public static IReadOnlyList<GivenAnswerDto> ToDtos(this IReadOnlyList<OrderGivenAnswer> answers) =>
+        answers.Select(a => new GivenAnswerDto(a.QuestionId, a.Question, a.Answer, a.LeftToAtelier, a.Origin.ToWire())).ToList();
 
     /// <summary>The open points of the writer for an earlier version that the shown version does not repeat (<see cref="OrderResultRules.ShownEarlierPoints"/>); <c>null</c> when there are none.</summary>
     public static IReadOnlyList<OrderEarlierPointDto>? ToEarlierPointDtos(this OrderResult result)

@@ -22,15 +22,18 @@ namespace Geef.Atelier.Tests.Mcp;
 /// descriptions of <c>revise_order</c> and <c>get_order_result</c>, so all eight hashes were taken again once; nothing else in the tool list changed.
 /// The four tool list hashes were taken again once more for the SDK 2.4.0 (D-086): SDK 1.3.0 marked every async tool with
 /// <c>execution: {"taskSupport":"optional"}</c> although the server offers no tasks; 2.4.0 leaves the field out, and nothing else changed.
+/// The four tool list hashes were taken again once more for <c>givenAnswers</c> (D-088): the description of <c>get_order_result</c> gained
+/// <see cref="Geef.Atelier.Mcp.Tools.GetOrderResultTool.GivenAnswersRule"/>; without that sentence the tool list gives the hashes before it.
+/// The instructions did not change.
 /// </summary>
 public sealed class McpTicketsOffBaselineTests
 {
-    private const string ToolsWithLegacyHash = "6df3d78d078549a34a9b38d1c21f6f49b2d0e5a13814eb5e52a4118863f1119e";
-    private const string ToolsWithoutLegacyHash = "863752b45a5537c880951e559c8b2591e22b1725c3753e5f111a047101ea7e44";
+    private const string ToolsWithLegacyHash = "c60bc0b4f2d8e6e64bbbcb004522771d2b66dcd91c39304964d2906c97879e95";
+    private const string ToolsWithoutLegacyHash = "e49a4bd52d165ce64eb944902eeda78e3974454881e63cfba0d9b39c1b29afe3";
     private const string InstructionsWithLegacyHash = "0008d51c7b9a6d3663e355f88eb9a485ec4565a787d3b1476277452eb585d81a";
     private const string InstructionsWithoutLegacyHash = "f9c6023635e5f6d73305154507755c8c36d483ba989488706b9c0920d52d04d1";
-    private const string ToolsWithLegacyBeforeAboutMeHash = "d41a8cc7025ba85b39f8311a45de938b6184148b9be2110d1d9ceb29d8ce25ad";
-    private const string ToolsWithoutLegacyBeforeAboutMeHash = "d9065d358e2afd84b19f96f5062e7273863737798e6cfd109fbca3d41556cbbd";
+    private const string ToolsWithLegacyBeforeAboutMeHash = "3d233cd5c6606f0dca6e1c12cd71fa4fc2ca53641be252a0316863fdb07e5cd2";
+    private const string ToolsWithoutLegacyBeforeAboutMeHash = "00083d904670898ab70b151f7c3579de45799bc4522e9d9a40d7b75c25422cb4";
     private const string InstructionsWithLegacyBeforeAboutMeHash = "8185e3bdcfa40031c0d4f0c5eca8cd08864a7ab11eb3cf2d0288203152eff680";
     private const string InstructionsWithoutLegacyBeforeAboutMeHash = "75aab43d645c8fadd9927f53851a12f8a53df7c86ef70114d03af033ccd7e09a";
 

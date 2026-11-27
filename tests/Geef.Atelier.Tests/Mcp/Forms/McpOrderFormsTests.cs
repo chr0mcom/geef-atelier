@@ -78,7 +78,33 @@ public sealed class McpOrderFormsTests
         Assert.Equal("angebot.pdf", Assert.Single(dto.Sources).FileName);
         Assert.Contains("Eine Datei war doppelt.", dto.Message, StringComparison.Ordinal);
         Assert.Contains("Eine Notiz.", dto.Message, StringComparison.Ordinal);
+        Assert.StartsWith(McpOrderForms.AnsweredLead, dto.Message, StringComparison.Ordinal);
+        Assert.Equal(
+        [
+            new GivenAnswerDto("length", "Wie lang soll der Text ungefähr werden?", "Kurz (etwa 150 Wörter)", false, "form"),
+            new GivenAnswerDto("q1", "Wer bekommt die Mail?", "Alle Kunden", false, "form"),
+        ], dto.GivenAnswers);
         Assert.Empty(_orders.Submitted);
+    }
+
+    [Fact]
+    public async Task You_decide_and_empty_questions_show_as_left_to_atelier_in_the_given_answers()
+    {
+        var dto = await Forms.ResumeAsync(Call(Parameters(State(), Accept(("length", "decide_for_me")))), CancellationToken.None);
+
+        Assert.Equal(
+        [
+            new GivenAnswerDto("length", "Wie lang soll der Text ungefähr werden?", null, true, "form"),
+            new GivenAnswerDto("q1", "Wer bekommt die Mail?", null, true, "form"),
+        ], dto!.GivenAnswers);
+    }
+
+    [Fact]
+    public async Task Without_answers_the_given_answers_stay_empty()
+    {
+        var dto = await Forms.ResumeAsync(Call(Parameters(State(), new ElicitResult { Action = "decline" })), CancellationToken.None);
+
+        Assert.Null(dto!.GivenAnswers);
     }
 
     [Theory]

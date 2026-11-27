@@ -57,7 +57,7 @@ public sealed class UnansweredQuestionsDtoTests
     {
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(Result([Question]).ToDto(), Web));
 
-        Assert.Equal(["lengthNotice", "unansweredQuestions", "fromAboutMe", "aboutMeMissing"], doc.RootElement.EnumerateObject().Select(p => p.Name).SkipWhile(n => n != "lengthNotice"));
+        Assert.Equal(["lengthNotice", "unansweredQuestions", "fromAboutMe", "aboutMeMissing", "givenAnswers"], doc.RootElement.EnumerateObject().Select(p => p.Name).SkipWhile(n => n != "lengthNotice"));
         Assert.Equal(Question, doc.RootElement.GetProperty("unansweredQuestions")[0].GetString());
     }
 

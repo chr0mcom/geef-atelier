@@ -99,7 +99,8 @@ public sealed record OrderView(
 /// <see cref="FromAboutMe"/> are the topics of <see cref="AboutMeTopics.Topics"/> that came from About me for the shown version, and
 /// <see cref="TellOnce"/> those the reading of the request assumed or left open while About me has nothing on them now
 /// (<see cref="AboutMeTopics.Missing"/>); both are set only for the owner of the order, only with a text, never empty, and never while
-/// <c>Orders:TellOnce</c> is <see cref="TellOnceMode.Off"/>.
+/// <c>Orders:TellOnce</c> is <see cref="TellOnceMode.Off"/>. <see cref="GivenAnswers"/> are the answers given to the questions of the order
+/// before writing, with who gave them (<see cref="OrderGivenAnswers"/>); set only for the owner of the order and never empty.
 /// </summary>
 public sealed record OrderResult(
     Guid OrderId,
@@ -132,7 +133,51 @@ public sealed record OrderResult(
     string? LengthNotice = null,
     IReadOnlyList<string>? UnansweredQuestions = null,
     IReadOnlyList<GapTopic>? FromAboutMe = null,
-    IReadOnlyList<GapTopic>? TellOnce = null);
+    IReadOnlyList<GapTopic>? TellOnce = null,
+    IReadOnlyList<OrderGivenAnswer>? GivenAnswers = null);
+
+/// <summary>
+/// An answer given to a question of the order before writing, or a correction of an assumption (D-088): the question (or the assumption) word for
+/// word, the chosen option and/or the own words (<c>null</c> when the question was left to Atelier) and who gave it.
+/// </summary>
+public sealed record OrderGivenAnswer(string QuestionId, string Question, string? Answer, bool LeftToAtelier, AnswerOrigin Origin);
+
+/// <summary>The answers of an order as <see cref="OrderGivenAnswer"/>s, in the stored order: questions, corrections of assumptions, the revision guess.</summary>
+public static class OrderGivenAnswers
+{
+    /// <summary>Question of the revision guess as it is shown with the answers.</summary>
+    public const string RevisionQuestion = "Improve the attached file chosen as the text to revise?";
+
+    /// <summary>
+    /// One entry per answer that belongs to a question, an assumption or the revision guess of the order; answers that belong to nothing are left
+    /// out. Texts are kept as they were asked and given.
+    /// </summary>
+    public static IReadOnlyList<OrderGivenAnswer> From(IReadOnlyList<ClarifyQuestion>? questions, IReadOnlyList<IntakeAssumption>? assumptions, IReadOnlyList<OrderAnswer>? answers)
+    {
+        var result = new List<OrderGivenAnswer>();
+        foreach (var answer in answers ?? [])
+        {
+            if ((questions ?? []).FirstOrDefault(q => q.Id == answer.QuestionId) is { } question)
+            {
+                var label = question.Options.FirstOrDefault(o => o.Id == answer.OptionId)?.Label;
+                var given = string.Join(" – ", new[] { label, answer.FreeText }.Where(t => !string.IsNullOrWhiteSpace(t)));
+                var left = answer.DecideForMe || given.Length == 0;
+                result.Add(new OrderGivenAnswer(question.Id, question.Text, left ? null : given, left, answer.Origin));
+            }
+            else if ((assumptions ?? []).FirstOrDefault(a => a.Id == answer.QuestionId) is { } assumption && !string.IsNullOrWhiteSpace(answer.FreeText))
+            {
+                result.Add(new OrderGivenAnswer(assumption.Id, assumption.Text, answer.FreeText, false, answer.Origin));
+            }
+            else if (answer.QuestionId == RevisionAnswer.QuestionId && answer.OptionId is RevisionAnswer.Yes or RevisionAnswer.No)
+            {
+                result.Add(new OrderGivenAnswer(RevisionAnswer.QuestionId, RevisionQuestion,
+                    answer.OptionId == RevisionAnswer.Yes ? "Yes, improve that file" : "No, write something new and use the file only as material", false, answer.Origin));
+            }
+        }
+
+        return result;
+    }
+}
 
 /// <summary>
 /// Something the writer noted for an earlier <see cref="Version"/> that the shown version does not repeat: an open point (also a fixed

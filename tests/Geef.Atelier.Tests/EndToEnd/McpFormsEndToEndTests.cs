@@ -72,6 +72,8 @@ public sealed partial class McpFormsEndToEndTests(PostgresFixture postgres)
         var orderId = submitted.GetProperty("orderId").GetString()!;
         Assert.Contains(submitted.GetProperty("state").GetString(), new[] { "queued", "working" });
         Assert.False(string.IsNullOrEmpty(submitted.GetProperty("runId").GetString()));
+        Assert.StartsWith(McpOrderForms.AnsweredLead, submitted.GetProperty("message").GetString(), StringComparison.Ordinal);
+        AssertGiven(submitted, ("length", "Kurz (etwa 150 Wörter)", false, "form"));
         Assert.Equal(1, await OrderCountAsync(host));
 
         var order = await LoadAsync(host, orderId);
@@ -84,6 +86,7 @@ public sealed partial class McpFormsEndToEndTests(PostgresFixture postgres)
         var prompt = Assert.Single(host.Llm.CallsFor(LlmRole.Executor)).Messages.Last(m => m.Role == "user").Content!;
         Assert.Contains("Kurz (etwa 150 Wörter)", prompt);
         Assert.DoesNotContain("answered by the assistant", prompt);
+        AssertGiven(await CallAsync(client, "get_order_result", new { orderId }), ("length", "Kurz (etwa 150 Wörter)", false, "form"));
 
         var state = Assert.Single(capture.States);
         var replay = await client.CallToolAsync(Replay(new { request = Request }, state, ("length", "long")));
@@ -168,6 +171,30 @@ public sealed partial class McpFormsEndToEndTests(PostgresFixture postgres)
         Assert.Contains(answered.GetProperty("state").GetString(), new[] { "queued", "working" });
         Assert.Equal(AnswerOrigin.User, Assert.Single(IntakeRecordJson.ParseAnswers((await LoadAsync(host, orderId)).AnswersJson)).Origin);
         Assert.Equal(1, await OrderCountAsync(host));
+        await using var older = await ConnectAsync(port, OlderRevision, null, null);
+        AssertGiven(await CallAsync(older, "get_order_result", new { orderId }), ("length", "Kurz (etwa 150 Wörter)", false, "user"));
+    }
+
+    [Fact]
+    public async Task Given_answers_show_only_to_the_person_who_ordered_the_text_for_both_revisions()
+    {
+        var port = FreePort();
+        await using var host = await StartAsync(port, McpElicitationMode.Off);
+        host.Script.EnqueueClarifierJson(Clarify($"{AskLength},{AssumeTone}"));
+        await using var owner = await ConnectAsync(port, null, null, null, OtherToken);
+        var submitted = await CallAsync(owner, "submit_order", new { request = Request });
+        var orderId = submitted.GetProperty("orderId").GetString()!;
+        Assert.Equal("needs_input", submitted.GetProperty("state").GetString());
+        await CallAsync(owner, "answer_order", new { orderId, answers = new[] { new { questionId = "length", optionId = "long", origin = "client" } } });
+
+        foreach (var revision in new string?[] { null, OlderRevision })
+        {
+            await using var own = await ConnectAsync(port, revision, null, null, OtherToken);
+            AssertGiven(await CallAsync(own, "get_order_result", new { orderId }), ("length", "Lang (etwa 800 Wörter)", false, "client"));
+            await using var admin = await ConnectAsync(port, revision, null, null);
+            var seen = await CallAsync(admin, "get_order_result", new { orderId });
+            Assert.True(!seen.TryGetProperty("givenAnswers", out var none) || none.ValueKind == JsonValueKind.Null, seen.ToString());
+        }
     }
 
     [Fact]
@@ -311,6 +338,17 @@ public sealed partial class McpFormsEndToEndTests(PostgresFixture postgres)
             forms.Add(form!);
             return ValueTask.FromResult(Answer(values));
         };
+
+    private static void AssertGiven(JsonElement answer, params (string QuestionId, string? Answer, bool LeftToAtelier, string Origin)[] expected)
+    {
+        Assert.True(answer.TryGetProperty("givenAnswers", out var given) && given.ValueKind == JsonValueKind.Array, answer.ToString());
+        Assert.Equal(expected, given.EnumerateArray().Select(g => (
+            g.GetProperty("questionId").GetString()!,
+            g.GetProperty("answer").ValueKind == JsonValueKind.Null ? null : g.GetProperty("answer").GetString(),
+            g.GetProperty("leftToAtelier").GetBoolean(),
+            g.GetProperty("origin").GetString()!)).ToArray());
+        Assert.All(given.EnumerateArray(), g => Assert.False(string.IsNullOrWhiteSpace(g.GetProperty("question").GetString())));
+    }
 
     private static ElicitResult Answer(params (string Key, string Value)[] values) =>
         new() { Action = "accept", Content = values.ToDictionary(v => v.Key, v => JsonSerializer.SerializeToElement(v.Value)) };
