@@ -34,6 +34,6 @@ internal sealed class SeedDraftPipelineAssembler : IPipelineAssembler
             groundingConsultationRepository: services.GetService<IGroundingConsultationRepository>(),
             toolBackedGroundingProvider: services.GetService<ToolBackedGroundingProvider>(),
             warningSink: context.WarningSink,
-            loopSafeguards: LoopSafeguards.From(context.ConvergenceOptions.Value));
+            loopSafeguards: LoopSafeguards.From(context.ConvergenceOptions.Value, context.Run.CreatedByUser));
     }
 }

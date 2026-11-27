@@ -105,7 +105,8 @@ internal sealed class OrderService(
             return new OrderSubmission(order.Id, OrderStateResolver.Resolve(order.State, null).State, null, notices);
         }
 
-        var resolved = await crewService.ResolveOrderSnapshotAsync(request.Mode, request.CrewTemplateName, request.CustomCrew, links.Count > 0, ct);
+        var resolved = await crewService.ResolveOrderSnapshotAsync(request.Mode, request.CrewTemplateName, request.CustomCrew, links.Count > 0, ct,
+            options.CarefulOutlineFor(request.CreatedByUser) == CarefulOutlineMode.On);
         var profile = await profiles.GetAsync(request.CreatedByUser, ct);
         var run = resolved.ToFirstRun(order, briefComposer.Compose(new OrderBriefInput(order, null, [], profile)).Text, now);
         await CreateAsync(() => orders.CreateWithFirstRunAsync(order, links, run, ct));
@@ -488,7 +489,7 @@ internal sealed class OrderService(
         var warnings = current is null ? [] : await warningRepository.ListByRunAsync(current.Id, ct);
         var finishedAt = display.IsFinished ? current?.CompletedAt ?? order.UpdatedAt : (DateTimeOffset?)null;
         var versionStartedAt = current is { RevisionHint: { Length: > 0 } } ? current.CreatedAt : (DateTimeOffset?)null;
-        var progress = OrderProgressMapper.Map(display, order.Mode, linked.Count > 0, events, order.CreatedAt, finishedAt, time.GetUtcNow(), order.ToIntakeProgress(),
+        var progress = OrderProgressMapper.Map(display, order.ProgressMode(current), linked.Count > 0, events, order.CreatedAt, finishedAt, time.GetUtcNow(), order.ToIntakeProgress(),
             versionStartedAt);
 
         return new OrderView(

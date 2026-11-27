@@ -11,4 +11,7 @@ internal static class DirectWarningCodes
 
     /// <summary>The writer's input tokens suggest that it searched the files instead of reading them in full.</summary>
     public const string PartialRead = "writer.partial_read";
+
+    /// <summary>"Extra careful" with an outline (D-087): the planning call gave no outline, so the text was written without one.</summary>
+    public const string NoWritingPlan = "writer.no_plan";
 }

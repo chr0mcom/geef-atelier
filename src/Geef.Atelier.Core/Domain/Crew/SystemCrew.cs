@@ -912,6 +912,13 @@ public static class SystemCrew
     /// <summary>Name of the code-only template of the direct path.</summary>
     public const string DirectTemplateName = "direct";
 
+    /// <summary>Name of the code-only template of "Extra careful" with an outline first (<c>Orders:CarefulOutline</c>, D-087).</summary>
+    public const string DirectOutlineTemplateName = "direct-outline";
+
+    /// <summary>True for the templates the direct path runs: <see cref="DirectTemplateName"/> and <see cref="DirectOutlineTemplateName"/>.</summary>
+    public static bool IsDirectPathTemplate(string? name) =>
+        string.Equals(name, DirectTemplateName, StringComparison.Ordinal) || string.Equals(name, DirectOutlineTemplateName, StringComparison.Ordinal);
+
     /// <summary>Writer of the direct path: one writing pass from the request and the attached files.</summary>
     public static readonly ExecutorProfile DirectWriterProfile = new(
         Name: "direct-writer",
@@ -978,6 +985,17 @@ public static class SystemCrew
         FinalizerProfileNames: [],
         Domain: ModelDomain.General);
 
+    /// <summary>
+    /// Code-only template of "Extra careful" with an outline first (D-087): the direct template under its own name, so that the run
+    /// records that one call planned sections with word budgets before the writing pass. Same writer, checks, fact check and passes.
+    /// </summary>
+    public static readonly CrewTemplate DirectOutlineTemplate = DirectTemplate with
+    {
+        Name = DirectOutlineTemplateName,
+        DisplayName = "Extra careful",
+        Description = "Plans the text in sections with word budgets first, then one writing pass along that plan, with the same automatic checks, fact check and correction as the direct path.",
+    };
+
     /// <summary>Executor profiles that exist only in code, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, ExecutorProfile> CodeOnlyExecutorProfiles =
         new Dictionary<string, ExecutorProfile>
@@ -998,5 +1016,6 @@ public static class SystemCrew
         new Dictionary<string, CrewTemplate>
         {
             [DirectTemplate.Name] = DirectTemplate,
+            [DirectOutlineTemplate.Name] = DirectOutlineTemplate,
         };
 }

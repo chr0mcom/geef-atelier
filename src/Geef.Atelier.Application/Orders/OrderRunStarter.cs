@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
@@ -8,6 +9,7 @@ using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Core.Persistence.Profiles;
 using Geef.Atelier.Core.Persistence.Sources;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Application.Orders;
 
@@ -20,7 +22,8 @@ internal sealed class OrderRunStarter(
     IRunWarningSink warningSink,
     IOrderNotifier notifier,
     ILogger<OrderRunStarter> logger,
-    TimeProvider time) : IOrderRunStarter
+    TimeProvider time,
+    IOptions<OrderOptions>? orderOptions = null) : IOrderRunStarter
 {
     public async Task<Guid?> TryStartAsync(RunStartRequest request, CancellationToken ct)
     {
@@ -33,7 +36,8 @@ internal sealed class OrderRunStarter(
         var answers = request.Answers ?? [];
         var linked = await sources.ListForOrderAsync(order.Id, includeText: false, ct);
         var profile = string.IsNullOrWhiteSpace(order.CreatedByUser) ? null : await profiles.GetAsync(order.CreatedByUser, ct);
-        var resolved = await crewService.ResolveOrderSnapshotAsync(order.Mode, order.CrewTemplateName, null, linked.Count > 0, ct);
+        var outline = orderOptions?.Value.CarefulOutlineFor(order.CreatedByUser) == CarefulOutlineMode.On;
+        var resolved = await crewService.ResolveOrderSnapshotAsync(order.Mode, order.CrewTemplateName, null, linked.Count > 0, ct, outline);
 
         var now = time.GetUtcNow();
         var briefing = briefComposer.Compose(new OrderBriefInput(order, request.Record, answers, profile,

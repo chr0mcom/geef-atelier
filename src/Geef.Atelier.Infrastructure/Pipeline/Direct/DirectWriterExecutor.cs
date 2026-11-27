@@ -30,6 +30,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 /// <see cref="DirectPathException.WritingServiceBusy"/>.
 /// After the first pass the input tokens are compared with the size of the files (<see cref="ReadEvidenceCheck"/>);
 /// too few become the warning <see cref="PartialReadWarning"/>.
+/// With a <see cref="WritingPlanner"/> ("Extra careful" with an outline, D-087) the first pass of a run without a seed draft is preceded by
+/// one planning call; its outline goes into the first pass only. Without a planner the executor is unchanged.
 /// </summary>
 internal sealed class DirectWriterExecutor(
     ExecutorProfile profile,
@@ -39,7 +41,8 @@ internal sealed class DirectWriterExecutor(
     IRunWarningSink warningSink,
     Guid runId,
     ILogger logger,
-    IWriterNotesSource notesSource) : IExecutionStep
+    IWriterNotesSource notesSource,
+    WritingPlanner? planner = null) : IExecutionStep
 {
     /// <summary>Warning shown when the writer most likely searched the files instead of reading them.</summary>
     public const string PartialReadWarning = "Some of your files may not have been read in full.";
@@ -69,7 +72,10 @@ internal sealed class DirectWriterExecutor(
         {
             var seed = context.TryGet(AtelierContextKeys.SeedDraft, out var s) && !string.IsNullOrWhiteSpace(s) ? s : null;
             var revision = context.TryGet(AtelierContextKeys.RevisionHint, out var hint) && !string.IsNullOrWhiteSpace(hint);
-            userPrompt = DirectWriterPrompts.FirstPass(brief, bundle, documentMode, seed, writerNotes, arithmetic, revision);
+            var plan = planner is not null && seed is null && !revision
+                ? await planner.PlanAsync(brief, bundle, TargetWords(context), cancellationToken)
+                : null;
+            userPrompt = DirectWriterPrompts.FirstPass(brief, bundle, documentMode, seed, writerNotes, arithmetic, revision, plan);
             baseline = seed ?? string.Empty;
         }
         else
@@ -175,6 +181,10 @@ internal sealed class DirectWriterExecutor(
             .Distinct(StringComparer.Ordinal)
             .ToList();
     }
+
+    /// <summary>The length in words the outline aims at: from the length the code read from the request (<see cref="WritingPlanRules.TargetWords"/>).</summary>
+    private static int? TargetWords(IRunContext context) =>
+        context.TryGet(AtelierContextKeys.OrderConstraints, out var constraints) && constraints is not null ? constraints.Length.TargetWords() : null;
 
     private async Task<WriterNotesSplit> SplitAsync(LlmResponse? response, string brief, CancellationToken ct) =>
         await notesSource.SplitAsync(response?.Text ?? string.Empty, brief, ct);

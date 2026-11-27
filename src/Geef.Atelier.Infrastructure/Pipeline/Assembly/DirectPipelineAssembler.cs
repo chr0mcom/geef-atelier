@@ -27,7 +27,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Assembly;
 /// The direct path: <see cref="OrderGroundingStep"/> (the order's files in full text and, for the version of the run, the passages looked
 /// up on the web), <see cref="DirectWriterExecutor"/>
 /// and <see cref="DeterministicChecksReviewer"/>, at most two passes. After the run it stores the report
-/// (<c>Runs.ReportJson</c>). Accepts runs of the code-only template <see cref="SystemCrew.DirectTemplateName"/>, also
+/// (<c>Runs.ReportJson</c>). Accepts runs of the code-only templates <see cref="SystemCrew.DirectTemplateName"/> and
+/// <see cref="SystemCrew.DirectOutlineTemplateName"/> ("Extra careful" with an outline, D-087: the writer gets a <see cref="WritingPlanner"/>), also
 /// with a seed draft. A run that changes an earlier version (<see cref="RunEntity.RevisionHint"/>) passes the change to the grounding
 /// step, and its report also reads the report of that version (<see cref="RunEntity.ParentRunId"/>, <see cref="EarlierVersionAsync"/>).
 /// </summary>
@@ -42,7 +43,7 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
     public int Priority => 90;
 
     /// <inheritdoc/>
-    public bool CanAssemble(RunEntity run, CrewSnapshot snapshot) => snapshot.TemplateName == SystemCrew.DirectTemplateName;
+    public bool CanAssemble(RunEntity run, CrewSnapshot snapshot) => SystemCrew.IsDirectPathTemplate(snapshot.TemplateName);
 
     /// <inheritdoc/>
     public GeefPipelineRunner<FinalizedDocument> Assemble(PipelineAssemblyContext context)
@@ -56,7 +57,8 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
         var writer = new DirectWriterExecutor(
             context.Snapshot.Executor, context.LlmClientResolver, context.PricingCatalog, context.CostAccumulator,
             context.WarningSink, context.Run.Id, context.LoggerFactory.CreateLogger<DirectWriterExecutor>(),
-            WriterNotesSources.For(_directOptions));
+            WriterNotesSources.For(_directOptions),
+            Planner(context));
         var checks = new DeterministicChecksReviewer();
         var ledger = Ledgers.GetValue(context, _ => new FactCheckLedger());
 
@@ -78,6 +80,13 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
             warningSink: context.WarningSink,
             customGroundingStep: grounding);
     }
+
+    /// <summary>The planning call of a run of <see cref="SystemCrew.DirectOutlineTemplateName"/> (D-087); <c>null</c> for every other run.</summary>
+    private static WritingPlanner? Planner(PipelineAssemblyContext context) =>
+        context.Snapshot.TemplateName == SystemCrew.DirectOutlineTemplateName
+            ? new WritingPlanner(context.Snapshot.Executor, context.LlmClientResolver, context.PricingCatalog, context.CostAccumulator,
+                context.WarningSink, context.Run.Id, context.LoggerFactory.CreateLogger<WritingPlanner>())
+            : null;
 
     /// <summary>
     /// The fact check of one run: a <see cref="LlmFactChecker"/> with the run's cost accumulator, the run's ledger and, as the one

@@ -38,6 +38,15 @@ public sealed class ConvergenceOptions
     /// (no round better than every round before it). Default <see cref="LoopSwitch.Off"/>.
     /// </summary>
     public LoopSwitch StopWithoutProgress { get; init; } = LoopSwitch.Off;
+
+    /// <summary>Value of <see cref="BestDraft"/> per user name (the owner of the run), overriding it (D-087, measurement accounts).</summary>
+    public Dictionary<string, LoopSwitch> BestDraftOverrides { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Value of <see cref="WriterBlockingOnly"/> per user name, overriding it (D-087).</summary>
+    public Dictionary<string, LoopSwitch> WriterBlockingOnlyOverrides { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Value of <see cref="StopWithoutProgress"/> per user name, overriding it (D-087).</summary>
+    public Dictionary<string, LoopSwitch> StopWithoutProgressOverrides { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>Operating switch of one review-loop safeguard (D-085).</summary>

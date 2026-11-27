@@ -14,9 +14,15 @@ internal sealed record LoopSafeguards(bool BestDraft, bool WriterBlockingOnly, b
     /// <summary>All safeguards off: the loop as it was before D-085.</summary>
     public static LoopSafeguards None { get; } = new(false, false, false);
 
-    /// <summary>The safeguards switched on in <paramref name="options"/>.</summary>
-    public static LoopSafeguards From(ConvergenceOptions options) => new(
-        options.BestDraft == LoopSwitch.On,
-        options.WriterBlockingOnly == LoopSwitch.On,
-        options.StopWithoutProgress == LoopSwitch.On);
+    /// <summary>
+    /// The safeguards switched on in <paramref name="options"/> for runs of <paramref name="user"/>: per switch the entry of its overrides
+    /// for that user name (D-087), otherwise the switch itself.
+    /// </summary>
+    public static LoopSafeguards From(ConvergenceOptions options, string? user = null) => new(
+        Switch(options.BestDraft, options.BestDraftOverrides, user) == LoopSwitch.On,
+        Switch(options.WriterBlockingOnly, options.WriterBlockingOnlyOverrides, user) == LoopSwitch.On,
+        Switch(options.StopWithoutProgress, options.StopWithoutProgressOverrides, user) == LoopSwitch.On);
+
+    private static LoopSwitch Switch(LoopSwitch value, Dictionary<string, LoopSwitch>? overrides, string? user) =>
+        user is not null && overrides is not null && overrides.TryGetValue(user, out var own) ? own : value;
 }
