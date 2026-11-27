@@ -103,7 +103,7 @@ Implementation: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 | `FilterPill.razor` | Status filter button with count |
 | `ProgressPip.razor` | Iteration-progress pip |
 | `Manuscript.razor` | Final manuscript with copy button |
-| `Icons/Icon*.razor` | 16 hairline SVG icons |
+| `Icons/Icon*.razor` | Hairline SVG icons |
 
 ### Updated components
 
@@ -119,17 +119,10 @@ Implementation: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 
 ## Mock stubs (.coming-soon)
 
-This list was, at the PS-3 design translation, the state of the not-yet-connected UI elements. Current status (May 2026):
-
-| Element | Stub back then | State today |
-|---------|----------------|----------------|
-| Welcome stats | `—` in stat tiles | Removed with the dashboard (D-091) |
-| Cost display (RunDetail) | `$ —` | ✅ Implemented (cost tracking, `Runs.TotalCostEur` / `IterationActorCosts`) |
-| Account functions | Disabled | ✅ Implemented: multi-user (`/admin/users`), connected clients (`/account/connected-clients`) |
-| "Profile" entry in `UserMenu` | Disabled | ⏳ Still a stub (`.coming-soon`) — the separate profile menu item itself is not yet wired up |
-| Export button (Manuscript) | Disabled | ⏳ Still a stub — DOCX/PDF *export* remains out of scope (see [01-vision-and-scope.md](01-vision-and-scope.md)) |
-
-The CSS class `.coming-soon` (dimmed color, tooltip) is still used in two places: the export button (`Manuscript.razor`) and the "Profile" entry in `UserMenu.razor`.
+At the PS-3 design translation several UI elements were not connected yet. What is left: the export button of the manuscript block
+on the technical run page (`Manuscript.razor`) is still disabled; the text of an order is downloaded as Word, PDF or Markdown on
+the order page (D-070). The other stubs of that time were implemented (cost display, accounts, connected clients) or removed
+with their pages (D-091). The public pages `/pricing`, `/status` and `/changelog` show the component `ComingSoon`.
 
 ## CSS architecture
 

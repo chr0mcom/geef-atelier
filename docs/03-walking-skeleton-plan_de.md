@@ -217,7 +217,7 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 
 **Ziel:** Zweiter Frontend-Adapter neben der Web-UI. Externe MCP-Clients (Claude Desktop, Claude Code, eigene Agenten) können Aufträge stellen, Status abfragen, Ergebnisse abholen.
 
-**Voraussetzung:** Schritte 1–8 + M1 in main. App auf `95.216.100.213:8080` mit Cookie-Auth bereits erreichbar. Schritt 9 fügt einen zweiten Auth-Pfad (Bearer-Token) und einen zweiten Frontend-Adapter (MCP) hinzu — bestehende Cookie-UI bleibt unverändert.
+**Voraussetzung:** Schritte 1–8 + M1 in main. App auf einem direkten Port des Servers mit Cookie-Auth bereits erreichbar. Schritt 9 fügt einen zweiten Auth-Pfad (Bearer-Token) und einen zweiten Frontend-Adapter (MCP) hinzu — bestehende Cookie-UI bleibt unverändert.
 
 **Architekturelle Implikation:** Mit Schritt 9 hat das System zum ersten Mal **zwei parallel laufende Frontends** über denselben Application-Service-Layer (`IRunService`). Das ist der eigentliche Lackmustest für die Schichten-Disziplin der bisherigen Schritte. Wenn `IRunService` und seine Verträge sauber genug sind, sollte MCP keine Pipeline-/Domain-/Orchestrator-Änderungen erfordern.
 
@@ -254,11 +254,11 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 
 **Ziel:** Deploybar auf dem Zielserver.
 
-**Voraussetzung:** Alle 9 Schritte + M1 in main. App-Container läuft bereits auf `95.216.100.213:8080` (Direkt-Port aus Schritt-8-R5). 85/85 Tests grün, alle Frontends (UI + MCP) funktional verifiziert.
+**Voraussetzung:** Alle 9 Schritte + M1 in main. App-Container läuft bereits auf einem direkten Port des Zielservers (aus Schritt-8-R5). 85/85 Tests grün, alle Frontends (UI + MCP) funktional verifiziert.
 
-**Scope-Reduktion gegenüber ursprünglicher Plan-Form:** Schritt 10 ist kein klassischer "Initial-Deploy" — der Container ist bereits funktional auf dem Zielserver. Schritt 10 ist **Routing-und-TLS-Setup**: Traefik-Labels für `geef.stefan-bechtel.de`, Let's-Encrypt-Zertifikat, Direkt-Port-Exposure abschalten, Cookie-`SecurePolicy.Always` aktivieren. Aufwand: deutlich geringer als initial geplant.
+**Scope-Reduktion gegenüber ursprünglicher Plan-Form:** Schritt 10 ist kein klassischer "Initial-Deploy" — der Container ist bereits funktional auf dem Zielserver. Schritt 10 ist **Routing-und-TLS-Setup**: Traefik-Labels für die Produktions-Domain, Let's-Encrypt-Zertifikat, Direkt-Port-Exposure abschalten, Cookie-`SecurePolicy.Always` aktivieren. Aufwand: deutlich geringer als initial geplant.
 
-**Aus Schritt-9-Bericht Empfehlungen-Sektion bereits vorbereitet:** Vollständige Env-Var-Liste, Traefik-Label-Vorlage, Migration-Strategie (Auto-on-Startup bleibt), SignalR-WebSocket-Routing-Hinweis. Architect prüft in Phase 1.4 vor allem die Übereinstimmung mit der existierenden Traefik-Server-Konvention auf `/srv/CLAUDE.md` oder `/srv/docker/docs/`.
+**Aus Schritt-9-Bericht Empfehlungen-Sektion bereits vorbereitet:** Vollständige Env-Var-Liste, Traefik-Label-Vorlage, Migration-Strategie (Auto-on-Startup bleibt), SignalR-WebSocket-Routing-Hinweis. Architect prüft in Phase 1.4 vor allem die Übereinstimmung mit der bestehenden Traefik-Konvention des Servers.
 
 **Umfang:**
 - Multi-Stage `Dockerfile` (.NET 10 SDK build → ASP.NET Core 10 runtime)
@@ -273,7 +273,7 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 - App verbindet sich mit der bestehenden Postgres-Instanz
 - Health-Check und Auth funktionieren hinter Reverse-Proxy
 
-**Hinweis aus Schritt-8-Bericht:** Die App läuft bereits auf `95.216.100.213:8080` (ohne Traefik-Routing) und wurde dort von R5 für die Auth-Flows verifiziert. Schritt 10 wird damit kein klassischer "ersten-Deploy" mehr, sondern ein **Routing-und-Domain-Setup**: Traefik-Labels für `geef.stefan-bechtel.de`, TLS-Termination, ggf. Production-Hardening (z.B. Migration-Strategie revisiten). Der Aufwand reduziert sich erheblich, weil das Container-Image bereits funktional ist.
+**Hinweis aus Schritt-8-Bericht:** Die App läuft bereits auf einem direkten Port des Servers (ohne Traefik-Routing) und wurde dort von R5 für die Auth-Flows verifiziert. Schritt 10 wird damit kein klassischer "ersten-Deploy" mehr, sondern ein **Routing-und-Domain-Setup**: Traefik-Labels für die Produktions-Domain, TLS-Termination, ggf. Production-Hardening (z.B. Migration-Strategie revisiten). Der Aufwand reduziert sich erheblich, weil das Container-Image bereits funktional ist.
 
 ---
 

@@ -34,7 +34,7 @@ middleware.
 - Multi-user hosting on a self-owned Docker server: DB-based user management (BCrypt), per-user isolation of orders and runs, admin override via explicit toggles
 - Web UI (Blazor Server) for orders: start page, "My work", order page, "About me"
 - MCP server interface so that AI assistants (Claude Desktop, Claude Code, custom agents) can place orders and fetch results, with a static bearer token or the self-hosted OAuth 2.1
-- LLM providers: subscription CLIs (Claude Code, Codex) through a local proxy and OpenRouter (pay per token); the checks deliberately run on other models than the writer
+- LLM providers: the command-line tools Claude Code and Codex, signed in with own accounts, through a local proxy; further OpenAI-compatible providers such as OpenRouter exist, but writing runs through the proxy (D-066). The checks deliberately run on other models than the writer
 - Files as sources: upload of PDF, Word, Markdown or plain text, also through an upload ticket from an AI assistant; the writer gets them in full text
 - Web research for orders without files, where switched on (Tavily), shown as passages of other websites, not as checked facts
 - Fire-and-forget workflow: place an order, check later, fetch the result. **Before** the writing, at most three short questions with ready-made answers to click are allowed, always skippable (D-068); no intervention while the text is written

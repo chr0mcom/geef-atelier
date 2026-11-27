@@ -70,10 +70,7 @@ wwwroot/
 └── img/brand/
     ├── mark-dark.png       (= quill-dark.png)
     ├── mark-light.png      (= quill-light.png)
-    ├── mark-sand.png       (= quill-sand.png)
-    ├── icon-vellum.png
-    ├── icon-noir.png
-    └── icon-petrol.png
+    └── mark-sand.png       (= quill-sand.png)
 ```
 
 ## TODOs

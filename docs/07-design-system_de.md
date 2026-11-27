@@ -103,7 +103,7 @@ Implementierung: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 | `FilterPill.razor` | Status-Filter-Button mit Count |
 | `ProgressPip.razor` | Iterations-Fortschritts-Pip |
 | `Manuscript.razor` | Finales Manuskript mit Copy-Button |
-| `Icons/Icon*.razor` | 16 hairline SVG-Icons |
+| `Icons/Icon*.razor` | Hairline SVG-Icons |
 
 ### Aktualisierte Komponenten
 
@@ -119,20 +119,11 @@ Implementierung: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 
 ## Mock-Stubs (.coming-soon)
 
-Diese Liste war zur PS-3-Design-Translation der Stand der noch nicht angebundenen
-UI-Elemente. Aktueller Status (Mai 2026):
-
-| Element | Damaliger Stub | Heutiger Stand |
-|---------|----------------|----------------|
-| Welcome-Stats | `—` in Stat-Tiles | Entfallen mit dem Dashboard (D-091) |
-| Cost-Anzeige (RunDetail) | `$ —` | ✅ Implementiert (Cost-Tracking, `Runs.TotalCostEur` / `IterationActorCosts`) |
-| Account-Funktionen | Disabled | ✅ Implementiert: Multi-User (`/admin/users`), verbundene Clients (`/account/connected-clients`) |
-| „Profile"-Eintrag im `UserMenu` | Disabled | ⏳ Weiterhin Stub (`.coming-soon`) — der separate Profil-Menüpunkt selbst ist noch nicht angebunden |
-| Export-Button (Manuscript) | Disabled | ⏳ Weiterhin Stub — DOCX/PDF-*Export* bleibt out of scope (siehe [01-vision-and-scope.md](01-vision-and-scope_de.md)) |
-
-Die CSS-Klasse `.coming-soon` (gedämpfte Farbe, Tooltip) wird noch an zwei Stellen
-verwendet: dem Export-Button (`Manuscript.razor`) und dem „Profile"-Eintrag im
-`UserMenu.razor`.
+Bei der PS-3-Design-Translation waren mehrere UI-Elemente noch nicht angebunden. Übrig ist: Der Export-Knopf des Textblocks auf
+der technischen Lauf-Seite (`Manuscript.razor`) ist weiterhin abgeschaltet; den Text eines Auftrags lädt man auf der Auftragsseite
+als Word, PDF oder Markdown herunter (D-070). Die übrigen Stubs von damals wurden umgesetzt (Kostenanzeige, Konten, verbundene
+Clients) oder sind mit ihren Seiten entfallen (D-091). Die öffentlichen Seiten `/pricing`, `/status` und `/changelog` zeigen die
+Komponente `ComingSoon`.
 
 ## CSS-Architektur
 

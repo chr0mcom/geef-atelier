@@ -34,7 +34,7 @@ den EventSink und die Middleware.
 - Mehrbenutzer-Hosting auf eigenem Docker-Server: DB-basierte Benutzerverwaltung (BCrypt), Aufträge und Läufe pro Nutzer isoliert, Admin-Override per expliziten Umschaltern
 - Web-UI (Blazor Server) für Aufträge: Startseite, „My work“, Auftragsseite, „About me“
 - MCP-Server-Schnittstelle, damit KI-Assistenten (Claude Desktop, Claude Code, Custom-Agents) Aufträge erteilen und Ergebnisse abholen können, mit statischem Bearer-Token oder dem selbst gehosteten OAuth 2.1
-- LLM-Provider: Abo-CLIs (Claude Code, Codex) über einen lokalen Proxy und OpenRouter (Pay-per-Token); die Prüfungen laufen bewusst auf anderen Modellen als der Schreiber
+- LLM-Provider: die Kommandozeilen-Werkzeuge Claude Code und Codex, mit eigenen Konten angemeldet, über einen lokalen Proxy; weitere OpenAI-kompatible Anbieter wie OpenRouter gibt es, geschrieben wird aber über den Proxy (D-066). Die Prüfungen laufen bewusst auf anderen Modellen als der Schreiber
 - Dateien als Quellen: Upload von PDF, Word, Markdown oder reinem Text, auch über ein Upload-Ticket aus einem KI-Assistenten; der Schreiber bekommt sie im Volltext
 - Web-Recherche für Aufträge ohne Dateien, wo eingeschaltet (Tavily), gezeigt als Stellen anderer Webseiten, nicht als geprüfte Tatsachen
 - Fire-and-Forget-Workflow: Auftrag erteilen, später nachsehen, Ergebnis abholen. **Vor** dem Schreiben sind höchstens drei kurze Rückfragen mit fertigen Antworten zum Anklicken erlaubt, immer überspringbar (D-068); während des Schreibens gibt es keinen Eingriff
