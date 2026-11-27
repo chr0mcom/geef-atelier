@@ -18,7 +18,9 @@ namespace Geef.Atelier.Infrastructure.Research;
 /// found word for word and stores the result once per order. Every failure ends as a status with <see cref="OrderResearch.ErrorCode"/>.
 /// </summary>
 /// <remarks>
-/// An order with attached files never searches (<see cref="ResearchStatus.FilesAttached"/>). Otherwise only the topics that
+/// Only orders of the standard way search (<see cref="OrderMode.Direct"/>); "Extra careful" never does. An order with attached files
+/// never searches (<see cref="ResearchStatus.FilesAttached"/>). Topics the intake already withheld against the About me details the
+/// clarifier read (<see cref="IntakeRecord.ResearchWithheld"/>) count as withheld. Otherwise only the topics that
 /// <see cref="ResearchQueryGate"/> lets go reach the search: it gets the values of the About me details without their field names
 /// (<see cref="ProfilePrompt.Values"/>) and, when those hold free text, the language of the order. The passage picker sees nothing but
 /// these topics and the pages. A search is reserved before it starts (<see cref="IOrderRepository.TryReserveResearchAsync"/>, daily
@@ -52,7 +54,7 @@ internal sealed class OrderResearchService(
     {
         ArgumentNullException.ThrowIfNull(order);
         var settings = options.Value;
-        if (ModeFor(settings, order.CreatedByUser) == ResearchMode.Off)
+        if (order.Mode != OrderMode.Direct || ModeFor(settings, order.CreatedByUser) == ResearchMode.Off)
             return null;
 
         if (hasFiles)
@@ -66,10 +68,11 @@ internal sealed class OrderResearchService(
 
         var record = IntakeRecordJson.TryParse(order.ClarifyJson);
         var topics = Topics(record);
-        if (topics.Count == 0)
+        var withheldAtIntake = WithheldAtIntake(record);
+        if (topics.Count == 0 && withheldAtIntake == 0)
             return null;
 
-        var run = await ResearchAsync(order, topics, profileText, record!.Output?.Language, settings, ct);
+        var run = await ResearchAsync(order, topics, withheldAtIntake, profileText, record!.Output?.Language, settings, ct);
         if (run is null)
             return null;
 
@@ -97,6 +100,10 @@ internal sealed class OrderResearchService(
                 .ToList()
             : [];
 
+    /// <summary>The research topics the intake withheld against the About me details the clarifier read (<see cref="IntakeRecord.ResearchWithheld"/>).</summary>
+    internal static int WithheldAtIntake(IntakeRecord? record) =>
+        record is { Status: IntakeRecordStatus.Ok, ResearchWithheld: > 0 and var withheld } ? withheld : 0;
+
     /// <summary>
     /// An order with attached files never searches (D-074): nothing of a file can reach the search or the passage picker. When the order
     /// has research topics, the status <see cref="ResearchStatus.FilesAttached"/> is stored once, so that every run of the order shows
@@ -107,7 +114,8 @@ internal sealed class OrderResearchService(
         var stored = order.ResearchJson is null ? null : Stored(order);
         if (stored is { Status: ResearchStatus.FilesAttached })
             return stored;
-        if (Topics(IntakeRecordJson.TryParse(order.ClarifyJson)).Count == 0)
+        var record = IntakeRecordJson.TryParse(order.ClarifyJson);
+        if (Topics(record).Count == 0 && WithheldAtIntake(record) == 0)
             return null;
 
         var research = new OrderResearch(OrderResearch.CurrentSchemaVersion, ResearchStatus.FilesAttached, [], 0, 0, 0, 0, 0, 0,
@@ -123,12 +131,13 @@ internal sealed class OrderResearchService(
         research with { Status = ResearchStatus.Failed, Entries = [], ErrorCode = NotStoredCode };
 
     private async Task<(OrderResearch Research, IReadOnlyList<ResearchPage> Pages, int Skipped)?> ResearchAsync(
-        OrderEntity order, IReadOnlyList<string> topics, string? profileText, string? orderLanguage, ResearchOptions settings, CancellationToken ct)
+        OrderEntity order, IReadOnlyList<string> topics, int withheldAtIntake, string? profileText, string? orderLanguage, ResearchOptions settings, CancellationToken ct)
     {
         var started = time.GetTimestamp();
         var profile = ProfilePrompt.Values(profileText);
-        var selection = ResearchQueryGate.Select(topics, order.RequestText, [], profile.Text, Math.Max(0, settings.MaxSearches),
+        var gate = ResearchQueryGate.Select(topics, order.RequestText, [], profile.Text, Math.Max(0, settings.MaxSearches),
             profile.HasFreeText ? orderLanguage : null);
+        var selection = gate with { Withheld = gate.Withheld + withheldAtIntake };
         var state = new State(selection);
         try
         {

@@ -343,6 +343,66 @@ public sealed class OrderResearchServiceTests
     }
 
     [Fact]
+    public async Task An_extra_careful_order_never_searches_even_with_research_on_for_everyone()
+    {
+        var s = Create();
+        var careful = Order(Clarify(IntakeRecordStatus.Ok, TopicA, TopicB)) with { Mode = OrderMode.Careful };
+
+        AssertNothingHappened(s, await Ensure(s, careful));
+        AssertNothingHappened(s, await Ensure(s, careful, files: true));
+        Assert.Null(s.Orders.Find(careful.Id)!.ResearchJson);
+    }
+
+    private static string ClarifyWithheld(int withheld, params string[] topics) =>
+        IntakeRecordJson.Serialize(IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with
+        {
+            ResearchTopics = topics,
+            ResearchWithheld = withheld,
+        });
+
+    [Fact]
+    public async Task Topics_withheld_at_the_reading_stay_withheld_when_about_me_was_emptied_before_the_run()
+    {
+        var s = Create();
+        var order = Order(ClarifyWithheld(2));
+
+        var result = await Ensure(s, order, profile: null);
+
+        Assert.Equal(ResearchStatus.AllWithheld, result!.Status);
+        Assert.Equal(2, result.Withheld);
+        Assert.Empty(result.TopicsSent);
+        Assert.Empty(s.Search.Queries);
+        Assert.Empty(s.Condenser.Calls);
+        Assert.Equal(0, s.Orders.Counts);
+        Assert.Equal(ResearchJson.Serialize(result), s.Orders.Find(order.Id)!.ResearchJson);
+    }
+
+    [Fact]
+    public async Task Topics_withheld_at_the_reading_are_counted_with_those_withheld_at_the_run()
+    {
+        var s = Create();
+        var order = Order(ClarifyWithheld(1, TopicA, "Tarif Oberhuber Mindestlohn"));
+
+        var result = await Ensure(s, order, profile: "Anything else: Ich heiße Oberhuber.");
+
+        Assert.Equal(ResearchStatus.Found, result!.Status);
+        Assert.Equal(2, result.Withheld);
+        Assert.Equal([TopicA], result.TopicsSent);
+        Assert.Equal([TopicA], s.Search.Queries);
+    }
+
+    [Fact]
+    public async Task An_order_with_files_whose_topics_were_all_withheld_at_the_reading_stores_files_attached()
+    {
+        var s = Create();
+
+        var result = await Ensure(s, Order(ClarifyWithheld(1)), files: true);
+
+        Assert.Equal(ResearchStatus.FilesAttached, result!.Status);
+        Assert.Empty(s.Search.Queries);
+    }
+
+    [Fact]
     public async Task A_topic_that_is_only_the_name_of_a_kind_of_gap_is_never_searched()
     {
         var s = Create();

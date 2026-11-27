@@ -313,6 +313,41 @@ public sealed class OrderIntakeServiceTests
     }
 
     [Fact]
+    public async Task Research_topics_with_words_of_the_about_me_details_the_clarifier_read_are_left_out_and_counted()
+    {
+        var profile = new Geef.Atelier.Core.Domain.Profiles.UserProfileEntity
+        {
+            Username = "intake-user", Organization = "Kranichsteiner GmbH", CreatedAt = Now, UpdatedAt = Now,
+        };
+        var memory = new ProfileMemoryResolution(new SingleProfile(profile));
+        var service = new OrderIntakeService(_orders, _sources, _shadows, memory, _clarifier, _starter, _notifier, Options.Create(_options),
+            NullLogger<OrderIntakeService>.Instance, _time, _deferrals);
+        var order = _orders.Add("Schreib einen Aushang zum neuen Mindestlohn, etwa 150 Wörter.");
+        _clarifier.Enqueue(OutputWith() with { ResearchTopics = ["Kranichsteiner Mindestlohn Tarif", "Mindestlohn 2027 Höhe"] });
+
+        await service.ProcessAsync(order.Id, CancellationToken.None);
+
+        var record = Assert.Single(_starter.Requests).Record!;
+        Assert.Equal(["Mindestlohn 2027 Höhe"], record.ResearchTopics);
+        Assert.Equal(1, record.ResearchWithheld);
+        Assert.Equal(1, IntakeRecordJson.TryParse(IntakeRecordJson.Serialize(record))!.ResearchWithheld);
+    }
+
+    [Fact]
+    public async Task Without_about_me_details_the_research_topics_stay_as_the_gate_left_them()
+    {
+        var order = _orders.Add("Schreib einen Aushang zum neuen Mindestlohn, etwa 150 Wörter.");
+        _clarifier.Enqueue(OutputWith() with { ResearchTopics = ["Kranichsteiner Mindestlohn Tarif", "Mindestlohn 2027 Höhe"] });
+
+        await Service().ProcessAsync(order.Id, CancellationToken.None);
+
+        var record = Assert.Single(_starter.Requests).Record!;
+        Assert.Equal(["Kranichsteiner Mindestlohn Tarif", "Mindestlohn 2027 Höhe"], record.ResearchTopics);
+        Assert.Null(record.ResearchWithheld);
+        Assert.DoesNotContain("researchWithheld", IntakeRecordJson.Serialize(record), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_stuck_order_that_keeps_failing_neither_blocks_the_younger_ones_nor_fills_the_batch()
     {
         var broken = _orders.Add("A");
