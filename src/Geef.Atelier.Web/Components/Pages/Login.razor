@@ -54,6 +54,7 @@
     /// </summary>
     internal static string ResolvePostLogin(string? returnUrl) => IsPathOnThisSite(returnUrl) ? returnUrl! : "/start";
 
-    private static bool IsPathOnThisSite(string? url) =>
+    /// <summary>Whether <paramref name="url"/> is a path on this site, as described at <see cref="ResolvePostLogin"/>.</summary>
+    internal static bool IsPathOnThisSite(string? url) =>
         url is ['/', ..] && url is not ([_, '/', ..] or [_, '\\', ..]) && !url.Any(char.IsControl);
 }

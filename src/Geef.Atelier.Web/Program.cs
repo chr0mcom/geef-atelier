@@ -124,7 +124,7 @@ builder.Services
             : CookieSecurePolicy.Always;
         o.Cookie.SameSite = SameSiteMode.Strict;
         o.Cookie.Name     = "Atelier.Auth";
-        o.Events.AnswerApiWithStatusCodes();
+        o.Events.ReloadCrossSiteNavigations().AnswerApiWithStatusCodes();
     })
     .AddScheme<AuthenticationSchemeOptions, BearerTokenHandler>(
         McpAuthorizationConstants.BearerScheme, _ => { });

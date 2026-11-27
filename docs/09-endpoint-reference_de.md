@@ -391,6 +391,14 @@ Die `GET /oauth/authorize`-Seite ist eine server-gerenderte Blazor-Consent-Seite
 (`[Authorize]` Cookie). Die Approve/Deny-Entscheidung wird per Formular-POST an
 `/oauth/consent` gesendet (siehe unten) — nicht an `/oauth/authorize` selbst.
 
+**Aufruf von einer anderen Site:** Das Anmelde-Cookie ist `SameSite=Strict` und fehlt dann auch bei angemeldeten
+Personen. Statt zur Anmeldung umzuleiten, antwortet die App auf eine Seitennavigation per `GET`, die der Browser als
+`cross-site` kennzeichnet (`Sec-Fetch-Site`, `Sec-Fetch-Mode: navigate`, `Sec-Fetch-Dest: document`), mit `200` und
+einer kleinen Seite, die dieselbe Adresse einmal von der eigenen Site aus neu lädt (Parameter `same_site_reload=1`,
+der ein zweites Neuladen verhindert). Das gilt für alle geschützten Seiten außerhalb von `/api`. Wer angemeldet ist,
+sieht danach die Seite, sonst die Anmeldung. Für die Zustimmung bleiben Klick und Antiforgery-Token nötig. Browser
+ohne `Sec-Fetch`-Header werden wie bisher zur Anmeldung umgeleitet.
+
 ---
 
 #### `POST /oauth/consent`

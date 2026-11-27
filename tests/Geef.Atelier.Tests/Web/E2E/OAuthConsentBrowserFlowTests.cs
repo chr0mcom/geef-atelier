@@ -59,6 +59,78 @@ public sealed class OAuthConsentBrowserFlowTests(PlaywrightFixture pw, PostgresF
         Assert.Contains("/login", page.Url, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ASignedInPersonComingFromAnotherSiteSeesTheConsentPageAndNoLoginForm()
+    {
+        var port = FreePort();
+        var baseUrl = $"http://127.0.0.1:{port}";
+        var redirectUri = $"http://localhost:{FreePort()}/callback";
+        using var client = ListenForCallbacks(redirectUri);
+        await using var host = await AtelierEndToEndHost.StartAsync(pg, kestrelPort: port);
+        var username = $"browser-{Guid.NewGuid():N}"[..20];
+        await host.CreateUserWithPasswordAsync(username, Password);
+        var clientId = await RegisterAsync(baseUrl, redirectUri);
+        await using var context = await pw.Browser.NewContextAsync();
+        var page = await context.NewPageAsync();
+        await SignInAsync(page, baseUrl, username);
+        var loginPages = 0;
+        page.Request += (_, request) => loginPages += request.Url.StartsWith($"{baseUrl}/login", StringComparison.Ordinal) ? 1 : 0;
+
+        await OpenFromAnotherSiteAsync(page, AuthorizeUrl(baseUrl, clientId, redirectUri, "first"));
+        var granted = await AnswerAsync(page, redirectUri, "btn-approve");
+        await OpenFromAnotherSiteAsync(page, AuthorizeUrl(baseUrl, clientId, redirectUri, "second"));
+        var denied = await AnswerAsync(page, redirectUri, "btn-deny");
+        await OpenFromAnotherSiteAsync(page, $"{baseUrl}/work");
+        await page.Locator("button.user-chip").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
+
+        Assert.StartsWith(redirectUri + "?code=", granted, StringComparison.Ordinal);
+        Assert.EndsWith("&state=first", granted, StringComparison.Ordinal);
+        Assert.Equal($"{redirectUri}?error=access_denied&state=second", denied);
+        Assert.StartsWith($"{baseUrl}/work", page.Url, StringComparison.Ordinal);
+        Assert.Equal(0, loginPages);
+    }
+
+    [Fact]
+    public async Task ASignedOutPersonComingFromAnotherSiteIsAskedToSignInOnceAndThenGrants()
+    {
+        var port = FreePort();
+        var baseUrl = $"http://127.0.0.1:{port}";
+        var redirectUri = $"http://localhost:{FreePort()}/callback";
+        using var client = ListenForCallbacks(redirectUri);
+        await using var host = await AtelierEndToEndHost.StartAsync(pg, kestrelPort: port);
+        var username = $"browser-{Guid.NewGuid():N}"[..20];
+        await host.CreateUserWithPasswordAsync(username, Password);
+        var clientId = await RegisterAsync(baseUrl, redirectUri);
+        await using var context = await pw.Browser.NewContextAsync();
+        var page = await context.NewPageAsync();
+        var asked = new List<string>();
+        page.Request += (_, request) =>
+        {
+            if (request.IsNavigationRequest && request.Url.StartsWith(baseUrl, StringComparison.Ordinal))
+                asked.Add($"{request.Method} {new Uri(request.Url).AbsolutePath}");
+        };
+
+        await OpenFromAnotherSiteAsync(page, AuthorizeUrl(baseUrl, clientId, redirectUri, "first"));
+        await page.FillAsync("input#username", username);
+        await page.FillAsync("input#password", Password);
+        await page.ClickAsync("button.btn-login");
+        var granted = await AnswerAsync(page, redirectUri, "btn-approve");
+
+        Assert.StartsWith(redirectUri + "?code=", granted, StringComparison.Ordinal);
+        Assert.InRange(asked.Count(a => a == "GET /oauth/authorize"), 2, 3);
+        Assert.Single(asked, a => a == "GET /login");
+        Assert.Single(asked, a => a == "POST /login");
+    }
+
+    private static async Task SignInAsync(IPage page, string baseUrl, string username)
+    {
+        await page.GotoAsync($"{baseUrl}/login");
+        await page.FillAsync("input#username", username);
+        await page.FillAsync("input#password", Password);
+        await page.ClickAsync("button.btn-login");
+        await page.WaitForURLAsync("**/start", new PageWaitForURLOptions { Timeout = 15_000 });
+    }
+
     private static async Task OpenFromAnotherSiteAsync(IPage page, string authorizeUrl)
     {
         await page.RouteAsync(ClientPage, route => route.FulfillAsync(new RouteFulfillOptions
