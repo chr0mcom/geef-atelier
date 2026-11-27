@@ -83,7 +83,8 @@ public sealed class GetOrderResultLookedUpTests
 
         Assert.Equal(["Mindestlohn 2027 Höhe"], with.LookedUp!.SearchWords);
         Assert.Null(without.LookedUp!.SearchWords);
-        Assert.Contains("lookedUp.searchWords", McpServerInstructions.Text, StringComparison.Ordinal);
+        Assert.Contains(OrderDtoMappings.SearchWordsNote, with.Note!, StringComparison.Ordinal);
+        Assert.DoesNotContain(OrderDtoMappings.SearchWordsNote, without.Note ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -133,7 +134,7 @@ public sealed class GetOrderResultLookedUpTests
 
         Assert.Equal(["lookedUp", "latestVersion", "earlierOpenPoints", "assumptionsVersion", "lengthNotice", "unansweredQuestions", "fromAboutMe", "aboutMeMissing"], root.EnumerateObject().Select(p => p.Name).SkipWhile(n => n != "lookedUp"));
         var lookedUp = root.GetProperty("lookedUp");
-        Assert.Equal(["status", "note", "withheld", "entries"], lookedUp.EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["status", "note", "withheld", "entries", "searchWords"], lookedUp.EnumerateObject().Select(p => p.Name));
         Assert.Equal(["quote", "url", "title", "retrievedAt"], lookedUp.GetProperty("entries")[0].EnumerateObject().Select(p => p.Name));
         Assert.Equal("found", lookedUp.GetProperty("status").GetString());
     }
