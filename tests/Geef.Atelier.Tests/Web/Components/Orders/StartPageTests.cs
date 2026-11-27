@@ -20,7 +20,7 @@ using Microsoft.JSInterop;
 namespace Geef.Atelier.Tests.Web.Components.Orders;
 
 /// <summary>
-/// The start page: one field, files with receipts, "Extra careful", one button. Uploads are simulated through the
+/// The start page: one field, files with receipts, one button. Uploads are simulated through the
 /// callbacks the upload script calls; the script itself is replaced by bUnit's JS interop.
 /// </summary>
 public sealed class StartPageTests : TestContext
@@ -36,8 +36,6 @@ public sealed class StartPageTests : TestContext
     private readonly FakeSourceIntakeService _intake = new();
     private readonly BunitJSModuleInterop _module;
     private readonly TestAuthorizationContext _auth;
-
-    private void OfferCareful() => Services.Configure<OrderOptions>(o => o.CarefulOutline = CarefulOutlineMode.On);
 
     public StartPageTests()
     {
@@ -58,15 +56,15 @@ public sealed class StartPageTests : TestContext
     }
 
     [Fact]
-    public void ShowsOneFieldFilesAndAStartButtonThatWaitsForTextAndNoExtraCarefulWhileItIsNotOffered()
+    public void ShowsOneFieldFilesAndAStartButtonThatWaitsForTextAndNoChoiceOfAWay()
     {
         var cut = RenderComponent<Start>();
 
         Assert.Equal("What do you need written?", cut.Find("h1").TextContent);
         Assert.StartsWith("Just describe it.", cut.Find("[data-testid='start-request']").GetAttribute("placeholder"));
         Assert.Contains("Add files – drop, paste or browse (PDF, Word, text)", cut.Find("[data-testid='start-drop']").TextContent);
-        Assert.Empty(cut.FindAll("label.start-careful"));
-        Assert.DoesNotContain("Extra careful", cut.Markup, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("input[type='checkbox']"));
+        Assert.DoesNotContain("Extra careful", cut.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.True(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
         Assert.Equal("Describe what you need first.", cut.Find("[data-testid='start-blocked-reason']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='start-more-options']"));
@@ -188,9 +186,8 @@ public sealed class StartPageTests : TestContext
     }
 
     [Fact]
-    public async Task SubmitsTheWordingUnchangedWithFilesPagesAndModeThenOpensTheOrder()
+    public async Task SubmitsTheWordingUnchangedWithFilesAndPagesThenOpensTheOrder()
     {
-        OfferCareful();
         var cut = RenderComponent<Start>();
         const string wording = "  Write a summary of the bill.\nKeep it under 200 words.  ";
         cut.Find("[data-testid='start-request']").Input(wording);
@@ -200,7 +197,6 @@ public sealed class StartPageTests : TestContext
         await UploadAsync(cut, "u1", small);
         await UploadAsync(cut, "u2", big);
         cut.FindAll("[data-testid='source-card-pages']").Single().Change("1-40, 55");
-        cut.Find("[data-testid='start-careful']").Change(true);
 
         cut.Find("[data-testid='start-submit']").Click();
 
@@ -208,7 +204,6 @@ public sealed class StartPageTests : TestContext
         Assert.Equal(wording, request.RequestText);
         Assert.Equal("alice", request.CreatedByUser);
         Assert.Equal(OrderEntry.Web, request.Entry);
-        Assert.Equal(OrderMode.Careful, request.Mode);
         Assert.Equal(
             new[] { new OrderSourceSelection(small.SourceId!.Value, null), new OrderSourceSelection(big.SourceId!.Value, "1-40, 55") },
             request.Sources!);
@@ -576,42 +571,15 @@ public sealed class StartPageTests : TestContext
     }
 
     [Fact]
-    public void WhileExtraCarefulIsOfferedItShowsWithItsHintAndNamesNoReviewRounds()
-    {
-        OfferCareful();
-
-        var cut = RenderComponent<Start>();
-
-        Assert.Contains("Extra careful", cut.Find("label.start-careful").TextContent);
-        Assert.Contains(Start.CarefulHint, cut.Find("label.start-careful").TextContent);
-        Assert.DoesNotContain("review rounds", cut.Markup, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void StartAgainOfACarefulOrderWhileExtraCarefulIsNotOfferedUsesTheStandardWayAndSaysSo()
-    {
-        var earlier = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Failed, requestText: "Summarise the bill.", mode: OrderMode.Careful));
-
-        var cut = RenderFrom(earlier.OrderId);
-        cut.Find("[data-testid='start-submit']").Click();
-
-        Assert.Empty(cut.FindAll("[data-testid='start-careful']"));
-        Assert.EndsWith(Start.CarefulGoneNote, cut.Find("[data-testid='start-prefill-note']").TextContent.Trim(), StringComparison.Ordinal);
-        Assert.Equal(OrderMode.Direct, Assert.Single(_orders.Submitted).Mode);
-    }
-
-    [Fact]
     public void StartAgainFillsInTheEarlierRequestAndItsFiles()
     {
-        OfferCareful();
         var receipt = _intake.Add("alice", OrderReceipts.Usable("bill.pdf", chars: 160_485, pages: 80));
         var source = OrderTestData.Source("bill.pdf", 160_485, 80) with { SourceId = receipt.SourceId!.Value, PageSelection = "1-10" };
-        var earlier = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Failed, requestText: "Summarise the bill.", mode: OrderMode.Careful, sources: [source]));
+        var earlier = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Failed, requestText: "Summarise the bill.", sources: [source]));
 
         var cut = RenderFrom(earlier.OrderId);
 
         Assert.Equal("Summarise the bill.", cut.Find("[data-testid='start-request']").GetAttribute("value"));
-        Assert.True(cut.Find("[data-testid='start-careful']").HasAttribute("checked"));
         Assert.Contains("Your earlier request is filled in.", cut.Find("[data-testid='start-prefill-note']").TextContent);
         Assert.Contains("80 pages", cut.Find("[data-testid='source-card-summary']").TextContent);
 

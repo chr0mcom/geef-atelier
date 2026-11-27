@@ -2,7 +2,7 @@ using Geef.Atelier.Core.Domain.Crew;
 
 namespace Geef.Atelier.Tests.Domain.Crew;
 
-/// <summary>Since stage 8d (D-091) the only setups are the two code-only templates of the direct path.</summary>
+/// <summary>The only setup is the code-only template of the direct path (D-091, addendum to D-087).</summary>
 public sealed class SystemCrewConstantsTests
 {
     [Fact]
@@ -13,10 +13,19 @@ public sealed class SystemCrewConstantsTests
     }
 
     [Fact]
-    public void TheOnlyTemplatesAreTheDirectAndTheOutlineTemplate()
+    public void TheOnlyTemplateIsTheDirectTemplate()
     {
-        Assert.Equal([SystemCrew.DirectTemplateName, SystemCrew.DirectOutlineTemplateName], SystemCrew.CodeOnlyTemplates.Keys.Order().ToList());
+        Assert.Equal([SystemCrew.DirectTemplateName], SystemCrew.CodeOnlyTemplates.Keys.ToList());
         Assert.All(SystemCrew.CodeOnlyTemplates.Keys, name => Assert.True(SystemCrew.IsDirectPathTemplate(name)));
+        Assert.DoesNotContain(SystemCrew.RetiredRequestCheckName, SystemCrew.CodeOnlyReviewerProfiles.Keys);
+    }
+
+    [Fact]
+    public void StoredRunsOfTheRemovedOutlineVariantStillCountAsDirectPath()
+    {
+        Assert.Equal("direct-outline", SystemCrew.RetiredOutlineTemplateName);
+        Assert.Equal("requirements-check", SystemCrew.RetiredRequestCheckName);
+        Assert.True(SystemCrew.IsDirectPathTemplate(SystemCrew.RetiredOutlineTemplateName));
     }
 
     [Fact]
@@ -27,15 +36,6 @@ public sealed class SystemCrewConstantsTests
             Assert.True(SystemCrew.CodeOnlyExecutorProfiles.ContainsKey(template.ExecutorProfileName), template.Name);
             Assert.All(template.ReviewerProfileNames, name => Assert.True(SystemCrew.CodeOnlyReviewerProfiles.ContainsKey(name), $"{template.Name}/{name}"));
         }
-    }
-
-    [Fact]
-    public void TheOutlineTemplateAddsOnlyTheRequestCheck()
-    {
-        Assert.Equal(SystemCrew.DirectTemplate.ExecutorProfileName, SystemCrew.DirectOutlineTemplate.ExecutorProfileName);
-        Assert.Equal([.. SystemCrew.DirectTemplate.ReviewerProfileNames, SystemCrew.RequirementsCheckProfile.Name],
-            SystemCrew.DirectOutlineTemplate.ReviewerProfileNames);
-        Assert.Equal(SystemCrew.DirectTemplate.ConvergenceOverride, SystemCrew.DirectOutlineTemplate.ConvergenceOverride);
     }
 
     [Theory]

@@ -3,7 +3,10 @@ namespace Geef.Atelier.Core.Domain.Orders;
 /// <summary>State of an order before its first run exists. Stored as text; once a run exists, the run decides what is shown.</summary>
 public enum OrderState { Analyzing = 0, NeedsInput = 1, Ready = 2, Cancelled = 3 }
 
-/// <summary>How an order is worked on: the direct path (one writing pass plus checks) or the careful path (a crew with reviewers).</summary>
+/// <summary>
+/// The stored mode of an order. Every new order is <see cref="Direct"/> (one writing pass plus checks). <see cref="Careful"/> only stands
+/// in orders stored by earlier versions; whatever is still done with such an order runs on the direct path.
+/// </summary>
 public enum OrderMode { Direct = 0, Careful = 1 }
 
 /// <summary>Where an order came from.</summary>

@@ -142,7 +142,7 @@ public sealed class HowItWorksPageTests : TestContext
         Assert.Contains("Shadow", admin.Find("[data-testid='hiw-admins-table']").TextContent, StringComparison.Ordinal);
         Assert.DoesNotContain("tester", admin.Markup, StringComparison.Ordinal);
         Assert.Contains("no longer exists", admin.Find("[data-testid='hiw-admins-workshop']").TextContent, StringComparison.Ordinal);
-        Assert.Contains("Orders:CarefulOutline", admin.Find("[data-testid='hiw-admins-table']").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("CarefulOutline", admin.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -274,30 +274,28 @@ public sealed class HowItWorksPageTests : TestContext
     }
 
     [Fact]
-    public void Without_research_no_web_search_is_promised_and_extra_careful_says_it_does_not_search()
+    public void Without_research_no_web_search_is_promised()
     {
-        Services.Configure<OrderOptions>(o => { o.IntakeMode = IntakeMode.On; o.CarefulOutline = CarefulOutlineMode.On; });
+        Services.Configure<OrderOptions>(o => o.IntakeMode = IntakeMode.On);
         this.AddTestAuthorization();
 
         var off = Render();
 
         Assert.Empty(off.FindAll("[data-testid='hiw-step-research']"));
         Assert.Empty(off.FindAll("[data-testid='hiw-privacy-research']"));
-        Assert.Contains("does not look things up on the web", off.Find("[data-testid='hiw-limit-careful']").TextContent, StringComparison.Ordinal);
         Assert.Contains("Nothing goes to a web search", off.Find("[data-testid='hiw-flow']").TextContent, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void With_research_the_web_search_is_promised_only_for_the_standard_way_without_files()
+    public void With_research_the_web_search_is_promised_only_without_files()
     {
-        Services.Configure<OrderOptions>(o => { o.IntakeMode = IntakeMode.On; o.CarefulOutline = CarefulOutlineMode.On; });
+        Services.Configure<OrderOptions>(o => o.IntakeMode = IntakeMode.On);
         Services.Configure<ResearchOptions>(o => o.Mode = ResearchMode.On);
         this.AddTestAuthorization();
 
         var on = Render();
 
         var step = on.Find("[data-testid='hiw-step-research']").TextContent;
-        Assert.Contains("never for “Extra careful”", step, StringComparison.Ordinal);
         Assert.Contains("does not search again", step, StringComparison.Ordinal);
         Assert.Contains("daily limit", step, StringComparison.Ordinal);
         Assert.Contains("the result says so", step, StringComparison.Ordinal);
@@ -307,17 +305,15 @@ public sealed class HowItWorksPageTests : TestContext
         Assert.Contains(OrderResearchLines.SearchPrivacy, privacy, StringComparison.Ordinal);
         Assert.DoesNotContain("private details", on.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("which search words were sent", step, StringComparison.Ordinal);
-        Assert.Contains("“Extra careful” never searches the web", privacy, StringComparison.Ordinal);
         Assert.Contains("never your answers or your files; names or other details you wrote can end up in them", on.Find("[data-testid='hiw-flow']").TextContent, StringComparison.Ordinal);
-        Assert.Contains("does not look things up on the web", on.Find("[data-testid='hiw-limit-careful']").TextContent, StringComparison.Ordinal);
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("tester")]
-    public void Without_extra_careful_the_page_does_not_mention_it(string? viewer)
+    public void The_page_offers_no_choice_of_a_second_way(string? viewer)
     {
-        Services.Configure<OrderOptions>(o => { o.IntakeMode = IntakeMode.On; o.CarefulOutlineOverrides["someone-else"] = CarefulOutlineMode.On; });
+        Services.Configure<OrderOptions>(o => o.IntakeMode = IntakeMode.On);
         Services.Configure<ResearchOptions>(o => o.Mode = ResearchMode.On);
         var auth = this.AddTestAuthorization();
         if (viewer is null)
@@ -327,20 +323,8 @@ public sealed class HowItWorksPageTests : TestContext
 
         var cut = Render();
 
-        Assert.DoesNotContain("Extra careful", cut.Markup, StringComparison.Ordinal);
-        Assert.Empty(cut.FindAll("[data-testid='hiw-limit-careful']"));
-    }
-
-    [Fact]
-    public void A_person_with_extra_careful_switched_on_reads_what_it_does()
-    {
-        Services.Configure<OrderOptions>(o => { o.IntakeMode = IntakeMode.On; o.CarefulOutlineOverrides["tester"] = CarefulOutlineMode.On; });
-        this.AddTestAuthorization().SetAuthorized("tester");
-
-        var line = Render().Find("[data-testid='hiw-limit-careful']").TextContent;
-
-        Assert.Contains("plans the text in sections first", line, StringComparison.Ordinal);
-        Assert.Contains("checks that everything you asked for is in it", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("careful", cut.Find("[data-testid='hiw-limits']").TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Extra careful", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

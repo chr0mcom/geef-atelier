@@ -25,8 +25,7 @@ public static class McpServiceExtensions
     /// <c>Orders:MaxWaitSeconds</c>, the same value that limits the wait. Trace lines of the SDK, which hold whole messages with upload
     /// tokens and file content, are never written (<see cref="McpMessageLogGuard"/>). The transport is stateless on purpose
     /// (<see cref="HttpServerSessionMode.Stateless"/>): every request stands alone, for clients of the 2026-07-28 revision as for older ones.
-    /// <c>submit_order</c> offers <c>extraCareful</c> only while "Extra careful" is offered to anybody (<c>Orders:CarefulOutline</c>, D-091); a call
-    /// with it from a person it is not offered to is refused with a plain sentence. While <c>Mcp:Skills</c> is <c>On</c> the server also offers <see cref="AtelierSkill"/>; while <c>Mcp:Elicitation</c> is <c>On</c>,
+    /// While <c>Mcp:Skills</c> is <c>On</c> the server also offers <see cref="AtelierSkill"/>; while <c>Mcp:Elicitation</c> is <c>On</c>,
     /// <c>submit_order</c> may ask its questions as a form of the client (<see cref="IMcpOrderForms"/>). Both are off by default, and then tool list,
     /// instructions and capabilities are the same as without them (D-088).
     /// </summary>
@@ -75,19 +74,16 @@ public static class McpServiceExtensions
     {
         var tickets = services.GetRequiredService<IOptions<UploadOptions>>().Value.Tickets == UploadTicketsMode.On;
         var orders = services.GetRequiredService<IOptions<OrderOptions>>().Value;
-        var careful = orders.OffersCarefulToAnyone();
         var submit = method.DeclaringType == typeof(SubmitOrderTool);
         var description = method.DeclaringType == typeof(GetOrderStatusTool)
             ? GetOrderStatusTool.Describe(orders.MaxWaitSeconds)
-            : submit ? SubmitOrderTool.Describe(tickets, services.GetRequiredService<IOptions<McpOptions>>().Value, careful) : null;
+            : submit ? SubmitOrderTool.Describe(tickets, services.GetRequiredService<IOptions<McpOptions>>().Value) : null;
         if (method.DeclaringType == typeof(ProfileTool) && orders.TellOnce == TellOnceMode.Off)
             return ProfileTool.SavingParameters.Aggregate(method.CreateTool(services, ProfileTool.ReadOnlyToolDescription), (t, p) => t.WithoutInputProperty(p))
                 .WithAnnotations(new ToolAnnotations { ReadOnlyHint = true });
         var tool = method.CreateTool(services, description);
         if (!submit)
             return tool;
-        if (!careful)
-            tool = tool.WithoutInputProperty(SubmitOrderTool.ExtraCarefulParameter);
         return tickets
             ? tool.WithInputPropertyDescription(SubmitOrderTool.AttachmentsParameter, SubmitOrderTool.TicketAttachmentsDescription)
             : tool.WithoutInputProperty(SubmitOrderTool.UploadIdsParameter);

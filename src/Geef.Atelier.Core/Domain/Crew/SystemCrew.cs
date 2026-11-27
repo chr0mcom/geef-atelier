@@ -4,22 +4,27 @@ using Geef.Atelier.Core.Domain.Crew.Profiles;
 namespace Geef.Atelier.Core.Domain.Crew;
 
 /// <summary>
-/// The setups that exist only in code: the direct path (<see cref="DirectTemplate"/>) and "Extra careful" with an outline first
-/// (<see cref="DirectOutlineTemplate"/>, D-087), with their writer and check profiles. Models are never literals here: every LLM role
-/// carries a <see cref="ModelSlot"/> and takes its displayed binding from <see cref="ModelMatrix"/>; the concrete model is assigned per
-/// run at snapshot-build time (D-066).
+/// The setup that exists only in code: the direct path (<see cref="DirectTemplate"/>) with its writer and check profiles. Models are
+/// never literals here: every LLM role carries a <see cref="ModelSlot"/> and takes its displayed binding from <see cref="ModelMatrix"/>;
+/// the concrete model is assigned per run at snapshot-build time (D-066).
 /// </summary>
 public static class SystemCrew
 {
     /// <summary>Name of the code-only template of the direct path.</summary>
     public const string DirectTemplateName = "direct";
 
-    /// <summary>Name of the code-only template of "Extra careful" with an outline first (<c>Orders:CarefulOutline</c>, D-087).</summary>
-    public const string DirectOutlineTemplateName = "direct-outline";
+    /// <summary>
+    /// Template name stored with runs of the removed variant "Extra careful" (D-087). No new run gets it; stored runs are still read,
+    /// continued and changed on the direct path.
+    /// </summary>
+    public const string RetiredOutlineTemplateName = "direct-outline";
 
-    /// <summary>True for the templates the direct path runs: <see cref="DirectTemplateName"/> and <see cref="DirectOutlineTemplateName"/>.</summary>
+    /// <summary>Name of the extra check of <see cref="RetiredOutlineTemplateName"/> in stored snapshots; the direct path leaves it out.</summary>
+    public const string RetiredRequestCheckName = "requirements-check";
+
+    /// <summary>True for the template names the direct path runs: <see cref="DirectTemplateName"/> and, for stored runs, <see cref="RetiredOutlineTemplateName"/>.</summary>
     public static bool IsDirectPathTemplate(string? name) =>
-        string.Equals(name, DirectTemplateName, StringComparison.Ordinal) || string.Equals(name, DirectOutlineTemplateName, StringComparison.Ordinal);
+        string.Equals(name, DirectTemplateName, StringComparison.Ordinal) || string.Equals(name, RetiredOutlineTemplateName, StringComparison.Ordinal);
 
     /// <summary>Writer of the direct path: one writing pass from the request and the attached files.</summary>
     public static readonly ExecutorProfile DirectWriterProfile = new(
@@ -59,21 +64,6 @@ public static class SystemCrew
         IsSystem: true,
         ModelSlot: ModelSlot.FactReviewer);
 
-    /// <summary>
-    /// Check of "Extra careful" with an outline (D-087, repair): lists the explicit requirements of the request word for word and says
-    /// whether the first version meets them; the implementation is injected at pipeline build time. Fixed to the standard model of the
-    /// intake (another model than the writer), without a slot, so that the model assignment keeps it.
-    /// </summary>
-    public static readonly ReviewerProfile RequirementsCheckProfile = new(
-        Name: "requirements-check",
-        DisplayName: "Request check",
-        Description: "Checks whether the first version meets every explicit requirement of the request. Injected at pipeline build time.",
-        SystemPrompt: "Requirements check -- injected at pipeline build time.",
-        Provider: ModelMatrix.Primary(ModelSlot.Intake).Provider,
-        Model: ModelMatrix.Primary(ModelSlot.Intake).Model,
-        MaxTokens: 8192,
-        IsSystem: true);
-
     /// <summary>Code-only template of the direct path.</summary>
     public static readonly CrewTemplate DirectTemplate = new(
         Name: DirectTemplateName,
@@ -84,19 +74,6 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 2, AbortOnCritical: false, DetectRegression: false, StagnationThreshold: 2),
         Domain: ModelDomain.General);
-
-    /// <summary>
-    /// Code-only template of "Extra careful" with an outline first (D-087): the direct template under its own name, so that the run
-    /// records that one call planned sections with word budgets before the writing pass. Same writer, checks, fact check and passes, plus
-    /// the check of the explicit requirements of the request after the first version (<see cref="RequirementsCheckProfile"/>, repair of D-087).
-    /// </summary>
-    public static readonly CrewTemplate DirectOutlineTemplate = DirectTemplate with
-    {
-        Name = DirectOutlineTemplateName,
-        DisplayName = "Extra careful",
-        Description = "Plans the text in sections with word budgets first, then one writing pass along that plan, with the same automatic checks and fact check as the direct path and a check that every explicit requirement of the request is met, followed by at most one correction.",
-        ReviewerProfileNames = [DeterministicChecksProfile.Name, SourceFactCheckProfile.Name, RequirementsCheckProfile.Name],
-    };
 
     /// <summary>Executor profiles that exist only in code, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, ExecutorProfile> CodeOnlyExecutorProfiles =
@@ -111,7 +88,6 @@ public static class SystemCrew
         {
             [DeterministicChecksProfile.Name] = DeterministicChecksProfile,
             [SourceFactCheckProfile.Name] = SourceFactCheckProfile,
-            [RequirementsCheckProfile.Name] = RequirementsCheckProfile,
         };
 
     /// <summary>Crew templates that exist only in code, indexed by name.</summary>
@@ -119,6 +95,5 @@ public static class SystemCrew
         new Dictionary<string, CrewTemplate>
         {
             [DirectTemplate.Name] = DirectTemplate,
-            [DirectOutlineTemplate.Name] = DirectOutlineTemplate,
         };
 }

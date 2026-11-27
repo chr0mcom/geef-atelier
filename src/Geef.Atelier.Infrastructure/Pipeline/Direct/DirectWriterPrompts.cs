@@ -81,20 +81,16 @@ internal static class DirectWriterPrompts
     /// <paramref name="writerNotes"/> the prompt is the one of stage 2 and <paramref name="arithmetic"/> is not used. When the bundle
     /// holds the passages looked up on the web, <see cref="LookedUpNote"/> follows the note about the files; otherwise the prompt is unchanged.
     /// With <paramref name="revision"/> (a run that changes an earlier version) and a <paramref name="seed"/>, <see cref="RevisionInstruction"/>
-    /// takes the place of <see cref="SeedInstruction"/>; everything else stays the same. With a <paramref name="plan"/> ("Extra careful" with an
-    /// outline, D-087) the outline block of <see cref="WritingPlanPrompts.Outline"/> follows the notes about the sources; without one the prompt
-    /// is unchanged.
+    /// takes the place of <see cref="SeedInstruction"/>; everything else stays the same.
     /// </summary>
     public static string FirstPass(string brief, OrderSourceBundle bundle, bool documentMode, string? seed, bool writerNotes = false,
-        IReadOnlyList<SourceArithmeticIssue>? arithmetic = null, bool revision = false, WritingPlan? plan = null)
+        IReadOnlyList<SourceArithmeticIssue>? arithmetic = null, bool revision = false)
     {
         var sb = new StringBuilder();
         AppendRequest(sb, brief);
         sb.Append(SourcesNote(bundle, documentMode));
         if (bundle.Sources.Any(s => s.LookedUp))
             sb.Append(LookedUpNote).Append('\n');
-        if (plan is not null)
-            sb.Append('\n').Append(WritingPlanPrompts.Outline(plan)).Append('\n');
 
         if (seed is not null)
         {

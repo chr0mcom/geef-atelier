@@ -33,7 +33,7 @@ internal sealed class OrderRunStarter(
         var answers = request.Answers ?? [];
         var linked = await sources.ListForOrderAsync(order.Id, includeText: false, ct);
         var profile = string.IsNullOrWhiteSpace(order.CreatedByUser) ? null : await profiles.GetAsync(order.CreatedByUser, ct);
-        var resolved = await crewService.ResolveOrderSnapshotAsync(order.Mode, ct);
+        var resolved = await crewService.ResolveOrderSnapshotAsync(ct);
 
         var now = time.GetUtcNow();
         var briefing = briefComposer.Compose(new OrderBriefInput(order, request.Record, answers, profile,
@@ -46,7 +46,7 @@ internal sealed class OrderRunStarter(
             request.RecordIsNew && request.Record is not null ? IntakeRecordJson.Serialize(request.Record) : null,
             answers.Count > 0 ? IntakeRecordJson.SerializeAnswers(answers) : null,
             request.Outcome,
-            RoleChanges(order, request.Record, answers, linked),
+            RoleChanges(request.Record, answers, linked),
             now);
 
         if (!await orders.TryStartWithRunAsync(start, ct))
@@ -79,12 +79,11 @@ internal sealed class OrderRunStarter(
     }
 
     /// <summary>
-    /// The file the intake chose as the text to revise becomes <see cref="SourceRole.TemplateToRevise"/>, but only in the direct
-    /// path (the only one that revises a given text) and not when the person answered "no" to the revision guess; then a file
-    /// that already carries the role goes back to <see cref="SourceRole.Facts"/>.
+    /// The file the intake chose as the text to revise becomes <see cref="SourceRole.TemplateToRevise"/>, unless the person answered
+    /// "no" to the revision guess; then a file that already carries the role goes back to <see cref="SourceRole.Facts"/>.
     /// </summary>
     private static IReadOnlyList<(Guid SourceId, SourceRole Role)> RoleChanges(
-        OrderEntity order, IntakeRecord? record, IReadOnlyList<OrderAnswer> answers, IReadOnlyList<OrderSourceItem> linked)
+        IntakeRecord? record, IReadOnlyList<OrderAnswer> answers, IReadOnlyList<OrderSourceItem> linked)
     {
         if (record?.RevisionSourceId is not { } sourceId)
             return [];
@@ -95,6 +94,6 @@ internal sealed class OrderRunStarter(
         var declined = answers.Any(a => a.QuestionId == RevisionAnswer.QuestionId && string.Equals(a.OptionId, RevisionAnswer.No, StringComparison.Ordinal));
         if (declined)
             return link.Role == SourceRole.TemplateToRevise ? [(sourceId, SourceRole.Facts)] : [];
-        return order.Mode == OrderMode.Direct && link.Role != SourceRole.TemplateToRevise ? [(sourceId, SourceRole.TemplateToRevise)] : [];
+        return link.Role != SourceRole.TemplateToRevise ? [(sourceId, SourceRole.TemplateToRevise)] : [];
     }
 }

@@ -51,7 +51,6 @@ internal sealed class OrderService(
     internal const string StoppedNotice = "This order was stopped.";
     internal const string NeedsAnswersNote = "The order needs your answers first.";
     internal const string AnswersNotUsedNotice = "Your answers were not used.";
-    internal const string CarefulNotOfferedMessage = "Extra careful is not available. Please send the order without it.";
     internal const int CancelAttempts = 3;
     private static readonly RunStatus[] ActiveStatuses = [RunStatus.Pending, RunStatus.Running];
 
@@ -68,9 +67,6 @@ internal sealed class OrderService(
         if (text.Length > options.RequestMaxChars)
             throw new OrderSubmissionException(Invariant(
                 $"Your request is too long ({text.Length:N0} characters, the limit is {options.RequestMaxChars:N0}). Please shorten it or attach the material as a file."));
-
-        if (request.Mode == OrderMode.Careful && !options.OffersCareful(request.CreatedByUser))
-            throw new OrderSubmissionException(CarefulNotOfferedMessage);
 
         var selections = Distinct(request.Sources);
         if (selections.Count > srcOptions.MaxFilesPerOrder)
@@ -90,7 +86,7 @@ internal sealed class OrderService(
             Id = Guid.NewGuid(),
             CreatedByUser = request.CreatedByUser,
             RequestText = text,
-            Mode = request.Mode,
+            Mode = OrderMode.Direct,
             State = route == OrderIntakeRoute.Clarify ? OrderState.Analyzing : OrderState.Ready,
             Entry = request.Entry,
             CreatedAt = now,
@@ -106,7 +102,7 @@ internal sealed class OrderService(
             return new OrderSubmission(order.Id, OrderStateResolver.Resolve(order.State, null).State, null, notices);
         }
 
-        var resolved = await crewService.ResolveOrderSnapshotAsync(request.Mode, ct);
+        var resolved = await crewService.ResolveOrderSnapshotAsync(ct);
         var profile = await profiles.GetAsync(request.CreatedByUser, ct);
         var run = resolved.ToFirstRun(order, briefComposer.Compose(new OrderBriefInput(order, null, [], profile)).Text, now);
         await CreateAsync(() => orders.CreateWithFirstRunAsync(order, links, run, ct));
@@ -224,7 +220,6 @@ internal sealed class OrderService(
                 r.Order.Id,
                 r.Order.RequestText.ToOrderTitle(),
                 display,
-                r.Order.Mode,
                 r.Order.CreatedAt,
                 r.Order.UpdatedAt,
                 r.SourceCount,
@@ -376,7 +371,7 @@ internal sealed class OrderService(
             throw new OrderRevisionException(TooManyVersions(options));
 
         var linked = await sources.ListForOrderAsync(order.Id, includeText: false, ct);
-        var resolved = await crewService.ResolveOrderSnapshotAsync(OrderMode.Direct, ct);
+        var resolved = await crewService.ResolveOrderSnapshotAsync(ct);
         var briefing = RevisionBrief.Compose(shown.BriefingText ?? string.Empty, change, next);
         var run = resolved.ToRevisionRun(order, shown, briefing, change, next, now);
 
@@ -498,7 +493,6 @@ internal sealed class OrderService(
             order.Id,
             order.RequestText.ToOrderTitle(),
             order.RequestText,
-            order.Mode,
             order.Entry,
             order.State,
             display,

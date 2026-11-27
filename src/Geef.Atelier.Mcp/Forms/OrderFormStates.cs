@@ -67,9 +67,9 @@ internal sealed class OrderFormStates(IDataProtectionProvider protection, TimePr
     private readonly IDataProtector _protector = protection.CreateProtector(Purpose);
 
     /// <summary>A stable hash of the arguments of <c>submit_order</c>, so that the answers come back only for the same call.</summary>
-    public static string HashArguments(string request, string? attachments, bool extraCareful, IReadOnlyList<string>? uploadIds) =>
+    public static string HashArguments(string request, string? attachments, IReadOnlyList<string>? uploadIds) =>
         Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
-            new object?[] { request, attachments, extraCareful, uploadIds ?? [] }, JsonOptions)));
+            new object?[] { request, attachments, uploadIds ?? [] }, JsonOptions)));
 
     public OrderFormState Create(Guid orderId, string username, string? clientId, string arguments, IReadOnlyList<string> questions,
         IReadOnlyList<OrderSourceDto> sources, IReadOnlyList<string> notices) =>

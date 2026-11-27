@@ -16,7 +16,7 @@ public sealed class OrderFormStatesTests
         new(_keys, _time, Options.Create(new McpOptions { ElicitationLifetime = lifetime ?? TimeSpan.FromMinutes(30) }));
 
     private static OrderFormState Sample(OrderFormStates states) =>
-        states.Create(Guid.NewGuid(), "alice", "client-1", OrderFormStates.HashArguments("Schreib eine Mail.", null, false, null), ["length", "q1"],
+        states.Create(Guid.NewGuid(), "alice", "client-1", OrderFormStates.HashArguments("Schreib eine Mail.", null, null), ["length", "q1"],
             [new OrderSourceDto("angebot.pdf", 2, 1200, "good", ["Seite 2 ist schwer lesbar."])], ["Eine Datei war doppelt."]);
 
     [Fact]
@@ -88,13 +88,12 @@ public sealed class OrderFormStatesTests
     [Fact]
     public void The_hash_of_the_arguments_changes_with_every_argument()
     {
-        var baseline = OrderFormStates.HashArguments("Schreib eine Mail.", null, false, null);
+        var baseline = OrderFormStates.HashArguments("Schreib eine Mail.", null, null);
 
-        Assert.Equal(baseline, OrderFormStates.HashArguments("Schreib eine Mail.", null, false, []));
-        Assert.NotEqual(baseline, OrderFormStates.HashArguments("Schreib eine Mail!", null, false, null));
-        Assert.NotEqual(baseline, OrderFormStates.HashArguments("Schreib eine Mail.", "[]", false, null));
-        Assert.NotEqual(baseline, OrderFormStates.HashArguments("Schreib eine Mail.", null, true, null));
-        Assert.NotEqual(baseline, OrderFormStates.HashArguments("Schreib eine Mail.", null, false, [Guid.Empty.ToString()]));
+        Assert.Equal(baseline, OrderFormStates.HashArguments("Schreib eine Mail.", null, []));
+        Assert.NotEqual(baseline, OrderFormStates.HashArguments("Schreib eine Mail!", null, null));
+        Assert.NotEqual(baseline, OrderFormStates.HashArguments("Schreib eine Mail.", "[]", null));
+        Assert.NotEqual(baseline, OrderFormStates.HashArguments("Schreib eine Mail.", null, [Guid.Empty.ToString()]));
     }
 
     [Fact]

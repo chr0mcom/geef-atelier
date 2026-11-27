@@ -30,7 +30,6 @@ public sealed class CrewServiceResolvesSnapshotModelsTests
 
     [Theory]
     [InlineData(SystemCrew.DirectTemplateName)]
-    [InlineData(SystemCrew.DirectOutlineTemplateName)]
     public async Task SnapshotIsBuiltFromTheCodeOnlyProfilesOfTheTemplate(string templateName)
     {
         var (service, _) = Build();

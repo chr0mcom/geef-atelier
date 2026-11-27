@@ -343,13 +343,13 @@ public sealed class OrderResearchServiceTests
     }
 
     [Fact]
-    public async Task An_extra_careful_order_never_searches_even_with_research_on_for_everyone()
+    public async Task A_stored_careful_order_read_by_an_earlier_version_never_searches()
     {
         var s = Create();
-        var careful = Order(Clarify(IntakeRecordStatus.Ok, TopicA, TopicB)) with { Mode = OrderMode.Careful };
+        var record = IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = [TopicA, TopicB] };
+        var careful = Order(IntakeRecordJson.Serialize(record)) with { Mode = OrderMode.Careful };
 
         AssertNothingHappened(s, await Ensure(s, careful));
-        AssertNothingHappened(s, await Ensure(s, careful, files: true));
         Assert.Null(s.Orders.Find(careful.Id)!.ResearchJson);
     }
 

@@ -14,21 +14,17 @@ internal static class OrderRunExtensions
 {
     private static readonly JsonSerializerOptions SnapshotJsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    /// <summary>
-    /// The crew snapshot of a run of an order: the code-only direct template for <see cref="OrderMode.Direct"/>, the code-only template
-    /// <see cref="SystemCrew.DirectOutlineTemplate"/> ("Extra careful" with an outline first, D-087) for <see cref="OrderMode.Careful"/>.
-    /// Whether "Extra careful" is offered is decided when the order is placed (<see cref="OrderOptionsExtensions.OffersCareful"/>); an
-    /// order that was accepted as careful always runs as careful, never as something else (D-091).
-    /// </summary>
-    public static Task<ResolvedCrewSnapshot> ResolveOrderSnapshotAsync(this ICrewService crewService, OrderMode mode, CancellationToken ct) =>
-        crewService.ResolveCodeTemplateSnapshotAsync(mode == OrderMode.Careful ? SystemCrew.DirectOutlineTemplate : SystemCrew.DirectTemplate, ct);
+    /// <summary>The crew snapshot of a new run of an order, whatever the stored <see cref="OrderEntity.Mode"/>: the code-only direct template.</summary>
+    public static Task<ResolvedCrewSnapshot> ResolveOrderSnapshotAsync(this ICrewService crewService, CancellationToken ct) =>
+        crewService.ResolveCodeTemplateSnapshotAsync(SystemCrew.DirectTemplate, ct);
 
     /// <summary>
-    /// The path whose steps the progress display shows for <paramref name="order"/>: the direct steps while the current run is one of
-    /// "Extra careful" with an outline (<see cref="SystemCrew.DirectOutlineTemplateName"/>, D-087), otherwise the mode of the order.
+    /// The path whose steps the progress display shows for <paramref name="order"/>: the direct steps while there is no run yet or the
+    /// current run is one of the direct path (<see cref="SystemCrew.IsDirectPathTemplate"/>), otherwise the stored mode of the order
+    /// (a stored run of the removed review loop keeps its steps).
     /// </summary>
     public static OrderMode ProgressMode(this OrderEntity order, RunEntity? current) =>
-        current is not null && string.Equals(current.CrewTemplateName, SystemCrew.DirectOutlineTemplateName, StringComparison.Ordinal)
+        current is null || SystemCrew.IsDirectPathTemplate(current.CrewTemplateName)
             ? OrderMode.Direct
             : order.Mode;
 

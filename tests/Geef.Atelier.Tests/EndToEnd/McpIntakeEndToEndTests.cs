@@ -393,7 +393,7 @@ public sealed class McpIntakeEndToEndTests(PostgresFixture postgres)
             var now = DateTimeOffset.UtcNow;
             var needsInput = pending.State == OrderDisplayState.NeedsInput;
             return new OrderView(
-                orderId, "Synthetic order", pending.Request.RequestText, pending.Request.Mode, pending.Request.Entry,
+                orderId, "Synthetic order", pending.Request.RequestText, pending.Request.Entry,
                 needsInput ? OrderState.NeedsInput : OrderState.Analyzing,
                 new OrderDisplay(pending.State, false, false),
                 pending.CreatedAt, now, null, [], [],

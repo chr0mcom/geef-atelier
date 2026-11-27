@@ -115,10 +115,6 @@
                             {
                                 <span> · @(item.SourceCount == 1 ? "1 file" : $"{item.SourceCount} files")</span>
                             }
-                            @if (item.Mode == OrderMode.Careful)
-                            {
-                                <span> · Extra careful</span>
-                            }
                         </span>
                     </div>
                     <OrderStateBadge State="item.Display.ShownState()" />

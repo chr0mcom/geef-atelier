@@ -19,7 +19,7 @@ namespace Geef.Atelier.Tests.EndToEnd;
 
 /// <summary>
 /// Over the real wiring: the "About me" profile reaches the clarifier and every writer briefing (answered, skipped,
-/// started after the deadline), but never an outside search service. A clarified "Extra careful" order searches nothing at all
+/// started after the deadline), but never an outside search service. A clarified order without research topics searches nothing at all
 /// (D-079).
 /// </summary>
 [Collection(EndToEndCollection.Name)]
@@ -44,14 +44,14 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
         $$"""{"text_type":"Pressemitteilung","language":"de","understanding":"Eine Pressemitteilung zur Eröffnung.","is_revision":false,"revision_file":null,"length_scale":"standard","gaps":[{{gaps}}],"research_topics":[]}""";
 
     [Fact]
-    public async Task A_clarified_careful_order_gives_profile_answers_and_assumptions_to_the_writer_and_nothing_to_search()
+    public async Task A_clarified_order_gives_profile_answers_and_assumptions_to_the_writer_and_nothing_to_search()
     {
         await using var host = await StartAsync(IntakeMode.On);
         await SaveProfileAsync(host, AtelierEndToEndHost.McpTokenUser);
         host.Tavily.ResultText = "Leipzig hat einen neuen Standort.";
         host.Script.EnqueueClarifierJson(Clarify($"{AskLength},{AssumeDate}"));
 
-        var submitted = await host.CallMcpToolAsync("submit_order", new { request = Request, extraCareful = true });
+        var submitted = await host.CallMcpToolAsync("submit_order", new { request = Request });
         host.ReleaseOrchestrator();
         Assert.Equal("needs_input", submitted.GetProperty("state").GetString());
         var clarifier = Assert.Single(host.Llm.Calls, ScriptedLlmEndpoint.IsClarifierCall);
@@ -165,11 +165,7 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
     private Task<AtelierEndToEndHost> StartAsync(IntakeMode mode, bool withWorker = true) =>
         AtelierEndToEndHost.StartAsync(postgres, services =>
         {
-            services.PostConfigure<OrderOptions>(o =>
-            {
-                o.IntakeMode = mode;
-                o.CarefulOutline = CarefulOutlineMode.On;
-            });
+            services.PostConfigure<OrderOptions>(o => o.IntakeMode = mode);
             services.PostConfigure<IntakeOptions>(o => o.PollInterval = TimeSpan.FromMilliseconds(200));
             if (!withWorker)
             {

@@ -31,7 +31,6 @@ public sealed class SubmitOrderToolTests
         Assert.Equal(Request, submitted.RequestText);
         Assert.Equal("alice", submitted.CreatedByUser);
         Assert.Equal(OrderEntry.Mcp, submitted.Entry);
-        Assert.Equal(OrderMode.Direct, submitted.Mode);
         Assert.True(submitted.AllowQuestions);
         Assert.Empty(submitted.Sources!);
 
@@ -45,14 +44,6 @@ public sealed class SubmitOrderToolTests
         Assert.Empty(_orders.Waits);
         Assert.Null(dto.Questions);
         Assert.Null(dto.Understanding);
-    }
-
-    [Fact]
-    public async Task Extra_careful_submits_a_careful_order()
-    {
-        await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request, extraCareful: true);
-
-        Assert.Equal(OrderMode.Careful, Assert.Single(_orders.Submitted).Mode);
     }
 
     [Fact]

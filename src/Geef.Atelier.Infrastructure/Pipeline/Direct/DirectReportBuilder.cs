@@ -49,7 +49,7 @@ internal static class DirectReportBuilder
     public const string EarlierReportMissingNote = "The open points of the earlier version could not be read, so they are not repeated here.";
 
     /// <summary>
-    /// Open point for the earlier version when it has no report (for example a text written with "Extra careful"): <c>{0}</c> is that
+    /// Open point for the earlier version when it has no report (for example a text of the removed review loop): <c>{0}</c> is that
     /// version. Its checks were not taken over and the new run does not repeat them.
     /// </summary>
     public const string ChecksNotTakenOverFormat = "The checks of version {0} were not taken over, so anything they left open was not checked again.";
@@ -132,7 +132,7 @@ internal static class DirectReportBuilder
 
     /// <summary>
     /// True when the earlier version (<paramref name="revision"/>) was shown as "Ready – please check" and its checks were not taken over
-    /// because it has no readable report (for example a text written with "Extra careful" that was not finished cleanly), or when its own
+    /// because it has no readable report (for example a text of the removed review loop that was not finished cleanly), or when its own
     /// report says so of the version before it; then nothing of it was checked again and this version is shown the same way, in every
     /// mode of the fact check (<see cref="RunReport.EarlierNeedsCheck"/>).
     /// </summary>
@@ -145,7 +145,7 @@ internal static class DirectReportBuilder
     /// (<see cref="EarlierPointKind.Assumption"/>), each with its version, and a fixed sentence (<see cref="EarlierPointKind.Note"/>) for its
     /// notes and flagged passages that could not be shown or listed. A point counts as repeated when this run notes it in the same kind word
     /// for word (<see cref="OrderResultRules.SameAssumptionKey"/>); each point is carried once, a fixed sentence once per version. When the
-    /// earlier version has no report (it was not written on the direct path, for example with "Extra careful"),
+    /// earlier version has no report (it was not written on the direct path, for example by the removed review loop),
     /// <see cref="ChecksNotTakenOverFormat"/> says that its checks were not taken over. <c>null</c> when
     /// there is nothing or the run changes no earlier version, so that the report of every other run stays as it was.
     /// </summary>

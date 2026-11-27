@@ -27,11 +27,9 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
     private static string Words(int count) => string.Join(' ', Enumerable.Repeat("Hallo", count));
 
     private static async Task<(AtelierEndToEndHost Host, Guid OrderId)> SubmitAsync(
-        PostgresFixture postgres, string request, Action<ScriptedLlmEndpoint> script, bool withPdf = false, OrderMode mode = OrderMode.Direct)
+        PostgresFixture postgres, string request, Action<ScriptedLlmEndpoint> script, bool withPdf = false)
     {
-        var host = await AtelierEndToEndHost.StartAsync(postgres, mode == OrderMode.Careful
-            ? s => s.Configure<OrderOptions>(o => o.CarefulOutlineOverrides["e2e-direct"] = CarefulOutlineMode.On)
-            : null);
+        var host = await AtelierEndToEndHost.StartAsync(postgres);
         script(host.Script);
         var sources = new List<OrderSourceSelection>();
         if (withPdf)
@@ -47,7 +45,7 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
             sources.Add(new OrderSourceSelection(receipt.GetProperty("sourceId").GetGuid()));
         }
 
-        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(request, "e2e-direct", OrderEntry.Web, sources, mode));
+        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(request, "e2e-direct", OrderEntry.Web, sources));
         await host.WaitForOrderFinishedAsync(submission.OrderId);
         return (host, submission.OrderId);
     }
@@ -120,15 +118,6 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
         var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, "e2e-direct"));
         Assert.False(string.IsNullOrWhiteSpace(result!.Text));
         Assert.Equal(DraftCheckCodes.Length, Assert.Single(result.OpenChecks).Code);
-    }
-
-    [Fact]
-    public async Task Careful_orders_pass_the_file_to_the_executor()
-    {
-        var (host, _) = await SubmitAsync(postgres, "Summarise the attached report carefully.", s => s.ExecutorText = Words(100), withPdf: true, mode: OrderMode.Careful);
-        await using var lifetime = host;
-
-        Assert.True(host.Llm.AnyExecutorPromptContains(FirstPageMarker), host.Llm.Describe());
     }
 
     [Fact]

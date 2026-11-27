@@ -183,20 +183,6 @@ public sealed class OrderIntakeServiceTests
     }
 
     [Fact]
-    public async Task A_revision_in_the_careful_mode_only_limits_the_questions()
-    {
-        var order = _orders.Add("Bitte überarbeite den angehängten Brief.", mode: OrderMode.Careful);
-        _sources.Attach(order.Id, "brief.txt", SourceKind.Text, "Sehr geehrte Frau Muster, …");
-        _clarifier.Enqueue(QuestionGateTests.Output([QuestionGateTests.Ask(GapTopic.Tone, "Wie soll er klingen?", ["Förmlich", "Locker"])], isRevision: true));
-
-        await Service().ProcessAsync(order.Id, CancellationToken.None);
-
-        var start = Assert.Single(_starter.Requests);
-        Assert.Null(start.Record!.RevisionSourceId);
-        Assert.Equal(GateDecision.DroppedRevisionRule, Assert.Single(start.Record.Trace).Decision);
-    }
-
-    [Fact]
     public async Task Profile_answers_reach_the_gate()
     {
         _memory = new FixedMemory(known: new Dictionary<GapTopic, MemoryAnswer> { [GapTopic.Sender] = new(GapTopic.Sender, "Eva Muster", "profile") });
@@ -334,14 +320,13 @@ public sealed class OrderIntakeServiceTests
     }
 
     [Theory]
-    [InlineData(ResearchMode.On, OrderMode.Direct, true)]
-    [InlineData(ResearchMode.Off, OrderMode.Direct, false)]
-    [InlineData(ResearchMode.On, OrderMode.Careful, false)]
-    public async Task The_record_says_whether_research_was_switched_on_for_the_person_when_the_request_was_read(ResearchMode mode, OrderMode orderMode, bool allowed)
+    [InlineData(ResearchMode.On, true)]
+    [InlineData(ResearchMode.Off, false)]
+    public async Task The_record_says_whether_research_was_switched_on_for_the_person_when_the_request_was_read(ResearchMode mode, bool allowed)
     {
         var service = new OrderIntakeService(_orders, _sources, _shadows, _memory, _clarifier, _starter, _notifier, Options.Create(_options),
             NullLogger<OrderIntakeService>.Instance, _time, _deferrals, Options.Create(new ResearchOptions { Mode = mode }));
-        var order = _orders.Add("Schreib einen Aushang zum neuen Mindestlohn, etwa 150 Wörter.", mode: orderMode);
+        var order = _orders.Add("Schreib einen Aushang zum neuen Mindestlohn, etwa 150 Wörter.");
         _clarifier.Enqueue(OutputWith() with { ResearchTopics = ["Mindestlohn 2027 Höhe"] });
 
         await service.ProcessAsync(order.Id, CancellationToken.None);

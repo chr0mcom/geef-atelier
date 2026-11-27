@@ -28,7 +28,6 @@ public sealed record SubmitOrderRequest(
     string CreatedByUser,
     OrderEntry Entry,
     IReadOnlyList<OrderSourceSelection>? Sources = null,
-    OrderMode Mode = OrderMode.Direct,
     bool AllowQuestions = true);
 
 /// <summary>Answer to a submitted order: its id, display state, first run (if any) and notices for the person.</summary>
@@ -61,7 +60,6 @@ public sealed record OrderView(
     Guid OrderId,
     string Title,
     string RequestText,
-    OrderMode Mode,
     OrderEntry Entry,
     OrderState State,
     OrderDisplay Display,
@@ -225,7 +223,7 @@ public sealed record OrderChecksView(IReadOnlyList<string> Checked, IReadOnlyLis
 /// An order as listed in "My work". <see cref="WordCount"/> and <see cref="Version"/> are those of the shown version (the newest with a
 /// text); the display state is that of the current run. Without a text the version is that of the current run.
 /// </summary>
-public sealed record OrderListItem(Guid OrderId, string Title, OrderDisplay Display, OrderMode Mode, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int SourceCount, int? WordCount,
+public sealed record OrderListItem(Guid OrderId, string Title, OrderDisplay Display, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int SourceCount, int? WordCount,
     int? Version = null);
 
 /// <summary>Raised for problems the person can fix (empty request, too many files, budget exceeded, foreign source). The message is plain English for the UI and MCP.</summary>

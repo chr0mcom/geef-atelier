@@ -60,10 +60,6 @@
             <div class="order-head-meta">
                 <OrderStateBadge State="_view.Display.ShownState()" />
                 <span class="order-head-date">Started @_view.CreatedAt.ToListDate()</span>
-                @if (_view.Mode == OrderMode.Careful)
-                {
-                    <span class="order-head-mode" data-testid="order-mode-careful">Extra careful</span>
-                }
             </div>
         </header>
 

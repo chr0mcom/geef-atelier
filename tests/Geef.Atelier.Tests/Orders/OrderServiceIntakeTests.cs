@@ -259,9 +259,9 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task The_run_starter_reports_intake_warnings_stores_a_new_record_and_sets_the_revision_role_only_in_the_direct_path()
+    public async Task The_run_starter_reports_intake_warnings_stores_a_new_record_and_sets_the_revision_role_unless_declined()
     {
-        await using var host = await StartAsync(IntakeMode.On, extra: s => s.Configure<OrderOptions>(o => o.CarefulOutline = CarefulOutlineMode.On));
+        await using var host = await StartAsync(IntakeMode.On);
         var user = NewUser();
 
         var failedOrder = await SubmitAsync(host, new SubmitOrderRequest(Request, user, OrderEntry.Web));
@@ -284,13 +284,11 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
         var lateView = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetAsync(lateId, user));
         Assert.Equal([OrderStepStatus.Done, OrderStepStatus.Skipped], lateView!.Progress.Steps.Take(2).Select(s => s.Status));
 
-        var direct = await RevisionCaseAsync(host, user, OrderMode.Direct, answers: []);
+        var direct = await RevisionCaseAsync(host, user, answers: []);
         Assert.Equal(SourceRole.TemplateToRevise, direct.Role);
         Assert.Equal("letter.md", direct.FileName);
-        var declined = await RevisionCaseAsync(host, user, OrderMode.Direct, answers: [new OrderAnswer("revision", "no", null, false, AnswerOrigin.User)]);
+        var declined = await RevisionCaseAsync(host, user, answers: [new OrderAnswer("revision", "no", null, false, AnswerOrigin.User)]);
         Assert.Equal(SourceRole.Facts, declined.Role);
-        var careful = await RevisionCaseAsync(host, user, OrderMode.Careful, answers: []);
-        Assert.Equal(SourceRole.Facts, careful.Role);
     }
 
     [Fact]
@@ -371,13 +369,13 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
         Assert.Equal(OrderState.Cancelled, (await LoadAsync(host, orderId)).State);
     }
 
-    private static async Task<(SourceRole Role, string? FileName)> RevisionCaseAsync(AtelierEndToEndHost host, string user, OrderMode mode, OrderAnswer[] answers)
+    private static async Task<(SourceRole Role, string? FileName)> RevisionCaseAsync(AtelierEndToEndHost host, string user, OrderAnswer[] answers)
     {
         var receipt = await host.WithScopeAsync(sp => sp.GetRequiredService<ISourceIntakeService>()
             .IntakeTextAsync("letter.md", "Sehr geehrte Frau Beispiel, " + Guid.NewGuid(), user, SourceOrigin.WebUpload));
         var sourceId = receipt.SourceId!.Value;
         var submission = await SubmitAsync(host, new SubmitOrderRequest("Überarbeite den Brief.", user, OrderEntry.Web,
-            [new OrderSourceSelection(sourceId)], mode));
+            [new OrderSourceSelection(sourceId)]));
         var record = IntakeBriefComposerTests.Record() with { RevisionSourceId = sourceId };
         Assert.True(await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderRepository>()
             .TrySaveQuestionsAsync(submission.OrderId, IntakeRecordJson.Serialize(record), DateTimeOffset.UtcNow)));

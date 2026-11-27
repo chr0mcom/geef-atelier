@@ -38,17 +38,6 @@ public static class SubmitOrderTool
         "Otherwise the order is already being written: call get_order_status with waitSeconds, then get_order_result. " +
         "The text is usually ready in 1–5 minutes.";
 
-    /// <summary>Sentence added to the description while "Extra careful" is offered to anybody (<c>Orders:CarefulOutline</c>, D-091).</summary>
-    public const string CarefulSentence = " With extraCareful it can take up to about 10 minutes.";
-
-    /// <summary>Name of the parameter <c>extraCareful</c>; it is left out of the input schema while "Extra careful" is offered to nobody.</summary>
-    public const string ExtraCarefulParameter = "extraCareful";
-
-    /// <summary>The description of <c>extraCareful</c>.</summary>
-    public const string ExtraCarefulDescription =
-        "True only when the person asks for extra care: slower; Atelier plans the text first and then checks that every requirement of the request is in it. " +
-        "Not offered to every person; if it is not, the call is refused with a sentence that says so.";
-
     /// <summary>Sentence added to the description while <c>Mcp:Skills</c> is <c>On</c> (D-088).</summary>
     public const string SkillSentence =
         " If you can load skills, load " + AtelierSkill.Uri + " before the first order; it explains every step.";
@@ -59,14 +48,12 @@ public static class SubmitOrderTool
 
     /// <summary>
     /// The description of <c>submit_order</c>: <see cref="TicketToolDescription"/> while upload tickets are on, otherwise <see cref="ToolDescription"/>,
-    /// followed by <see cref="CarefulSentence"/> while "Extra careful" is offered to anybody (<paramref name="careful"/>) and by
-    /// <see cref="SkillSentence"/> and <see cref="FormSentence"/> while their switches are on.
+    /// followed by <see cref="SkillSentence"/> and <see cref="FormSentence"/> while their switches are on.
     /// </summary>
-    public static string Describe(bool tickets, McpOptions mcp, bool careful = false)
+    public static string Describe(bool tickets, McpOptions mcp)
     {
         ArgumentNullException.ThrowIfNull(mcp);
         return (tickets ? TicketToolDescription : ToolDescription)
-               + (careful ? CarefulSentence : string.Empty)
                + (mcp.Skills == McpSkillsMode.On ? SkillSentence : string.Empty)
                + (mcp.Elicitation == McpElicitationMode.On ? FormSentence : string.Empty);
     }
@@ -99,7 +86,6 @@ public static class SubmitOrderTool
         IOptions<OAuthOptions> oauth,
         [Description("The person's request, word for word as they wrote or said it. Do not summarise, translate, expand or rewrite it, and do not paste file content here.")] string request,
         [Description("Optional files as a JSON array: [{\"filename\":\"offer.pdf\",\"contentType\":\"application/pdf\",\"contentBase64\":\"...\"}]. contentBase64 must be the complete original file. Supported content types: application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, text/markdown, text/plain. Placeholders, summaries or shortened content are rejected.")] string? attachments = null,
-        [Description(ExtraCarefulDescription)] bool extraCareful = false,
         [Description(UploadIdsDescription)] string[]? uploadIds = null,
         CancellationToken cancellationToken = default,
         IMcpOrderForms? forms = null,
@@ -112,7 +98,7 @@ public static class SubmitOrderTool
         var call = forms is null
             ? null
             : new OrderFormCall(context?.Server, context?.Params, username, OrderFormCall.ClientOf(context?.User),
-                OrderFormStates.HashArguments(request, attachments, extraCareful, uploadIds));
+                OrderFormStates.HashArguments(request, attachments, uploadIds));
         if (call is not null && await forms!.ResumeAsync(call, cancellationToken) is { } resumed)
             return resumed;
 
@@ -136,7 +122,6 @@ public static class SubmitOrderTool
                     CreatedByUser: username,
                     Entry: OrderEntry.Mcp,
                     Sources: all.Select(r => new OrderSourceSelection(r.SourceId!.Value)).ToList(),
-                    Mode: extraCareful ? OrderMode.Careful : OrderMode.Direct,
                     AllowQuestions: true),
                 cancellationToken);
         }

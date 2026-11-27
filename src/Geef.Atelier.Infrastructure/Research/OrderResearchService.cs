@@ -18,7 +18,7 @@ namespace Geef.Atelier.Infrastructure.Research;
 /// found word for word and stores the result once per order. Every failure ends as a status with <see cref="OrderResearch.ErrorCode"/>.
 /// </summary>
 /// <remarks>
-/// Only orders of the standard way search (<see cref="OrderMode.Direct"/>); "Extra careful" never does. Only a record whose reading
+/// Only a record whose reading
 /// found research switched on for the person searches (<see cref="IntakeRecord.ResearchAllowed"/>); orders read before, or while it
 /// was off, never do, whatever the switch says later. An order with attached files
 /// never searches (<see cref="ResearchStatus.FilesAttached"/>). Topics the intake already withheld against the About me details the
@@ -56,7 +56,7 @@ internal sealed class OrderResearchService(
     {
         ArgumentNullException.ThrowIfNull(order);
         var settings = options.Value;
-        if (order.Mode != OrderMode.Direct || ModeFor(settings, order.CreatedByUser) == ResearchMode.Off)
+        if (ModeFor(settings, order.CreatedByUser) == ResearchMode.Off)
             return null;
 
         if (hasFiles)

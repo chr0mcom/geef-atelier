@@ -73,7 +73,7 @@ internal static class OrderToolTestData
             ? new OrderRunView(id, version, RunKind.Standard, RunStatus.Running, outcome, now, now, null, null)
             : null;
         return new OrderView(
-            orderId, "Synthetic order", "Write a short note.", OrderMode.Direct, OrderEntry.Mcp, OrderState.Ready, display,
+            orderId, "Synthetic order", "Write a short note.", OrderEntry.Mcp, OrderState.Ready, display,
             now, now, run, run is null ? [] : [run], [],
             new OrderProgress([], step, elapsed ?? TimeSpan.FromSeconds(12)),
             warnings ?? [],

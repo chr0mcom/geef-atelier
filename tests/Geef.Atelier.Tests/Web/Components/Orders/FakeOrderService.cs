@@ -68,7 +68,7 @@ internal sealed class FakeOrderService : IOrderService
             Submitted.Enqueue(request);
             if (SubmitError is not null)
                 throw SubmitError;
-            var view = OrderTestData.View(OrderDisplayState.Queued, title: Title(request.RequestText), requestText: request.RequestText, mode: request.Mode);
+            var view = OrderTestData.View(OrderDisplayState.Queued, title: Title(request.RequestText), requestText: request.RequestText);
             Add(request.CreatedByUser, view);
             return new OrderSubmission(view.OrderId, OrderDisplayState.Queued, view.CurrentRun?.RunId, []);
         }
@@ -136,7 +136,7 @@ internal sealed class FakeOrderService : IOrderService
                 .Select(e => e.View)
                 .OrderByDescending(v => v.UpdatedAt)
                 .Take(limit)
-                .Select(v => new OrderListItem(v.OrderId, v.Title, v.Display, v.Mode, v.CreatedAt, v.UpdatedAt, v.Sources.Count, v.CurrentRun?.WordCount))
+                .Select(v => new OrderListItem(v.OrderId, v.Title, v.Display, v.CreatedAt, v.UpdatedAt, v.Sources.Count, v.CurrentRun?.WordCount))
                 .ToList();
         }
         finally
@@ -231,7 +231,7 @@ internal sealed class FakeOrderService : IOrderService
         var (_, current) = _orders[orderId];
         if (current.Display.State is not (OrderDisplayState.Preparing or OrderDisplayState.NeedsInput))
             return new OrderSubmission(orderId, current.Display.State, current.CurrentRun?.RunId, ["This order has already started."], current.Clarification);
-        var queued = OrderTestData.View(OrderDisplayState.Queued, orderId: orderId, title: current.Title, requestText: current.RequestText, mode: current.Mode)
+        var queued = OrderTestData.View(OrderDisplayState.Queued, orderId: orderId, title: current.Title, requestText: current.RequestText)
             with { Clarification = current.Clarification is { } c ? c with { Outcome = outcome, Answers = answers } : null };
         Update(orderId, _ => queued);
         return new OrderSubmission(orderId, OrderDisplayState.Queued, queued.CurrentRun?.RunId, StartNotices, queued.Clarification);
@@ -270,7 +270,6 @@ internal static class OrderTestData
         bool? hasText = null,
         string title = "A short email about a delivery delay",
         string requestText = "Write a short, friendly email to a customer about a two-week delivery delay.",
-        OrderMode mode = OrderMode.Direct,
         Guid? orderId = null,
         IReadOnlyList<OrderSourceView>? sources = null,
         IReadOnlyList<RunWarningEntity>? warnings = null,
@@ -297,7 +296,6 @@ internal static class OrderTestData
             id,
             title,
             requestText,
-            mode,
             OrderEntry.Web,
             OrderState.Ready,
             new OrderDisplay(state, text, IsFinished(state)),

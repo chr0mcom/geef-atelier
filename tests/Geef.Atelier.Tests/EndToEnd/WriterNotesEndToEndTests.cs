@@ -43,7 +43,7 @@ public sealed class WriterNotesEndToEndTests(PostgresFixture postgres)
         var username = "notes-" + Guid.NewGuid().ToString("N")[..6];
         using var client = await host.CreateSignedInClientAsync(username);
 
-        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(Request, username, OrderEntry.Web, [], OrderMode.Direct));
+        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(Request, username, OrderEntry.Web, []));
         var view = await host.WaitForOrderFinishedAsync(submission.OrderId);
 
         Assert.True(view.Display.State == OrderDisplayState.Delivered, $"{view.Display.State}\n{host.Llm.Describe()}");
@@ -82,7 +82,7 @@ public sealed class WriterNotesEndToEndTests(PostgresFixture postgres)
         host.Script.ExecutorText = echoed + "\n\n" + Block(3);
 
         var submission = await host.SubmitOrderAsync(new SubmitOrderRequest("Fasse die Notiz zusammen, max. 50 Wörter.", username, OrderEntry.Web,
-            [new OrderSourceSelection(receipt.GetProperty("sourceId").GetGuid())], OrderMode.Direct));
+            [new OrderSourceSelection(receipt.GetProperty("sourceId").GetGuid())]));
         await host.WaitForOrderFinishedAsync(submission.OrderId);
 
         var call = Assert.Single(host.Llm.CallsFor(LlmRole.Executor));

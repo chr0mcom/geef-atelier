@@ -139,7 +139,7 @@ public sealed class CrewSummaryTests : TestContext
 
     [Theory]
     [InlineData(SystemCrew.DirectTemplateName, "Direct")]
-    [InlineData(SystemCrew.DirectOutlineTemplateName, "Extra careful")]
+    [InlineData(SystemCrew.RetiredOutlineTemplateName, "Extra careful")]
     public void A_direct_setup_shows_its_name_and_no_retired_note(string template, string display)
     {
         var cut = RenderComponent<CrewSummary>(p => p.Add(c => c.Snapshot, MakeSnapshot(template)));

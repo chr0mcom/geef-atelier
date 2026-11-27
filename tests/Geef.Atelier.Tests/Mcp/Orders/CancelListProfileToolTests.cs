@@ -269,6 +269,6 @@ public sealed class CancelListProfileToolTests
     }
 
     private static OrderListItem Item(string title, OrderDisplayState state, int version, int? words, DateTimeOffset updated) =>
-        new(Guid.NewGuid(), title, new OrderDisplay(state, words is not null, OrderToolTestData.IsFinished(state)), OrderMode.Direct,
+        new(Guid.NewGuid(), title, new OrderDisplay(state, words is not null, OrderToolTestData.IsFinished(state)),
             updated.AddHours(-1), updated, 0, words, version);
 }

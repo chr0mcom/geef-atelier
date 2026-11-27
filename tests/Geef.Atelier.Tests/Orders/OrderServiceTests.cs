@@ -57,39 +57,6 @@ public sealed class OrderServiceTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task CarefulOrderWithFilesTakesTheOutlineTemplateAndKeepsItsFilesInTheOrder()
-    {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services =>
-            services.PostConfigure<OrderOptions>(o => o.CarefulOutline = CarefulOutlineMode.On));
-        var user = NewUser();
-        var source = await IntakeAsync(host, user, "brief.txt", "Background for the article. " + Guid.NewGuid());
-
-        var submission = await SubmitAsync(host, new SubmitOrderRequest("Write an article.", user, OrderEntry.Mcp,
-            [new OrderSourceSelection(source)], OrderMode.Careful));
-
-        var run = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.Id == submission.RunId));
-        var snapshot = CrewSnapshot.Deserialize(run.CrewSnapshot!)!;
-        Assert.Equal(SystemCrew.DirectOutlineTemplateName, snapshot.TemplateName);
-        var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == submission.OrderId));
-        Assert.Equal(OrderMode.Careful, order.Mode);
-        Assert.Equal(OrderEntry.Mcp, order.Entry);
-        Assert.Null(order.CrewTemplateName);
-        Assert.Equal(source, await host.QueryAsync(db => db.OrderSources.Where(l => l.OrderId == order.Id).Select(l => l.SourceId).SingleAsync()));
-    }
-
-    [Fact]
-    public async Task CarefulOrderIsRefusedInPlainWordsWhileExtraCarefulIsNotOffered()
-    {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
-        var user = NewUser();
-
-        await AssertRefusedAsync(host, new SubmitOrderRequest("Write an article.", user, OrderEntry.Web, Mode: OrderMode.Careful),
-            "Extra careful is not available. Please send the order without it.");
-
-        Assert.Equal(0, await host.QueryAsync(db => db.Orders.CountAsync(o => o.CreatedByUser == user)));
-    }
-
-    [Fact]
     public async Task ProblemsThePersonCanFixAreReportedInPlainEnglish()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);

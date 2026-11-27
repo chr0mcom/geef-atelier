@@ -40,7 +40,7 @@ public sealed record HowItWorksSettings(
 /// <param name="MaxVersions">Most versions of one order.</param>
 /// <param name="WebResearch">
 /// Whether the first version of an order on the standard way may look things up on the web (research on and questions on, because the
-/// topics come from reading the request). "Extra careful" never looks things up.
+/// topics come from reading the request).
 /// </param>
 /// <param name="FactCheck">How the fact check may be described.</param>
 /// <param name="SumsInFiles">Whether totals in the files are recalculated without an AI model.</param>
@@ -50,7 +50,6 @@ public sealed record HowItWorksSettings(
 /// <param name="FullTextChars">Up to this many characters the writer gets the files completely.</param>
 /// <param name="MapChars">Up to this many characters the writer gets the files with a table of contents.</param>
 /// <param name="TellOnce">Whether a result offers to save a missing name, sign-off, form of address or language under About me (<c>Orders:TellOnce</c>).</param>
-/// <param name="Careful">Whether "Extra careful" is offered (<c>Orders:CarefulOutline</c> with its exceptions per user name, D-091).</param>
 public sealed record HowItWorksFeatures(
     bool ForSignedInPerson,
     bool Questions,
@@ -65,15 +64,14 @@ public sealed record HowItWorksFeatures(
     long MaxFileBytes,
     int FullTextChars,
     int MapChars,
-    TellOnceMode TellOnce = TellOnceMode.Off,
-    bool Careful = false);
+    TellOnceMode TellOnce = TellOnceMode.Off);
 
 /// <summary>Derives <see cref="HowItWorksFeatures"/> from the settings and the viewer.</summary>
 public static class HowItWorksFeatureExtensions
 {
     /// <summary>
     /// The features for <paramref name="viewer"/>: for a signed-in person with their exceptions per user name (changing a text,
-    /// research, fact check, "Extra careful"); for nobody signed in the values for everyone.
+    /// research, fact check); for nobody signed in the values for everyone.
     /// </summary>
     public static HowItWorksFeatures FeaturesFor(this HowItWorksSettings settings, ClaimsPrincipal? viewer)
     {
@@ -94,8 +92,7 @@ public static class HowItWorksFeatureExtensions
             MaxFileBytes: settings.Sources.MaxFileBytes,
             FullTextChars: settings.Sources.FullTextMaxChars,
             MapChars: settings.Sources.MapMaxChars,
-            TellOnce: settings.Orders.TellOnce,
-            Careful: settings.Orders.OffersCareful(user));
+            TellOnce: settings.Orders.TellOnce);
     }
 
     /// <summary>

@@ -73,7 +73,6 @@ public sealed class StartFlowTests(PlaywrightFixture pw, PostgresFixture pg) : I
 
             var request = Assert.Single(_orders.Submitted);
             Assert.Equal("Write a short, friendly email about a two-week delivery delay.", request.RequestText);
-            Assert.Equal(OrderMode.Direct, request.Mode);
             Assert.Single(request.Sources!);
             Assert.Equal("notes.md", Assert.Single(_uploads));
 

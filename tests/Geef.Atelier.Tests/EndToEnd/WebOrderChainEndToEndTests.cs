@@ -44,7 +44,7 @@ public sealed class WebOrderChainEndToEndTests(PostgresFixture postgres)
         var sourceId = receipt.GetProperty("sourceId").GetGuid();
 
         var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(
-            "Summarise the attached report for the council.", username, OrderEntry.Web, [new OrderSourceSelection(sourceId)], OrderMode.Direct));
+            "Summarise the attached report for the council.", username, OrderEntry.Web, [new OrderSourceSelection(sourceId)]));
         var view = await host.WaitForOrderFinishedAsync(submission.OrderId);
 
         Assert.True(view.Display.State == OrderDisplayState.Delivered, $"{view.Display.State}\n{host.Llm.Describe()}");

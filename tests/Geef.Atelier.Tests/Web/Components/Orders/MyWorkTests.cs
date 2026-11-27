@@ -52,7 +52,7 @@ public sealed class MyWorkTests : TestContext
     {
         _orders.Add("alice", OrderTestData.View(OrderDisplayState.Delivered, title: "Older letter", updatedAt: OrderTestData.Start.AddHours(1), wordCount: 1_250,
             sources: [OrderTestData.Source(), OrderTestData.Source("b.md")]));
-        _orders.Add("alice", OrderTestData.View(OrderDisplayState.Working, title: "Newer summary", updatedAt: OrderTestData.Start.AddHours(2), mode: OrderMode.Careful));
+        _orders.Add("alice", OrderTestData.View(OrderDisplayState.Working, title: "Newer summary", updatedAt: OrderTestData.Start.AddHours(2)));
         _orders.Add("bob", OrderTestData.View(OrderDisplayState.Delivered, title: "Bob's letter"));
 
         var cut = RenderComponent<MyWork>();
@@ -61,7 +61,6 @@ public sealed class MyWorkTests : TestContext
         Assert.Equal(2, rows.Count);
         Assert.Equal("Newer summary", rows[0].QuerySelector("[data-testid='work-row-link']")!.TextContent);
         Assert.Equal("working", rows[0].QuerySelector("[data-testid='order-state']")!.GetAttribute("data-state"));
-        Assert.Contains("Extra careful", rows[0].TextContent);
         Assert.Contains("1,250 words", rows[1].TextContent);
         Assert.Contains("2 files", rows[1].TextContent);
         Assert.StartsWith("/orders/", rows[1].QuerySelector("[data-testid='work-row-link']")!.GetAttribute("href"));

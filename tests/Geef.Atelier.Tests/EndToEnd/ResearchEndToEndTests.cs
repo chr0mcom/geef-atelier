@@ -62,7 +62,7 @@ public sealed partial class ResearchEndToEndTests(PostgresFixture postgres)
 
     private static async Task<Guid> SubmitAsync(AtelierEndToEndHost host, string request = Request, IReadOnlyList<OrderSourceSelection>? sources = null)
     {
-        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(request, User, OrderEntry.Web, sources, OrderMode.Direct));
+        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(request, User, OrderEntry.Web, sources));
         var view = await host.WaitForOrderFinishedAsync(submission.OrderId);
         Assert.True(view.Display.State == OrderDisplayState.Delivered, $"{view.Display.State}\n{host.Llm.Describe()}");
         return submission.OrderId;

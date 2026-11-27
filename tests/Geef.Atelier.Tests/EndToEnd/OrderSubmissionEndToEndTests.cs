@@ -60,25 +60,4 @@ public sealed class OrderSubmissionEndToEndTests(PostgresFixture postgres)
         Assert.Contains("[[page 1]]\nMARKER-FIRST-PAGE", text, StringComparison.Ordinal);
         Assert.Contains("[[page 80]]\nMARKER-LAST-PAGE", text, StringComparison.Ordinal);
     }
-
-    [Fact]
-    public async Task CarefulOrderRunsToTheEndAndShowsTheTextFirst()
-    {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services =>
-            services.PostConfigure<OrderOptions>(o => o.CarefulOutline = CarefulOutlineMode.On));
-        var username = "careful-" + Guid.NewGuid().ToString("N")[..6];
-        host.Script.EnqueueExecutorText("""{"sections": [{"heading": "Why", "words": 40, "content": "The reason"}]}""");
-
-        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(
-            "Write three sentences that explain why the office closes early on Fridays.", username, OrderEntry.Web,
-            Mode: OrderMode.Careful));
-        var view = await host.WaitForOrderFinishedAsync(submission.OrderId);
-
-        Assert.True(view.Display.State == OrderDisplayState.Delivered, $"{view.Display.State}\n{host.Llm.Describe()}");
-        Assert.True(view.Display.HasText);
-        Assert.All(view.Progress.Steps, s => Assert.Equal(OrderStepStatus.Done, s.Status));
-        var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(submission.OrderId, username));
-        Assert.Equal(ScriptedLlmEndpoint.DefaultExecutorText, result!.Text);
-        Assert.True(await host.QueryAsync(db => db.Orders.AnyAsync(o => o.Id == submission.OrderId && o.UpdatedAt >= o.CreatedAt)));
-    }
 }

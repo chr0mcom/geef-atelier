@@ -7,9 +7,9 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 internal sealed record OrderSourcePromptSet(IReadOnlyList<PromptSource> Sources, IReadOnlyDictionary<Guid, int> Positions);
 
 /// <summary>
-/// Builds the prompt sources of an order and the usage rows of a rendered bundle. Shared by the direct path
-/// (<see cref="OrderGroundingStep"/>) and the careful mode (<c>OrderSourcesGroundingProvider</c>), so that both apply
-/// the page selection and count characters the same way as the order service does before the start.
+/// Builds the prompt sources of an order and the usage rows of a rendered bundle for the direct path
+/// (<see cref="OrderGroundingStep"/>), so that it applies the page selection and counts characters the same way as the order
+/// service does before the start.
 /// </summary>
 internal static class OrderSourcePrompts
 {

@@ -30,8 +30,6 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 /// <see cref="DirectPathException.WritingServiceBusy"/>.
 /// After the first pass the input tokens are compared with the size of the files (<see cref="ReadEvidenceCheck"/>);
 /// too few become the warning <see cref="PartialReadWarning"/>.
-/// With a <see cref="WritingPlanner"/> ("Extra careful" with an outline, D-087) the first pass of a run without a seed draft is preceded by
-/// one planning call; its outline goes into the first pass only. Without a planner the executor is unchanged.
 /// </summary>
 internal sealed class DirectWriterExecutor(
     ExecutorProfile profile,
@@ -41,8 +39,7 @@ internal sealed class DirectWriterExecutor(
     IRunWarningSink warningSink,
     Guid runId,
     ILogger logger,
-    IWriterNotesSource notesSource,
-    WritingPlanner? planner = null) : IExecutionStep
+    IWriterNotesSource notesSource) : IExecutionStep
 {
     /// <summary>Warning shown when the writer most likely searched the files instead of reading them.</summary>
     public const string PartialReadWarning = "Some of your files may not have been read in full.";
@@ -72,10 +69,7 @@ internal sealed class DirectWriterExecutor(
         {
             var seed = context.TryGet(AtelierContextKeys.SeedDraft, out var s) && !string.IsNullOrWhiteSpace(s) ? s : null;
             var revision = context.TryGet(AtelierContextKeys.RevisionHint, out var hint) && !string.IsNullOrWhiteSpace(hint);
-            var plan = planner is not null && seed is null && !revision
-                ? await planner.PlanAsync(brief, bundle, TargetWords(context), cancellationToken)
-                : null;
-            userPrompt = DirectWriterPrompts.FirstPass(brief, bundle, documentMode, seed, writerNotes, arithmetic, revision, plan);
+            userPrompt = DirectWriterPrompts.FirstPass(brief, bundle, documentMode, seed, writerNotes, arithmetic, revision);
             baseline = seed ?? string.Empty;
         }
         else
@@ -156,9 +150,8 @@ internal sealed class DirectWriterExecutor(
     }
 
     /// <summary>
-    /// The problems of the previous pass the correction must fix: messages of the blocking findings of the automatic checks, for
-    /// blocking findings of the fact check a fixed sentence built from their metadata (<see cref="DirectWriterPrompts.FactProblem"/>), and
-    /// for requirements of the request that are not met (outline template only) <see cref="RequirementsCheckReviewer.Problem"/>.
+    /// The problems of the previous pass the correction must fix: messages of the blocking findings of the automatic checks and for
+    /// blocking findings of the fact check a fixed sentence built from their metadata (<see cref="DirectWriterPrompts.FactProblem"/>).
     /// Findings of other reviewers, findings that do not block (hints, shadow mode, source conflicts) and reports about checks that
     /// could not run are never passed on.
     /// </summary>
@@ -176,17 +169,12 @@ internal sealed class DirectWriterExecutor(
             {
                 DeterministicChecksReviewer.FindingCategory => f.Message,
                 SourceFactCheckReviewer.FindingCategory => DirectWriterPrompts.FactProblem(f.Metadata, f.Message, forbidPlaceholders),
-                RequirementsCheckReviewer.FindingCategory => RequirementsCheckReviewer.Problem(f.Metadata, f.Message),
                 _ => null,
             })
             .OfType<string>()
             .Distinct(StringComparer.Ordinal)
             .ToList();
     }
-
-    /// <summary>The length in words the outline aims at: from the length the code read from the request (<see cref="WritingPlanRules.TargetWords"/>).</summary>
-    private static int? TargetWords(IRunContext context) =>
-        context.TryGet(AtelierContextKeys.OrderConstraints, out var constraints) && constraints is not null ? constraints.Length.TargetWords() : null;
 
     private async Task<WriterNotesSplit> SplitAsync(LlmResponse? response, string brief, CancellationToken ct) =>
         await notesSource.SplitAsync(response?.Text ?? string.Empty, brief, ct);
