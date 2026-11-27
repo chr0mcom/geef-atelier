@@ -34,6 +34,9 @@ internal static class OrderWireNames
     public const string OriginClient = "client";
     public const string OriginMemory = "memory";
 
+    /// <summary>Answer from the form of the client (D-088). Only the server sets it; <see cref="ParseAnswerOrigin"/> never accepts it from a client.</summary>
+    public const string OriginForm = "form";
+
     public static string ToWire(this GapTopic topic) => topic switch
     {
         GapTopic.Length => "length",
@@ -57,6 +60,7 @@ internal static class OrderWireNames
         AnswerOrigin.User => OriginUser,
         AnswerOrigin.Client => OriginClient,
         AnswerOrigin.Memory => OriginMemory,
+        AnswerOrigin.Form => OriginForm,
         _ => throw new ArgumentOutOfRangeException(nameof(origin), origin, null),
     };
 
@@ -161,7 +165,10 @@ internal static class OrderWireNames
         _ => throw new ArgumentOutOfRangeException(nameof(formality), formality, null),
     };
 
-    /// <summary>The origin of an answer from its wire name, ignoring case and surrounding blanks; <c>null</c> for anything unknown.</summary>
+    /// <summary>
+    /// The origin of an answer from its wire name, ignoring case and surrounding blanks; <c>null</c> for anything unknown, and for
+    /// <see cref="OriginForm"/>, which a client can never claim.
+    /// </summary>
     public static AnswerOrigin? ParseAnswerOrigin(string? wire) => wire?.Trim().ToLowerInvariant() switch
     {
         OriginUser => AnswerOrigin.User,

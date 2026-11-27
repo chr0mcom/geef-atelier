@@ -110,6 +110,7 @@ public sealed class ClarificationSummaryTests : TestContext
     [InlineData("no", AnswerOrigin.Client, "Improve “rede.docx”? → No, write something new (answered by your assistant)")]
     [InlineData("yes", AnswerOrigin.Client, "Improve “rede.docx”? → Yes, improve it (answered by your assistant)")]
     [InlineData("yes", AnswerOrigin.User, "Improve “rede.docx”? → Yes, improve it")]
+    [InlineData("no", AnswerOrigin.Form, "Improve “rede.docx”? → No, write something new (chosen in a form of your assistant)")]
     public void TheRevisionAnswerShowsWhoGaveIt(string option, AnswerOrigin origin, string expected)
     {
         var clarification = OrderTestData.Clarification(questions: [], answers: [new OrderAnswer("revision", option, null, false, origin)],

@@ -37,6 +37,8 @@ feature on.
 | Files from an AI assistant (upload ticket) | `Uploads:Tickets` (`Off`, `On`) | `Off` | `On` (D-076) | – |
 | Workshop menu only for administrators | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
 | Older tools for AI assistants | `Mcp:LegacyTools` | `true` | `true` (D-075) | – |
+| Skill "how to use Atelier" for AI assistants | `Mcp:Skills` (`Off`, `On`) | `Off` | `Off` (D-088) | – |
+| Questions as a form in the AI assistant | `Mcp:Elicitation` (`Off`, `On`) | `Off` | `Off` (D-088) | – |
 | Learning loop of the older way | `Learning:Enabled` | `false` | `false` (D-067) | – |
 | Offer to save missing details under About me (“Tell Atelier once”) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `On` (addendum to D-083, acceptance passed) | – |
 | Older review loop: best instead of most recent version | `Convergence:BestDraft` (`Off`, `On`) | `Off` | `Off` (D-085) | – |

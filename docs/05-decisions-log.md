@@ -3522,3 +3522,85 @@ with and without the clarifier.
 
 **Way back:** switch `Off` (default), remove the exceptions.
 
+## D-088 — MCP: skill and questions as a form, both behind switches and shipped off (2026-11-27)
+
+**Status:** built and tested (steps 2 and 3 of the review of new MCP capabilities); both switches shipped `Off`; acceptance on the
+real client open. D-087 belongs to a parallel package.
+
+**Reason.** Since November 2026 Claude Code and claude.ai can load skills from MCP servers and show form questions (elicitation). The
+server instructions are limited to 3,900 characters (D-086); a skill can explain the flow in more detail without costing context
+while it is not loaded. Today the model passes on the questions itself and may lose options, guess or set the origin wrongly.
+
+**Decision – skill (`Mcp:Skills`, `Off`/`On`).**
+- One skill `using-atelier` from fixed files in the repository (`src/Geef.Atelier.Mcp/Skills/using-atelier/`: `SKILL.md`,
+  `references/files.md`, `references/questions.md`, `references/result.md`), embedded in the assembly, with a manifest of digests and
+  sizes. Never put together from orders, files, user or run-time data, never `dynamic`.
+- Package `ModelContextProtocol.Extensions.Skills` exactly `[2.4.0]` (like the SDK); `MCPEXP005` suppressed only in the Mcp and the
+  test project.
+- With `On`: extension `io.modelcontextprotocol/skills`, capability `resources`, the four files as resources, `skills/list` and
+  `skills/get` exactly as the SDK builds them (`AtelierSkill.AddTo`). The server instructions stay **unchanged**: the recommended
+  sentence "load the skill" would have pushed the longest combination above 3,900 characters (25 to spare). Instead only the
+  description of `submit_order` gains a sentence that points to `skill://using-atelier/SKILL.md`.
+- The skill never contradicts the instructions: a test checks that 20 core rules of the instructions in all combinations of switches
+  and seven rules that moved into tool descriptions stand in the skill in the same words, that 18 contrary phrasings are absent, that it
+  names only tools that exist, links only its own files and holds the rule of D-081 about skipped questions. Where the flow depends on
+  switches (upload ticket, saving About me, older tools), the skill describes both cases ("If prepare_attachment is in your tool list
+  …"), so that it holds in every configuration.
+
+**Decision – questions as a form (`Mcp:Elicitation`, `Off`/`On`, `Mcp:ElicitationLifetime` default 30 minutes).**
+- Only in `submit_order`, only with `needs_input`, only when the client negotiated 2026-07-28 (`IsMrtrSupported`, stateless through MRTR
+  and `InputRequiredException`) and announces `elicitation.form`. Otherwise `needs_input` as before. `get_order_status` and
+  `answer_order` stay unchanged.
+- The form is **made only of choices**: per question its options and "You decide", the question about the file to improve with
+  `revisionFile`; nothing required, nothing preselected. **No text input** anywhere (test: the schema never holds a free text field); own
+  words go through the chat, as the fixed message says ("To answer in your own words, close this form and tell your assistant."),
+  together with "Atelier never asks for passwords, PINs, TANs, keys, card or account numbers".
+- **What the filter promises:** it keeps the common forms out, not all of them. No form for orders whose language is not German or
+  English or whose question texts hold letters outside the Latin script, and none for questions, options or file names with words for
+  secrets (on the normalized text, also written apart such as "Pass-Wort", "P.I.N.", "Karten-Nummer"), links and addresses (also "punkt
+  de"/"dot com", bare IP addresses, `.md`/`.zip` in a question, `tel:`/`sms:`), phone and other digit runs of seven digits or more,
+  requests to call or reply by SMS, hidden characters or texts that are too long (240/120/120); plus the guard of the clarifier without
+  its exception. Question texts partly come from file content and would look like a question by Atelier in the form. What the filter
+  misses shows at most as a choice question; nothing can be typed in. False alarms (such as "Login") only lead to `needs_input` as before
+  (log line "MCP form of submit_order not sent: {Reason}" as a measure).
+- `requestState`: signed and encrypted with the data protection keys, bound to order, user, client (OAuth client), hash of the
+  arguments and question ids, with an expiry; it carries the receipts and notices of the first call so that none of them is lost. The
+  second call **never** creates an order; a foreign, forged or other-arguments value → tool error that tells nothing about the order;
+  an order that no longer waits → its current state, nothing answered again.
+- Cancel, decline, expiry, unusable answers, changed questions → `needs_input` as before, with a sentence in front; for decline with a
+  pointer to `skip=true`. "You decide" and empty questions → "decide for me", open as D-081 says. A form that is **accepted but entirely
+  empty** counts as closed (`needs_input`), so that a client which accepts forms by itself does not take the question away from the
+  person.
+- **Origin.** May the server claim "user"? No: it cannot see who fills in the form (clients may answer forms automatically, for
+  example through hooks). New origin `AnswerOrigin.Form` (wire `form`, accepted from no client through `answer_order`), on the web
+  "(chosen in a form of your assistant)". For the writer and the fact check it counts like an answer of the person (no mark in the
+  brief of the writer), because Atelier built the form itself and offered only its own options.
+- With `Off`, `requestState` is passed over as before; only a real value of this server (only possible if `On` held before) leads to
+  the state of its order instead of a second order.
+
+**API stability and risks.**
+- The skills package is three weeks old and experimental; the extension specification is beta. Only
+  `McpServerSkillPackage.Create`, `McpServerSkillFile.FromText` and `WithSkillPackages` are used. Because the switch is read only when
+  the options are built, `AtelierSkill.AddTo` takes the options setup of the package from a small container of its own and applies it to
+  the server options; if a later SDK changes that setup, start-up fails only with `On`, with a clear message, and the tests notice it
+  first. Move the skills package with every SDK update and run the skill tests.
+- Claude Code revokes the approval of a skill on every content change (digest); change the skill sparingly.
+- Elicitation runs through MRTR, which the SDK supports for stateless servers only since 2.0; older revisions never get a form.
+  Clients may show forms differently (title, description, order); check the display on the real client.
+- **Rollback:** an older image does not know the origin `Form`; for orders answered through a form it does not read the stored answers
+  (empty list). Without the switch on, no such orders come about. **Once `Mcp:Elicitation=On` has held, the rollback image is this D-088
+  image with the switch `Off`, not the image before it.** If one has to go further back anyway, do not change or continue such orders.
+
+**Tests.** Unit tests for building the form, the filter, reading the answers, the state value (round trip, expiry, forgery, foreign
+purpose and keys, argument hash), the flow (foreign user, client, arguments, foreign order, repeated call, cancel, decline, invalid,
+expiry, switch off), the answer rules with `Form`, brief and web display; switch tests (tool list, instructions, capabilities equal with
+`Off`; with `On` only one sentence in `submit_order`); hash baselines unchanged. End to end over the real Kestrel server with the SDK
+client: form answered (one order, origin `Form`, the writer gets the answer), replay, changed arguments, forged value, foreign user,
+cancel and decline followed by `answer_order`, "You decide" as D-081 says, expiry, client 2025-11-25, client without forms, switch off;
+listing, getting and reading every file of the skill with verification (2026-07-28), tools and instructions unchanged with 2025-11-25.
+All examples are made up.
+
+**Acceptance on the real client (after the deploy, not done).** Claude Code interactive with the claude.ai connector and claude.ai on the
+web, each with `Mcp:Skills=On` and `Mcp:Elicitation=On`: the skill shows and is loaded before the first order; an order with an open
+length shows the form; choosing, "You decide", closing and declining behave as described; a test file with an injected TAN question
+gives no form. Counter-check with both switches `Off`.

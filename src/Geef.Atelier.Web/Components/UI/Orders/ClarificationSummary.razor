@@ -112,6 +112,7 @@
     static string Who(OrderAnswer answer, string byPerson) => answer.Origin switch
     {
         AnswerOrigin.Client => " (answered by your assistant)",
+        AnswerOrigin.Form => " (chosen in a form of your assistant)",
         _ when byPerson.Length > 0 => $" ({byPerson})",
         _ => string.Empty,
     };

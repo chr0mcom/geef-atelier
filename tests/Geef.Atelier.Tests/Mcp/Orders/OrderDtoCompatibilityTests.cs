@@ -94,12 +94,12 @@ public sealed class OrderDtoCompatibilityTests
     }
 
     [Fact]
-    public void Every_answer_origin_round_trips_through_its_wire_name()
+    public void Every_answer_origin_round_trips_through_its_wire_name_except_the_form_which_no_client_can_claim()
     {
         foreach (var origin in Enum.GetValues<AnswerOrigin>())
         {
             Assert.Equal(SnakeCase(origin.ToString()), origin.ToWire());
-            Assert.Equal(origin, OrderWireNames.ParseAnswerOrigin(origin.ToWire()));
+            Assert.Equal(origin == AnswerOrigin.Form ? null : origin, OrderWireNames.ParseAnswerOrigin(origin.ToWire()));
         }
     }
 

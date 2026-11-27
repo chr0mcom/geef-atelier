@@ -21,8 +21,12 @@ public enum AssumptionConfidence { Sure = 0, Unsure = 1 }
 /// <summary>Length class of the text type; selects the options of the length template.</summary>
 public enum LengthScale { ShortForm = 0, Standard = 1, LongForm = 2 }
 
-/// <summary>Who gave an answer.</summary>
-public enum AnswerOrigin { User = 0, Client = 1, Memory = 2 }
+/// <summary>
+/// Who gave an answer. <see cref="Form"/> is an answer from the form Atelier sent to the MCP client (D-088): the client says the person filled
+/// it in, but the server cannot see who did, so it is kept apart from <see cref="User"/>. For writing and checking it counts as an answer of the
+/// person, because Atelier built the form itself and only offered its own options.
+/// </summary>
+public enum AnswerOrigin { User = 0, Client = 1, Memory = 2, Form = 3 }
 
 /// <summary>Whether an answer should be remembered (stage 7; always <see cref="No"/> in stage 2).</summary>
 public enum RememberChoice { No = 0, Always = 1, TextType = 2 }

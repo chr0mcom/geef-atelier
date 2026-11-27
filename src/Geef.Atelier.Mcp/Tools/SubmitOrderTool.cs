@@ -6,9 +6,11 @@ using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
+using Geef.Atelier.Mcp.Forms;
 using Geef.Atelier.Mcp.Models;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace Geef.Atelier.Mcp.Tools;
@@ -35,6 +37,27 @@ public static class SubmitOrderTool
         "ask the person, then call answer_order. " +
         "Otherwise the order is already being written: call get_order_status with waitSeconds, then get_order_result. " +
         "The text is usually ready in 1–5 minutes (with extraCareful up to about 10).";
+
+    /// <summary>Sentence added to the description while <c>Mcp:Skills</c> is <c>On</c> (D-088).</summary>
+    public const string SkillSentence =
+        " If you can load skills, load " + AtelierSkill.Uri + " before the first order; it explains every step.";
+
+    /// <summary>Sentence added to the description while <c>Mcp:Elicitation</c> is <c>On</c> (D-088).</summary>
+    public const string FormSentence =
+        " Your app may show Atelier's questions to the person as a form during this call; if the answer still has state needs_input, ask the person as described.";
+
+    /// <summary>
+    /// The description of <c>submit_order</c>: <see cref="TicketToolDescription"/> while upload tickets are on, otherwise <see cref="ToolDescription"/>,
+    /// followed by <see cref="SkillSentence"/> and <see cref="FormSentence"/> while their switches are on. With both switches off it is exactly the
+    /// description from before D-088.
+    /// </summary>
+    public static string Describe(bool tickets, McpOptions mcp)
+    {
+        ArgumentNullException.ThrowIfNull(mcp);
+        return (tickets ? TicketToolDescription : ToolDescription)
+               + (mcp.Skills == McpSkillsMode.On ? SkillSentence : string.Empty)
+               + (mcp.Elicitation == McpElicitationMode.On ? FormSentence : string.Empty);
+    }
 
     /// <summary>Name of the parameter <c>attachments</c> in the input schema.</summary>
     public const string AttachmentsParameter = "attachments";
@@ -66,11 +89,20 @@ public static class SubmitOrderTool
         [Description("Optional files as a JSON array: [{\"filename\":\"offer.pdf\",\"contentType\":\"application/pdf\",\"contentBase64\":\"...\"}]. contentBase64 must be the complete original file. Supported content types: application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, text/markdown, text/plain. Placeholders, summaries or shortened content are rejected.")] string? attachments = null,
         [Description("True only when the person asks for extra care: slower, with several review rounds.")] bool extraCareful = false,
         [Description(UploadIdsDescription)] string[]? uploadIds = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IMcpOrderForms? forms = null,
+        RequestContext<CallToolRequestParams>? context = null)
     {
         var username = currentUser.RequireUsername();
         if (string.IsNullOrWhiteSpace(request))
             throw new McpException("The request is empty. Pass the person's request in their own words.");
+
+        var call = forms is null
+            ? null
+            : new OrderFormCall(context?.Server, context?.Params, username, OrderFormCall.ClientOf(context?.User),
+                OrderFormStates.HashArguments(request, attachments, extraCareful, uploadIds));
+        if (call is not null && await forms!.ResumeAsync(call, cancellationToken) is { } resumed)
+            return resumed;
 
         var tickets = uploads.Enabled;
         var ids = ReadUploadIds(uploadIds, tickets);
@@ -104,12 +136,19 @@ public static class SubmitOrderTool
 
         var wait = GetOrderStatusTool.ClampWait(intakeOptions.Value.SubmitWaitSeconds, orderOptions.Value.MaxWaitSeconds);
         if (submission.State != OrderDisplayState.Preparing || wait == 0)
-            return submission.ToDto(all);
+            return Answer(submission.ToDto(all), submission.Clarification);
 
         var view = await orders.WaitForChangeAsync(
                        submission.OrderId, username, OrderDisplayState.Preparing, TimeSpan.FromSeconds(wait), cancellationToken)
                    ?? throw new McpException(McpOrderAccess.OrderNotFound);
-        return view.ToSubmittedDto(submission.Notices, all);
+        return Answer(view.ToSubmittedDto(submission.Notices, all), view.Clarification);
+
+        OrderSubmittedDto Answer(OrderSubmittedDto dto, ClarificationView? clarification)
+        {
+            if (call is not null)
+                forms!.AskWhenPossible(call, dto, clarification, submission.Notices);
+            return dto;
+        }
     }
 
     /// <summary>
