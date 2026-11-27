@@ -5,6 +5,7 @@
     <AssemblyName>Geef.Atelier.Tests</AssemblyName>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);MCPEXP005</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

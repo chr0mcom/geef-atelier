@@ -22,6 +22,8 @@ public static class McpServiceExtensions
     /// <c>Orders:MaxWaitSeconds</c>, the same value that limits the wait. Trace lines of the SDK, which hold whole messages with upload
     /// tokens and file content, are never written (<see cref="McpMessageLogGuard"/>). The transport is stateless on purpose
     /// (<see cref="HttpServerSessionMode.Stateless"/>): every request stands alone, for clients of the 2026-07-28 revision as for older ones.
+    /// While <c>Mcp:Skills</c> is <c>On</c> the server also offers <see cref="AtelierSkill"/>; it is off by default, and then tool list,
+    /// instructions and capabilities are the same as without it (D-088).
     /// </summary>
     public static IServiceCollection AddAtelierMcp(this IServiceCollection services)
     {
@@ -38,6 +40,8 @@ public static class McpServiceExtensions
             {
                 var tickets = uploads.Value.Tickets == UploadTicketsMode.On;
                 o.ServerInstructions = McpServerInstructions.For(orders.Value.MaxWaitSeconds, mcp.Value.LegacyTools, tickets, orders.Value.TellOnce != TellOnceMode.Off);
+                if (mcp.Value.Skills == McpSkillsMode.On)
+                    AtelierSkill.AddTo(o);
                 if (tickets)
                 {
                     o.ToolCollection ??= new McpServerPrimitiveCollection<McpServerTool>();
@@ -70,7 +74,7 @@ public static class McpServiceExtensions
         var submit = method.DeclaringType == typeof(SubmitOrderTool);
         var description = method.DeclaringType == typeof(GetOrderStatusTool)
             ? GetOrderStatusTool.Describe(services.GetRequiredService<IOptions<OrderOptions>>().Value.MaxWaitSeconds)
-            : submit && tickets ? SubmitOrderTool.TicketToolDescription : null;
+            : submit ? SubmitOrderTool.Describe(tickets, services.GetRequiredService<IOptions<McpOptions>>().Value) : null;
         if (method.DeclaringType == typeof(ProfileTool) && services.GetRequiredService<IOptions<OrderOptions>>().Value.TellOnce == TellOnceMode.Off)
             return ProfileTool.SavingParameters.Aggregate(method.CreateTool(services, ProfileTool.ReadOnlyToolDescription), (t, p) => t.WithoutInputProperty(p))
                 .WithAnnotations(new ToolAnnotations { ReadOnlyHint = true });

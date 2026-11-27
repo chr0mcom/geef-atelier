@@ -36,6 +36,21 @@ public static class SubmitOrderTool
         "Otherwise the order is already being written: call get_order_status with waitSeconds, then get_order_result. " +
         "The text is usually ready in 1–5 minutes (with extraCareful up to about 10).";
 
+    /// <summary>Sentence added to the description while <c>Mcp:Skills</c> is <c>On</c> (D-088).</summary>
+    public const string SkillSentence =
+        " If you can load skills, load " + AtelierSkill.Uri + " before the first order; it explains every step.";
+
+    /// <summary>
+    /// The description of <c>submit_order</c>: <see cref="TicketToolDescription"/> while upload tickets are on, otherwise <see cref="ToolDescription"/>,
+    /// followed by <see cref="SkillSentence"/> while its switch is on. With the switch off it is exactly the description from before D-088.
+    /// </summary>
+    public static string Describe(bool tickets, McpOptions mcp)
+    {
+        ArgumentNullException.ThrowIfNull(mcp);
+        return (tickets ? TicketToolDescription : ToolDescription)
+               + (mcp.Skills == McpSkillsMode.On ? SkillSentence : string.Empty);
+    }
+
     /// <summary>Name of the parameter <c>attachments</c> in the input schema.</summary>
     public const string AttachmentsParameter = "attachments";
 
