@@ -14,13 +14,18 @@ public sealed class CrewBadgeTests : TestContext
         Assert.Equal("custom", badge.TextContent);
     }
 
-    [Fact]
-    public void NamedTemplateName_DisplaysName()
+    [Theory]
+    [InlineData("direct", "Direct")]
+    [InlineData("klassik", "Classic")]
+    [InlineData("juristisch", "Legal")]
+    [InlineData("direct-outline", "Extra careful")]
+    [InlineData("my-own-team", "my-own-team")]
+    public void NamedTemplateName_DisplaysItsName_AlsoForRemovedSetups(string template, string shown)
     {
-        var cut = RenderComponent<CrewBadge>(p => p.Add(c => c.TemplateName, "klassik"));
+        var cut = RenderComponent<CrewBadge>(p => p.Add(c => c.TemplateName, template));
 
         var badge = cut.Find("[data-testid='crew-badge']");
-        Assert.Equal("klassik", badge.TextContent);
+        Assert.Equal(shown, badge.TextContent);
     }
 
     [Fact]
