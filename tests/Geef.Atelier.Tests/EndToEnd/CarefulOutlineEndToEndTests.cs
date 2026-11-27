@@ -13,10 +13,11 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Geef.Atelier.Tests.EndToEnd;
 
 /// <summary>
-/// D-087 over the real wiring (MCP, order service, intake, orchestrator, direct assembler, Postgres): with <c>Orders:CarefulOutlineOverrides</c>
-/// on for one user, an "Extra careful" order of that user runs the outline template – one planning call, then the writing pass with the
-/// outline, the report of the direct path and the cost line of the planning call. Orders of other users, and standard orders of the same
-/// user, run exactly as before.
+/// D-087 and D-091 over the real wiring (MCP, order service, intake, orchestrator, direct assembler, Postgres): with
+/// <c>Orders:CarefulOutlineOverrides</c> on for one user, an "Extra careful" order of that user runs the outline template – one planning call,
+/// then the writing pass with the outline, the report of the direct path and the cost line of the planning call. For everybody else
+/// "Extra careful" is not offered: the web call and <c>submit_order</c> refuse it in plain words and no order is created; standard orders
+/// run the direct template.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
@@ -82,22 +83,60 @@ public sealed class CarefulOutlineEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Other_users_and_standard_orders_of_the_same_user_resolve_as_before()
+    public async Task Without_the_switch_extra_careful_is_refused_in_plain_words_and_standard_orders_run_the_direct_template()
     {
         await using var host = await StartAsync(postgres);
 
-        var web = await host.SubmitOrderAsync(new SubmitOrderRequest(Request, "e2e-other-user", OrderEntry.Web, Mode: OrderMode.Careful));
+        var refusedWeb = await Assert.ThrowsAsync<OrderSubmissionException>(() =>
+            host.SubmitOrderAsync(new SubmitOrderRequest(Request, "e2e-other-user", OrderEntry.Web, Mode: OrderMode.Careful)));
         var standard = await host.CallMcpToolAsync("submit_order", new { request = Request });
         var standardId = Guid.Parse(standard.GetProperty("orderId").GetString()!);
         host.ReleaseOrchestrator();
-        await host.WaitForOrderFinishedAsync(web.OrderId, TimeSpan.FromSeconds(90));
         await host.WaitForOrderFinishedAsync(standardId, TimeSpan.FromSeconds(90));
 
-        var webRun = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == web.OrderId));
+        Assert.Equal("Extra careful is not available. Please send the order without it.", refusedWeb.Message);
+        Assert.Equal(0, await host.QueryAsync(db => db.Orders.CountAsync(o => o.CreatedByUser == "e2e-other-user")));
         var standardRun = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == standardId));
-        Assert.Equal(SystemCrew.KlassikTemplateName, webRun.CrewTemplateName);
         Assert.Equal(SystemCrew.DirectTemplateName, standardRun.CrewTemplateName);
         Assert.DoesNotContain(host.Llm.CallsFor(LlmRole.Executor), c => c.SystemPrompt == WritingPlanPrompts.SystemPrompt);
         Assert.DoesNotContain(host.Llm.Calls, ScriptedLlmEndpoint.IsRequirementsCall);
+    }
+
+    [Fact]
+    public async Task Without_the_switch_for_anybody_submit_order_offers_no_extra_careful_and_refuses_it_from_a_cached_list()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services =>
+            services.PostConfigure<OrderOptions>(o => o.IntakeMode = IntakeMode.Off));
+
+        var submit = (await host.PostMcpAsync("tools/list")).GetProperty("result").GetProperty("tools").EnumerateArray()
+            .Single(t => t.GetProperty("name").GetString() == "submit_order");
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.CallMcpToolAsync("submit_order", new { request = Request, extraCareful = true }));
+
+        Assert.False(submit.GetProperty("inputSchema").GetProperty("properties").TryGetProperty("extraCareful", out _));
+        Assert.DoesNotContain("extraCareful", submit.GetProperty("description").GetString()!, StringComparison.Ordinal);
+        Assert.Contains("Extra careful is not available. Please send the order without it.", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(0, await host.QueryAsync(db => db.Orders.CountAsync()));
+    }
+
+    [Fact]
+    public async Task With_the_switch_for_one_person_submit_order_offers_extra_careful_to_everybody_but_refuses_it_for_the_others()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services =>
+            services.PostConfigure<OrderOptions>(o =>
+            {
+                o.IntakeMode = IntakeMode.Off;
+                o.CarefulOutlineOverrides["someone-else"] = CarefulOutlineMode.On;
+            }));
+
+        var submit = (await host.PostMcpAsync("tools/list")).GetProperty("result").GetProperty("tools").EnumerateArray()
+            .Single(t => t.GetProperty("name").GetString() == "submit_order");
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.CallMcpToolAsync("submit_order", new { request = Request, extraCareful = true }));
+
+        Assert.True(submit.GetProperty("inputSchema").GetProperty("properties").TryGetProperty("extraCareful", out _));
+        Assert.Contains("extraCareful", submit.GetProperty("description").GetString()!, StringComparison.Ordinal);
+        Assert.Contains("Extra careful is not available. Please send the order without it.", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(0, await host.QueryAsync(db => db.Orders.CountAsync()));
     }
 }

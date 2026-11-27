@@ -61,7 +61,7 @@ public sealed class McpTicketsProtocolTests
         Assert.Equal(["fileName", "sizeBytes"], Properties(prepare));
         Assert.Equal(["fileName"], Required(prepare));
         var submit = tools.Single(t => t.Name == "submit_order").ProtocolTool;
-        Assert.Equal(["request", "attachments", "extraCareful", "uploadIds"], Properties(submit));
+        Assert.Equal(["request", "attachments", "uploadIds"], Properties(submit));
         Assert.Equal(["request"], Required(submit));
         var uploadIds = submit.InputSchema.GetProperty("properties").GetProperty("uploadIds");
         Assert.Equal(SubmitOrderTool.UploadIdsDescription, uploadIds.GetProperty("description").GetString());

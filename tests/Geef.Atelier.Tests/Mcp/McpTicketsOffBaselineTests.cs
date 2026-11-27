@@ -31,13 +31,14 @@ namespace Geef.Atelier.Tests.Mcp;
 /// Stage 8d (D-091) removed the older tools and <c>Mcp:LegacyTools</c>: the list always holds the order tools and the five stubs
 /// <c>submit_request</c>, <c>submit_auto_crew_request</c> and <c>get_run_*</c>, and the line about the older tools left the instructions,
 /// so one tool list hash and one instructions hash remain for each of the two states, taken again once; the instructions hashes are those
-/// that were taken without the older tools before.
+/// that were taken without the older tools before. In the same stage <c>submit_order</c> lost the sentence about <c>extraCareful</c> and the
+/// parameter itself while "Extra careful" is offered to nobody (the default); with it offered, both come back.
 /// </summary>
 public sealed class McpTicketsOffBaselineTests
 {
-    private const string ToolsHash = "b0e3376fbb46fab7c2225ecf54a5fc19ada4bcec88ec89d060c31a1a009ef61b";
+    private const string ToolsHash = "d3bbf029e664982befaf3055632a64ffffc40c4abaea5078da2f1ce82ede4b8a";
     private const string InstructionsHash = InstructionsWithoutLegacyHash;
-    private const string ToolsBeforeAboutMeHash = "7e04c7226f550e360603331466baf7f031699756ea41b3d3134d319f6f8531d0";
+    private const string ToolsBeforeAboutMeHash = "42c62f5b2bb9e313e9f03e03b7ed66147d8ef36afdedb1c614dd210239a62044";
     private const string InstructionsBeforeAboutMeHash = InstructionsWithoutLegacyBeforeAboutMeHash;
     private const string InstructionsWithoutLegacyHash = "f9c6023635e5f6d73305154507755c8c36d483ba989488706b9c0920d52d04d1";
     private const string InstructionsWithoutLegacyBeforeAboutMeHash = "75aab43d645c8fadd9927f53851a12f8a53df7c86ef70114d03af033ccd7e09a";

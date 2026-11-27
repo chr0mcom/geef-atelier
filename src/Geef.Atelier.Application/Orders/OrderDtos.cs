@@ -29,8 +29,6 @@ public sealed record SubmitOrderRequest(
     OrderEntry Entry,
     IReadOnlyList<OrderSourceSelection>? Sources = null,
     OrderMode Mode = OrderMode.Direct,
-    string? CrewTemplateName = null,
-    CrewSpec? CustomCrew = null,
     bool AllowQuestions = true);
 
 /// <summary>Answer to a submitted order: its id, display state, first run (if any) and notices for the person.</summary>

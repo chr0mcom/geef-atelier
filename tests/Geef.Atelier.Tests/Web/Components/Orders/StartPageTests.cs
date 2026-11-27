@@ -37,6 +37,8 @@ public sealed class StartPageTests : TestContext
     private readonly BunitJSModuleInterop _module;
     private readonly TestAuthorizationContext _auth;
 
+    private void OfferCareful() => Services.Configure<OrderOptions>(o => o.CarefulOutline = CarefulOutlineMode.On);
+
     public StartPageTests()
     {
         Services.AddSingleton<IOrderService>(_orders);
@@ -56,15 +58,15 @@ public sealed class StartPageTests : TestContext
     }
 
     [Fact]
-    public void ShowsOneFieldFilesCarefulAndAStartButtonThatWaitsForText()
+    public void ShowsOneFieldFilesAndAStartButtonThatWaitsForTextAndNoExtraCarefulWhileItIsNotOffered()
     {
         var cut = RenderComponent<Start>();
 
         Assert.Equal("What do you need written?", cut.Find("h1").TextContent);
         Assert.StartsWith("Just describe it.", cut.Find("[data-testid='start-request']").GetAttribute("placeholder"));
         Assert.Contains("Add files – drop, paste or browse (PDF, Word, text)", cut.Find("[data-testid='start-drop']").TextContent);
-        Assert.Contains("Extra careful", cut.Find("label.start-careful").TextContent);
-        Assert.Contains("several review rounds", cut.Find("label.start-careful").TextContent);
+        Assert.Empty(cut.FindAll("label.start-careful"));
+        Assert.DoesNotContain("Extra careful", cut.Markup, StringComparison.Ordinal);
         Assert.True(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
         Assert.Equal("Describe what you need first.", cut.Find("[data-testid='start-blocked-reason']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='start-more-options']"));
@@ -208,6 +210,7 @@ public sealed class StartPageTests : TestContext
     [Fact]
     public async Task SubmitsTheWordingUnchangedWithFilesPagesAndModeThenOpensTheOrder()
     {
+        OfferCareful();
         var cut = RenderComponent<Start>();
         const string wording = "  Write a summary of the bill.\nKeep it under 200 words.  ";
         cut.Find("[data-testid='start-request']").Input(wording);
@@ -593,8 +596,34 @@ public sealed class StartPageTests : TestContext
     }
 
     [Fact]
+    public void WhileExtraCarefulIsOfferedItShowsWithItsHintAndNamesNoReviewRounds()
+    {
+        OfferCareful();
+
+        var cut = RenderComponent<Start>();
+
+        Assert.Contains("Extra careful", cut.Find("label.start-careful").TextContent);
+        Assert.Contains(Start.CarefulHint, cut.Find("label.start-careful").TextContent);
+        Assert.DoesNotContain("review rounds", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StartAgainOfACarefulOrderWhileExtraCarefulIsNotOfferedUsesTheStandardWayAndSaysSo()
+    {
+        var earlier = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Failed, requestText: "Summarise the bill.", mode: OrderMode.Careful));
+
+        var cut = RenderFrom(earlier.OrderId);
+        cut.Find("[data-testid='start-submit']").Click();
+
+        Assert.Empty(cut.FindAll("[data-testid='start-careful']"));
+        Assert.EndsWith(Start.CarefulGoneNote, cut.Find("[data-testid='start-prefill-note']").TextContent.Trim(), StringComparison.Ordinal);
+        Assert.Equal(OrderMode.Direct, Assert.Single(_orders.Submitted).Mode);
+    }
+
+    [Fact]
     public void StartAgainFillsInTheEarlierRequestAndItsFiles()
     {
+        OfferCareful();
         var receipt = _intake.Add("alice", OrderReceipts.Usable("bill.pdf", chars: 160_485, pages: 80));
         var source = OrderTestData.Source("bill.pdf", 160_485, 80) with { SourceId = receipt.SourceId!.Value, PageSelection = "1-10" };
         var earlier = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Failed, requestText: "Summarise the bill.", mode: OrderMode.Careful, sources: [source]));

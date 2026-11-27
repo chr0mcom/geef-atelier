@@ -34,7 +34,6 @@ public sealed class SubmitOrderToolTests
         Assert.Equal(OrderMode.Direct, submitted.Mode);
         Assert.True(submitted.AllowQuestions);
         Assert.Empty(submitted.Sources!);
-        Assert.Null(submitted.CrewTemplateName);
 
         Assert.Equal(orderId.ToString(), dto.OrderId);
         Assert.Equal("queued", dto.State);

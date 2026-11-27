@@ -99,7 +99,7 @@ public sealed class McpOrderEndpointTests(PostgresFixture pg) : IAsyncLifetime
         var properties = tool.GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).ToList();
         Assert.Contains("request", properties);
         Assert.Contains("attachments", properties);
-        Assert.Contains("extraCareful", properties);
+        Assert.DoesNotContain("extraCareful", properties);
         Assert.DoesNotContain("orderOptions", properties);
         Assert.DoesNotContain("intakeOptions", properties);
         Assert.DoesNotContain("orders", properties);

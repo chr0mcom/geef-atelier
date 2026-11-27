@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Orders;
@@ -63,12 +64,14 @@ public sealed class OrderSubmissionEndToEndTests(PostgresFixture postgres)
     [Fact]
     public async Task CarefulOrderRunsToTheEndAndShowsTheTextFirst()
     {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services =>
+            services.PostConfigure<OrderOptions>(o => o.CarefulOutline = CarefulOutlineMode.On));
         var username = "careful-" + Guid.NewGuid().ToString("N")[..6];
+        host.Script.EnqueueExecutorText("""{"sections": [{"heading": "Why", "words": 40, "content": "The reason"}]}""");
 
         var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(
             "Write three sentences that explain why the office closes early on Fridays.", username, OrderEntry.Web,
-            Mode: OrderMode.Careful, CrewTemplateName: SystemCrew.KlassikTemplateName));
+            Mode: OrderMode.Careful));
         var view = await host.WaitForOrderFinishedAsync(submission.OrderId);
 
         Assert.True(view.Display.State == OrderDisplayState.Delivered, $"{view.Display.State}\n{host.Llm.Describe()}");

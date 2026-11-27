@@ -29,10 +29,10 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
     [Fact]
     public async Task A_change_creates_version_two_seeded_with_the_shown_text_on_the_direct_path()
     {
-        await using var host = await StartAsync();
+        await using var host = await StartAsync(o => o.CarefulOutline = CarefulOutlineMode.On);
         var user = NewUser();
         var submission = await SubmitAsync(host, new SubmitOrderRequest("Write an article.", user, OrderEntry.Web,
-            Mode: OrderMode.Careful, CrewTemplateName: SystemCrew.KlassikTemplateName));
+            Mode: OrderMode.Careful));
         var v1Briefing = "Write an article." + BriefingSections.Separator + ProfileBlock;
         await DeliverAsync(host, submission.RunId!.Value, V1Text, briefing: v1Briefing);
 

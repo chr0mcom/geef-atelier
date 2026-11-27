@@ -23,7 +23,7 @@ say otherwise, follow them.
 Start with submit_order. Pass the person's request word for word, as they wrote or said it. Do not write your own version of
 the order, and do not summarise, translate, shorten or expand it. Never paste file content into the request.
 
-Set extraCareful only when the person asks for extra care.
+Set extraCareful only when the person asks for extra care and submit_order offers it.
 
 ## 2. Files
 

@@ -25,7 +25,7 @@ public static class SubmitOrderTool
         "If Atelier needs to know something only the person can tell, the answer has state needs_input and up to three short questions with answer options: " +
         "ask the person, then call answer_order. " +
         "Otherwise the order is already being written: call get_order_status with waitSeconds, then get_order_result. " +
-        "The text is usually ready in 1–5 minutes (with extraCareful up to about 10).";
+        "The text is usually ready in 1–5 minutes.";
 
     /// <summary>The description while <c>Uploads:Tickets</c> is <c>On</c>: files go through <c>prepare_attachment</c> and <c>uploadIds</c>, Base64 only for very small text files.</summary>
     public const string TicketToolDescription =
@@ -36,7 +36,18 @@ public static class SubmitOrderTool
         "If Atelier needs to know something only the person can tell, the answer has state needs_input and up to three short questions with answer options: " +
         "ask the person, then call answer_order. " +
         "Otherwise the order is already being written: call get_order_status with waitSeconds, then get_order_result. " +
-        "The text is usually ready in 1–5 minutes (with extraCareful up to about 10).";
+        "The text is usually ready in 1–5 minutes.";
+
+    /// <summary>Sentence added to the description while "Extra careful" is offered to anybody (<c>Orders:CarefulOutline</c>, D-091).</summary>
+    public const string CarefulSentence = " With extraCareful it can take up to about 10 minutes.";
+
+    /// <summary>Name of the parameter <c>extraCareful</c>; it is left out of the input schema while "Extra careful" is offered to nobody.</summary>
+    public const string ExtraCarefulParameter = "extraCareful";
+
+    /// <summary>The description of <c>extraCareful</c>.</summary>
+    public const string ExtraCarefulDescription =
+        "True only when the person asks for extra care: slower; Atelier plans the text first and then checks that every requirement of the request is in it. " +
+        "Not offered to every person; if it is not, the call is refused with a sentence that says so.";
 
     /// <summary>Sentence added to the description while <c>Mcp:Skills</c> is <c>On</c> (D-088).</summary>
     public const string SkillSentence =
@@ -48,13 +59,14 @@ public static class SubmitOrderTool
 
     /// <summary>
     /// The description of <c>submit_order</c>: <see cref="TicketToolDescription"/> while upload tickets are on, otherwise <see cref="ToolDescription"/>,
-    /// followed by <see cref="SkillSentence"/> and <see cref="FormSentence"/> while their switches are on. With both switches off it is exactly the
-    /// description from before D-088.
+    /// followed by <see cref="CarefulSentence"/> while "Extra careful" is offered to anybody (<paramref name="careful"/>) and by
+    /// <see cref="SkillSentence"/> and <see cref="FormSentence"/> while their switches are on.
     /// </summary>
-    public static string Describe(bool tickets, McpOptions mcp)
+    public static string Describe(bool tickets, McpOptions mcp, bool careful = false)
     {
         ArgumentNullException.ThrowIfNull(mcp);
         return (tickets ? TicketToolDescription : ToolDescription)
+               + (careful ? CarefulSentence : string.Empty)
                + (mcp.Skills == McpSkillsMode.On ? SkillSentence : string.Empty)
                + (mcp.Elicitation == McpElicitationMode.On ? FormSentence : string.Empty);
     }
@@ -87,7 +99,7 @@ public static class SubmitOrderTool
         IOptions<OAuthOptions> oauth,
         [Description("The person's request, word for word as they wrote or said it. Do not summarise, translate, expand or rewrite it, and do not paste file content here.")] string request,
         [Description("Optional files as a JSON array: [{\"filename\":\"offer.pdf\",\"contentType\":\"application/pdf\",\"contentBase64\":\"...\"}]. contentBase64 must be the complete original file. Supported content types: application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, text/markdown, text/plain. Placeholders, summaries or shortened content are rejected.")] string? attachments = null,
-        [Description("True only when the person asks for extra care: slower, with several review rounds.")] bool extraCareful = false,
+        [Description(ExtraCarefulDescription)] bool extraCareful = false,
         [Description(UploadIdsDescription)] string[]? uploadIds = null,
         CancellationToken cancellationToken = default,
         IMcpOrderForms? forms = null,

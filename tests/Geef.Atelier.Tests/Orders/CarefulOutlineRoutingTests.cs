@@ -20,9 +20,10 @@ using static Geef.Atelier.Tests.Orders.OrderTestData;
 namespace Geef.Atelier.Tests.Orders;
 
 /// <summary>
-/// <c>Orders:CarefulOutline</c> (D-087): which template an order gets. Only an "Extra careful" order without a chosen team and without a
-/// custom crew of an owner for whom the switch is on gets the outline template; everything else resolves exactly as before. The switch
-/// ships off, reads per user name from <c>CarefulOutlineOverrides</c>, and the progress display shows the direct steps for such a run.
+/// <c>Orders:CarefulOutline</c> (D-087, D-091): whether "Extra careful" is offered, and which template an order gets. The switch ships off and
+/// reads per user name from <c>CarefulOutlineOverrides</c>; it decides only whether a careful order is accepted. A careful order always gets
+/// the outline template, also when it starts after the intake, and a standard order always the direct template. The progress display
+/// shows the direct steps for such a run.
 /// </summary>
 public sealed class CarefulOutlineRoutingTests
 {
@@ -48,33 +49,32 @@ public sealed class CarefulOutlineRoutingTests
         Assert.Equal(CarefulOutlineMode.Off, configured.CarefulOutlineFor("someone-else"));
         Assert.Equal(CarefulOutlineMode.Off, configured.CarefulOutlineFor(null));
         Assert.Equal(CarefulOutlineMode.Off, new OrderOptions { CarefulOutline = CarefulOutlineMode.On, CarefulOutlineOverrides = { [Owner] = CarefulOutlineMode.Off } }.CarefulOutlineFor(Owner));
-    }
-
-    [Theory]
-    [InlineData(OrderMode.Careful, null, true, SystemCrew.DirectOutlineTemplateName)]
-    [InlineData(OrderMode.Careful, null, false, SystemCrew.KlassikTemplateName)]
-    [InlineData(OrderMode.Careful, "juristisch", true, "juristisch")]
-    [InlineData(OrderMode.Direct, null, true, SystemCrew.DirectTemplateName)]
-    [InlineData(OrderMode.Direct, null, false, SystemCrew.DirectTemplateName)]
-    public async Task Only_a_careful_order_without_a_team_takes_the_outline(OrderMode mode, string? template, bool outline, string expected)
-    {
-        var crew = new RecordingCrew();
-
-        var resolved = await crew.Service.ResolveOrderSnapshotAsync(mode, template, null, hasSources: false, CancellationToken.None, outline);
-
-        Assert.Equal(expected, resolved.Snapshot.TemplateName);
+        Assert.True(configured.OffersCareful(Owner));
+        Assert.False(configured.OffersCareful("someone-else"));
+        Assert.False(shipped.OffersCareful(Owner));
     }
 
     [Fact]
-    public async Task A_custom_crew_never_takes_the_outline()
+    public void Extra_careful_is_offered_to_anyone_while_the_switch_or_one_override_is_on()
+    {
+        Assert.False(new OrderOptions().OffersCarefulToAnyone());
+        Assert.False(new OrderOptions { CarefulOutlineOverrides = { [Owner] = CarefulOutlineMode.Off } }.OffersCarefulToAnyone());
+        Assert.True(new OrderOptions { CarefulOutlineOverrides = { [Owner] = CarefulOutlineMode.On } }.OffersCarefulToAnyone());
+        Assert.True(new OrderOptions { CarefulOutline = CarefulOutlineMode.On }.OffersCarefulToAnyone());
+        Assert.True(new OrderOptions { CarefulOutline = CarefulOutlineMode.On, CarefulOutlineOverrides = { [Owner] = CarefulOutlineMode.Off } }.OffersCarefulToAnyone());
+    }
+
+    [Theory]
+    [InlineData(OrderMode.Careful, SystemCrew.DirectOutlineTemplateName)]
+    [InlineData(OrderMode.Direct, SystemCrew.DirectTemplateName)]
+    public async Task A_careful_order_takes_the_outline_and_a_standard_order_the_direct_template(OrderMode mode, string expected)
     {
         var crew = new RecordingCrew();
-        var spec = new CrewSpec(SystemCrew.DefaultExecutorProfile.Name, [SystemCrew.BriefingFidelityProfile.Name], EvaluationStrategy.Parallel, null);
 
-        var resolved = await crew.Service.ResolveOrderSnapshotAsync(OrderMode.Careful, null, spec, hasSources: false, CancellationToken.None, carefulOutline: true);
+        var resolved = await crew.Service.ResolveOrderSnapshotAsync(mode, CancellationToken.None);
 
-        Assert.Equal("custom", resolved.Snapshot.TemplateName);
-        Assert.DoesNotContain(SystemCrew.DirectOutlineTemplateName, crew.Requested);
+        Assert.Equal(expected, resolved.Snapshot.TemplateName);
+        Assert.Equal([expected], crew.Requested);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class CarefulOutlineRoutingTests
     {
         var crew = new RecordingCrew();
 
-        var resolved = await crew.Service.ResolveOrderSnapshotAsync(OrderMode.Careful, null, null, hasSources: true, CancellationToken.None, carefulOutline: true);
+        var resolved = await crew.Service.ResolveOrderSnapshotAsync(OrderMode.Careful, CancellationToken.None);
 
         Assert.Equal(SystemCrew.DirectOutlineTemplateName, resolved.Snapshot.TemplateName);
         Assert.Null(resolved.Snapshot.GroundingProviders);
@@ -103,30 +103,17 @@ public sealed class CarefulOutlineRoutingTests
     }
 
     [Theory]
-    [InlineData(Owner, SystemCrew.DirectOutlineTemplateName)]
-    [InlineData("someone-else", SystemCrew.KlassikTemplateName)]
-    public async Task A_careful_order_started_after_the_intake_takes_the_switch_of_its_owner(string owner, string expected)
+    [InlineData(Owner)]
+    [InlineData("someone-else")]
+    public async Task A_careful_order_started_after_the_intake_always_takes_the_outline(string owner)
     {
         var starts = new List<OrderStart>();
-        var options = new OrderOptions { CarefulOutlineOverrides = { [Owner] = CarefulOutlineMode.On } };
-        var starter = Starter(new RecordingCrew(), starts, Options.Create(options));
+        var starter = Starter(new RecordingCrew(), starts);
         var order = Order(owner, "Schreib einen langen Bericht.", OrderState.Analyzing) with { Mode = OrderMode.Careful };
 
         await starter.TryStartAsync(new RunStartRequest(order, OrderState.Analyzing, IntakeBriefComposerTests.Record(), [], IntakeOutcome.Clarified, true), CancellationToken.None);
 
-        Assert.Equal(expected, Assert.Single(starts).Run.CrewTemplateName);
-    }
-
-    [Fact]
-    public async Task Without_options_the_starter_resolves_as_before()
-    {
-        var starts = new List<OrderStart>();
-        var starter = Starter(new RecordingCrew(), starts, null);
-        var order = Order(Owner, "Schreib einen langen Bericht.", OrderState.Analyzing) with { Mode = OrderMode.Careful };
-
-        await starter.TryStartAsync(new RunStartRequest(order, OrderState.Analyzing, IntakeBriefComposerTests.Record(), [], IntakeOutcome.Clarified, true), CancellationToken.None);
-
-        Assert.Equal(SystemCrew.KlassikTemplateName, Assert.Single(starts).Run.CrewTemplateName);
+        Assert.Equal(SystemCrew.DirectOutlineTemplateName, Assert.Single(starts).Run.CrewTemplateName);
     }
 
     [Theory]
@@ -143,7 +130,7 @@ public sealed class CarefulOutlineRoutingTests
         Assert.Equal(expected, order.ProgressMode(run));
     }
 
-    private static OrderRunStarter Starter(RecordingCrew crew, List<OrderStart> starts, IOptions<OrderOptions>? options) => new(
+    private static OrderRunStarter Starter(RecordingCrew crew, List<OrderStart> starts) => new(
         ScriptedProxy<IOrderRepository>.Create((method, args) => method.Name switch
         {
             nameof(IOrderRepository.TryStartWithRunAsync) => Started(starts, (OrderStart)args![0]!),
@@ -164,8 +151,7 @@ public sealed class CarefulOutlineRoutingTests
         new InMemoryRunWarnings(),
         ScriptedProxy<IOrderNotifier>.Create((_, _) => Task.CompletedTask),
         NullLogger<OrderRunStarter>.Instance,
-        TimeProvider.System,
-        options);
+        TimeProvider.System);
 
     private static Task<bool> Started(List<OrderStart> starts, OrderStart start)
     {
@@ -194,11 +180,6 @@ public sealed class CarefulOutlineRoutingTests
                     var template = (CrewTemplate)args![0]!;
                     Requested.Add(template.Name);
                     return Task.FromResult(new ResolvedCrewSnapshot(Snapshot(template.Name), []));
-                case nameof(ICrewService.ResolveSnapshotWithWarningsAsync):
-                    var name = (string?)args![0];
-                    var custom = args[1] is not null;
-                    Requested.Add(custom ? "custom" : name ?? "(none)");
-                    return Task.FromResult(new ResolvedCrewSnapshot(Snapshot(custom ? "custom" : name!), []));
                 default:
                     throw new InvalidOperationException(method.Name);
             }

@@ -51,6 +51,7 @@ internal sealed class OrderService(
     internal const string StoppedNotice = "This order was stopped.";
     internal const string NeedsAnswersNote = "The order needs your answers first.";
     internal const string AnswersNotUsedNotice = "Your answers were not used.";
+    internal const string CarefulNotOfferedMessage = "Extra careful is not available. Please send the order without it.";
     internal const int CancelAttempts = 3;
     private static readonly RunStatus[] ActiveStatuses = [RunStatus.Pending, RunStatus.Running];
 
@@ -68,6 +69,9 @@ internal sealed class OrderService(
             throw new OrderSubmissionException(Invariant(
                 $"Your request is too long ({text.Length:N0} characters, the limit is {options.RequestMaxChars:N0}). Please shorten it or attach the material as a file."));
 
+        if (request.Mode == OrderMode.Careful && !options.OffersCareful(request.CreatedByUser))
+            throw new OrderSubmissionException(CarefulNotOfferedMessage);
+
         var selections = Distinct(request.Sources);
         if (selections.Count > srcOptions.MaxFilesPerOrder)
             throw new OrderSubmissionException(Invariant($"You can use at most {srcOptions.MaxFilesPerOrder} files per order."));
@@ -80,7 +84,7 @@ internal sealed class OrderService(
             notices.Add(MapNotice);
 
         var now = time.GetUtcNow();
-        var route = OrderIntakeRouting.Decide(options.IntakeMode, request.AllowQuestions, request.CustomCrew is not null, text.Length, intakeOptions.Value.SkipAboveChars);
+        var route = OrderIntakeRouting.Decide(options.IntakeMode, request.AllowQuestions, text.Length, intakeOptions.Value.SkipAboveChars);
         var order = new OrderEntity
         {
             Id = Guid.NewGuid(),
@@ -89,7 +93,6 @@ internal sealed class OrderService(
             Mode = request.Mode,
             State = route == OrderIntakeRoute.Clarify ? OrderState.Analyzing : OrderState.Ready,
             Entry = request.Entry,
-            CrewTemplateName = request.Mode == OrderMode.Careful ? request.CrewTemplateName : null,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -97,16 +100,13 @@ internal sealed class OrderService(
 
         if (route == OrderIntakeRoute.Clarify)
         {
-            if (request.Mode == OrderMode.Careful)
-                await crewService.ResolveOrderSnapshotAsync(request.Mode, request.CrewTemplateName, null, links.Count > 0, ct);
             await CreateAsync(() => orders.CreateAsync(order, links, ct));
             intakeSignal?.Wake();
             await NotifyAsync(order.Id);
             return new OrderSubmission(order.Id, OrderStateResolver.Resolve(order.State, null).State, null, notices);
         }
 
-        var resolved = await crewService.ResolveOrderSnapshotAsync(request.Mode, request.CrewTemplateName, request.CustomCrew, links.Count > 0, ct,
-            options.CarefulOutlineFor(request.CreatedByUser) == CarefulOutlineMode.On);
+        var resolved = await crewService.ResolveOrderSnapshotAsync(request.Mode, ct);
         var profile = await profiles.GetAsync(request.CreatedByUser, ct);
         var run = resolved.ToFirstRun(order, briefComposer.Compose(new OrderBriefInput(order, null, [], profile)).Text, now);
         await CreateAsync(() => orders.CreateWithFirstRunAsync(order, links, run, ct));
@@ -376,7 +376,7 @@ internal sealed class OrderService(
             throw new OrderRevisionException(TooManyVersions(options));
 
         var linked = await sources.ListForOrderAsync(order.Id, includeText: false, ct);
-        var resolved = await crewService.ResolveOrderSnapshotAsync(OrderMode.Direct, null, null, linked.Count > 0, ct);
+        var resolved = await crewService.ResolveOrderSnapshotAsync(OrderMode.Direct, ct);
         var briefing = RevisionBrief.Compose(shown.BriefingText ?? string.Empty, change, next);
         var run = resolved.ToRevisionRun(order, shown, briefing, change, next, now);
 

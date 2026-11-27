@@ -19,12 +19,12 @@ internal enum OrderIntakeRoute
 internal static class OrderIntakeRouting
 {
     /// <summary>
-    /// <see cref="OrderIntakeRoute.Clarify"/> when the mode is On and nothing bypasses the intake (questions not allowed, custom
-    /// crew, request longer than <paramref name="skipAboveChars"/>); in Shadow mode the same orders get a shadow intake.
+    /// <see cref="OrderIntakeRoute.Clarify"/> when the mode is On and nothing bypasses the intake (questions not allowed, request longer
+    /// than <paramref name="skipAboveChars"/>); in Shadow mode the same orders get a shadow intake.
     /// </summary>
-    public static OrderIntakeRoute Decide(IntakeMode mode, bool allowQuestions, bool customCrew, int requestChars, int skipAboveChars)
+    public static OrderIntakeRoute Decide(IntakeMode mode, bool allowQuestions, int requestChars, int skipAboveChars)
     {
-        var eligible = allowQuestions && !customCrew && requestChars <= skipAboveChars;
+        var eligible = allowQuestions && requestChars <= skipAboveChars;
         return mode switch
         {
             IntakeMode.On when eligible => OrderIntakeRoute.Clarify,

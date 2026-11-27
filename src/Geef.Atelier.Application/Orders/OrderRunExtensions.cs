@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Models;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Orders;
@@ -14,32 +15,13 @@ internal static class OrderRunExtensions
     private static readonly JsonSerializerOptions SnapshotJsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     /// <summary>
-    /// The crew snapshot of an order: the code-only direct template for <see cref="OrderMode.Direct"/>, otherwise the named
-    /// template (default klassik) or the custom crew, with the order's files as the first grounding source. With
-    /// <paramref name="carefulOutline"/> (<c>Orders:CarefulOutline</c> on for the owner, D-087) a careful order without a chosen template
-    /// and without a custom crew gets the code-only template <see cref="SystemCrew.DirectOutlineTemplate"/> instead of klassik.
+    /// The crew snapshot of a run of an order: the code-only direct template for <see cref="OrderMode.Direct"/>, the code-only template
+    /// <see cref="SystemCrew.DirectOutlineTemplate"/> ("Extra careful" with an outline first, D-087) for <see cref="OrderMode.Careful"/>.
+    /// Whether "Extra careful" is offered is decided when the order is placed (<see cref="OrderOptionsExtensions.OffersCareful"/>); an
+    /// order that was accepted as careful always runs as careful, never as something else (D-091).
     /// </summary>
-    public static async Task<ResolvedCrewSnapshot> ResolveOrderSnapshotAsync(
-        this ICrewService crewService, OrderMode mode, string? crewTemplateName, CrewSpec? customCrew, bool hasSources, CancellationToken ct,
-        bool carefulOutline = false)
-    {
-        if (mode == OrderMode.Direct)
-            return await crewService.ResolveCodeTemplateSnapshotAsync(SystemCrew.DirectTemplate, ct);
-        if (carefulOutline && crewTemplateName is null && customCrew is null)
-            return await crewService.ResolveCodeTemplateSnapshotAsync(SystemCrew.DirectOutlineTemplate, ct);
-
-        var resolved = await crewService.ResolveSnapshotWithWarningsAsync(
-            customCrew is null ? crewTemplateName ?? SystemCrew.KlassikTemplateName : crewTemplateName,
-            customCrew,
-            ct);
-        if (!hasSources)
-            return resolved;
-
-        var providers = (resolved.Snapshot.GroundingProviders ?? [])
-            .Where(p => p.Name != SystemCrew.RunAttachmentsProfile.Name && p.Name != SystemCrew.OrderSourcesProfile.Name)
-            .ToList();
-        return resolved with { Snapshot = resolved.Snapshot with { GroundingProviders = [SystemCrew.OrderSourcesProfile, .. providers] } };
-    }
+    public static Task<ResolvedCrewSnapshot> ResolveOrderSnapshotAsync(this ICrewService crewService, OrderMode mode, CancellationToken ct) =>
+        crewService.ResolveCodeTemplateSnapshotAsync(mode == OrderMode.Careful ? SystemCrew.DirectOutlineTemplate : SystemCrew.DirectTemplate, ct);
 
     /// <summary>
     /// The path whose steps the progress display shows for <paramref name="order"/>: the direct steps while the current run is one of

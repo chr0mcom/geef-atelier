@@ -351,7 +351,7 @@ internal static class OrderDtoMappings
         OrderDisplayState.Stopped or OrderDisplayState.Failed =>
             "The order did not start. Call get_order_status for details.",
         _ =>
-            "The order has started. The text is usually ready in 1–5 minutes, with extraCareful up to about 10. " +
+            "The order has started. The text is usually ready in 1–5 minutes, a long or extra careful text in up to about 10. " +
             "Call get_order_status with waitSeconds to wait for it, then get_order_result.",
     };
 

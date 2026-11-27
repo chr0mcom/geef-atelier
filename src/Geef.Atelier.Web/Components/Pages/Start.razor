@@ -82,10 +82,13 @@
         <p class="start-budget start-budget--@budget.Tone" data-testid="start-budget">@budget.Text</p>
     }
 
-    <label class="start-careful">
-        <input type="checkbox" data-testid="start-careful" @bind="_careful" />
-        <span><strong>Extra careful</strong> <span class="start-careful-hint">(slower: several review rounds)</span></span>
-    </label>
+    @if (CarefulOffered)
+    {
+        <label class="start-careful">
+            <input type="checkbox" data-testid="start-careful" @bind="_careful" />
+            <span><strong>Extra careful</strong> <span class="start-careful-hint">(@CarefulHint)</span></span>
+        </label>
+    }
 
     @if (_error is not null)
     {
@@ -116,6 +119,12 @@
 @code {
     private const string ModulePath = "./js/source-upload.js";
 
+    /// <summary>The hint next to "Extra careful" while it is offered (<c>Orders:CarefulOutline</c>, D-091).</summary>
+    public const string CarefulHint = "slower: plans the text first, then checks that everything you asked for is in it";
+
+    /// <summary>Added to the note of an earlier "Extra careful" order while "Extra careful" is not offered.</summary>
+    public const string CarefulGoneNote = "Extra careful is not available now, so this request uses the standard way.";
+
     /// <summary>Why Start is blocked when a file without pages (Word, text) is too long on its own next to a PDF, so choosing pages cannot help.</summary>
     public const string TooLongWithoutPagesBlock = "Remove the file that is too long, or use a shorter version.";
 
@@ -125,6 +134,8 @@
     ElementReference _root;
     string _request = string.Empty;
     bool _careful;
+
+    bool CarefulOffered => OrderSettings.Value.OffersCareful(_username);
     bool _interactive;
     bool _submitting;
     bool? _uploadAvailable;
@@ -318,7 +329,8 @@
                 return;
             }
             _request = found.View.RequestText;
-            _careful = found.View.Mode == OrderMode.Careful;
+            _careful = CarefulOffered && found.View.Mode == OrderMode.Careful;
+            var carefulGone = !CarefulOffered && found.View.Mode == OrderMode.Careful;
             var missing = 0;
             foreach (var (source, receipt) in found.Receipts)
             {
@@ -336,9 +348,10 @@
                     FromEarlierOrder = true,
                 });
             }
-            _prefillNote = missing == 0
+            _prefillNote = (missing == 0
                 ? "Your earlier request is filled in. Change it if you like, then press Start."
-                : $"Your earlier request is filled in, but {missing} of its files are no longer available. Add them again if you need them.";
+                : $"Your earlier request is filled in, but {missing} of its files are no longer available. Add them again if you need them.")
+                + (carefulGone ? " " + CarefulGoneNote : string.Empty);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -518,7 +531,7 @@
                 _username,
                 OrderEntry.Web,
                 sources,
-                _careful ? OrderMode.Careful : OrderMode.Direct);
+                _careful && CarefulOffered ? OrderMode.Careful : OrderMode.Direct);
             var submission = await DataGate.RunAsync(() => Orders.SubmitAsync(request));
             Nav.NavigateTo($"/orders/{submission.OrderId}");
         }
