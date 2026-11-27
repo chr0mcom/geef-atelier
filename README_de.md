@@ -167,7 +167,7 @@ Voraussetzung: Der OAuth-Client muss im Admin-Panel unter `/admin/oauth-clients`
 Die Auftragswerkzeuge (`submit_order`, `answer_order`, `get_order_status`, `get_order_result`, `revise_order`, `export_order`,
 `cancel_order`, `list_orders`, `profile`) und, solange `Uploads:Tickets` `On` ist, `prepare_attachment`. Solange
 `Mcp:LegacyTools` `true` ist (ausgeliefert), kommen die älteren Werkzeuge der Werkstatt hinzu. Hinter `Mcp:Skills` und
-`Mcp:Elicitation` (beide ausgeliefert `Off`, D-088) kann der Server zusätzlich einen Skill zur Benutzung von Atelier anbieten und
+`Mcp:Elicitation` (beide ausgeliefert `On`, D-088, mit Claude Code geprüft) kann der Server zusätzlich einen Skill zur Benutzung von Atelier anbieten und
 seine Rückfragen als Formular des Clients stellen. Überblick:
 [docs/13-ai-assistant-guide_de.md](docs/13-ai-assistant-guide_de.md) (die Werkzeugtabelle dort prüft ein Test gegen den Server);
 Verträge: [docs/04-mcp-integration_de.md](docs/04-mcp-integration_de.md), [docs/09-endpoint-reference_de.md](docs/09-endpoint-reference_de.md).

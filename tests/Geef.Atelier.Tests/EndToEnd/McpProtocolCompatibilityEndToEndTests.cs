@@ -51,7 +51,7 @@ public sealed class McpProtocolCompatibilityEndToEndTests(PostgresFixture postgr
         Assert.StartsWith("Atelier writes finished texts", instructions, StringComparison.Ordinal);
         var capabilities = result.GetProperty("capabilities");
         Assert.True(capabilities.TryGetProperty("tools", out _));
-        Assert.False(capabilities.TryGetProperty("extensions", out _));
+        Assert.Equal(["io.modelcontextprotocol/skills"], capabilities.GetProperty("extensions").EnumerateObject().Select(e => e.Name));
         Assert.False(capabilities.TryGetProperty("tasks", out _));
 
         using var initialized = await SendAsync(http, revision, new { jsonrpc = "2.0", method = "notifications/initialized" });

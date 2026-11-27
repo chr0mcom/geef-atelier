@@ -38,8 +38,8 @@ muss beim Einschalten nicht geändert werden.
 | Dateien aus einem KI-Assistenten (Upload-Ticket) | `Uploads:Tickets` (`Off`, `On`) | `Off` | `On` (D-076) | – |
 | Werkstatt-Menü nur für die Administration | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
 | Ältere Werkzeuge für KI-Assistenten | `Mcp:LegacyTools` | `true` | `true` (D-075) | – |
-| Skill „wie man Atelier benutzt“ für KI-Assistenten | `Mcp:Skills` (`Off`, `On`) | `Off` | `Off` (D-088) | – |
-| Rückfragen als Formular im KI-Assistenten | `Mcp:Elicitation` (`Off`, `On`) | `Off` | `Off` (D-088) | – |
+| Skill „wie man Atelier benutzt“ für KI-Assistenten | `Mcp:Skills` (`Off`, `On`) | `Off` | `On` (D-088, am echten Client mit Claude Code geprüft) | – |
+| Rückfragen als Formular im KI-Assistenten | `Mcp:Elicitation` (`Off`, `On`) | `Off` | `On` (D-088, am echten Client mit Claude Code geprüft) | – |
 | Lernschleife des älteren Wegs | `Learning:Enabled` | `false` | `false` (D-067) | – |
 | Angebot, fehlende Angaben unter About me zu speichern („Tell Atelier once“) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `On` (Zusatz zu D-083, Abnahme bestanden) | – |
 | Ältere Prüfschleife: beste statt jüngster Fassung | `Convergence:BestDraft` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
