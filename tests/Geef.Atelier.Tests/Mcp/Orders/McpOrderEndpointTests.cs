@@ -95,7 +95,7 @@ public sealed class McpOrderEndpointTests(PostgresFixture pg) : IAsyncLifetime
         var result = await PostAsync(new { jsonrpc = "2.0", id = 1, method = "tools/list" });
 
         var tool = result.GetProperty("tools").EnumerateArray().Single(t => t.GetProperty("name").GetString() == "submit_order");
-        Assert.Equal(SubmitOrderTool.ToolDescription, tool.GetProperty("description").GetString());
+        Assert.Equal(SubmitOrderTool.ToolDescription + SubmitOrderTool.SkillSentence + SubmitOrderTool.FormSentence, tool.GetProperty("description").GetString());
         var properties = tool.GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).ToList();
         Assert.Contains("request", properties);
         Assert.Contains("attachments", properties);

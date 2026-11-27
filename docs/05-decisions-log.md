@@ -3630,3 +3630,17 @@ all so far, not even those through `answer_order`.
 `submit_order` after the form (answers, "You decide", decline without entries); field order of the result DTOs; end to end with the SDK
 client: form → `submit_order` and `get_order_result` name the choice with `form`; `answer_order` → `get_order_result` through a
 2025-11-25 client with `user`; answer `client` visible to the owner in both revisions, not to an administrator.
+
+### Addendum to D-088 — acceptance passed, both switches shipped `On` (2026-11-27)
+
+**Acceptance on the real client with Claude Code (2.1.332, against production):** form answered → the model names choice and origin
+correctly ("chosen in a form according to Atelier, I did not see it"); form without an answer → clean `needs_input`, nothing decided by
+itself; skill from the real server: `skills/list` and `resources/read` work. **Not checked:** the claude.ai chat window and Claude
+Desktop.
+
+**Decision.** `appsettings.json` ships `Mcp:Skills` and `Mcp:Elicitation` `On` for good; the code default stays `Off` (as for the other
+switches). The tests still check bit-for-bit equality with `Off` explicitly set (hash baselines, switch tests, end to end with `Off`);
+the tests of the shipped state expect `On`, and the compatibility test for older clients now expects exactly the extension
+`io.modelcontextprotocol/skills`. The explanation page and the start page stay unchanged: they say nothing the forms would make wrong.
+**Rollback:** `Mcp__Skills=Off` or `Mcp__Elicitation=Off` through the environment, without a new image; after the first `On` the rollback
+image is a D-088 image (see above).

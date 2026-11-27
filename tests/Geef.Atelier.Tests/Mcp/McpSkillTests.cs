@@ -20,11 +20,11 @@ public sealed class McpSkillTests
     private static readonly string[] SkillFiles = ["SKILL.md", "references/files.md", "references/questions.md", "references/result.md"];
 
     [Fact]
-    public void The_switch_is_off_by_default_and_in_the_shipped_settings()
+    public void The_switch_is_off_in_the_code_and_on_in_the_shipped_settings()
     {
         Assert.Equal(McpSkillsMode.Off, new McpOptions().Skills);
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot(), "src", "Geef.Atelier.Web", "appsettings.json")));
-        Assert.Equal("Off", document.RootElement.GetProperty("Mcp").GetProperty("Skills").GetString());
+        Assert.Equal("On", document.RootElement.GetProperty("Mcp").GetProperty("Skills").GetString());
     }
 
     [Theory]
