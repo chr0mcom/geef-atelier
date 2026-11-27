@@ -689,37 +689,6 @@ public static class SystemCrew
         Settings: new Dictionary<string, string> { [MetadataEnrichSettings.KeyEnricherType] = MetadataEnrichSettings.ReadingLevel },
         IsSystem: true);
 
-    // ─ ExternalSink (2 profiles) ───────────────────────────────────────────────
-
-    public static readonly FinalizerProfile WebhookSinkProfile = new(
-        Name: "webhook-sink",
-        DisplayName: "Webhook Sink",
-        Description: "POSTs the final text as JSON to a configured webhook URL. Customize URL and optional auth header in settings.",
-        FinalizerType: FinalizerType.ExternalSink,
-        Settings: new Dictionary<string, string>
-        {
-            [WebhookSinkSettings.KeySinkKind] = WebhookSinkSettings.SinkKindValue,
-            [WebhookSinkSettings.KeyUrl] = "",
-            [WebhookSinkSettings.KeyContentType] = "application/json",
-            [WebhookSinkSettings.KeyTimeoutSeconds] = "30",
-        },
-        IsSystem: true);
-
-    public static readonly FinalizerProfile EmailSinkProfile = new(
-        Name: "email-sink",
-        DisplayName: "E-Mail Sink",
-        Description: "Sends the final text to a configured e-mail address via SMTP. SMTP credentials are resolved from environment variables at runtime.",
-        FinalizerType: FinalizerType.ExternalSink,
-        Settings: new Dictionary<string, string>
-        {
-            [EmailSinkSettings.KeySinkKind] = EmailSinkSettings.SinkKindValue,
-            [EmailSinkSettings.KeyToAddress] = "",
-            [EmailSinkSettings.KeySubject] = "Geef.Atelier — Run Result",
-            [EmailSinkSettings.KeyAttachAsFile] = "false",
-            [EmailSinkSettings.KeyAttachmentFormat] = "markdown",
-        },
-        IsSystem: true);
-
     // ─ Transform (6 profiles) ──────────────────────────────────────────────────
 
     public static readonly FinalizerProfile AntiAiVoiceProfile = new(
@@ -843,9 +812,6 @@ public static class SystemCrew
             [AddFrontMatterProfile.Name]      = AddFrontMatterProfile,
             [AddWordCountFooterProfile.Name]  = AddWordCountFooterProfile,
             [AddReadingLevelProfile.Name]     = AddReadingLevelProfile,
-            // ExternalSink
-            [WebhookSinkProfile.Name]         = WebhookSinkProfile,
-            [EmailSinkProfile.Name]           = EmailSinkProfile,
             // Transform
             [AntiAiVoiceProfile.Name]         = AntiAiVoiceProfile,
             [ToneFormalizationProfile.Name]   = ToneFormalizationProfile,

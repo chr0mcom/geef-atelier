@@ -26,6 +26,7 @@ internal sealed class CrewService(
     private const string ReadOnlyAdvisorMessage = "System advisor profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyGroundingMessage = "System grounding-provider profile is read-only — copy it as a custom variant.";
     private const string RetiredGroundingTypeMessage = "This kind of source was removed. Profiles of this kind can no longer be saved; tasks skip them.";
+    private const string RetiredFinalizerTypeMessage = "This kind of finishing step was removed. Profiles of this kind can no longer be saved; tasks skip them.";
     private const string ReadOnlyFinalizerMessage = "System finalizer profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyTemplateMessage = "System template is read-only — copy it as a custom variant.";
 
@@ -207,6 +208,12 @@ internal sealed class CrewService(
         return profile;
     }
 
+    private static void EnsureTypeNotRetired(FinalizerProfile profile)
+    {
+        if (profile.FinalizerType.IsRetired())
+            throw new InvalidOperationException(RetiredFinalizerTypeMessage);
+    }
+
     private static void EnsureTypeNotRetired(GroundingProviderProfile profile)
     {
         if (profile.ProviderType.IsRetiredGroundingType())
@@ -232,7 +239,7 @@ internal sealed class CrewService(
     public async Task<IReadOnlyList<FinalizerProfile>> ListFinalizerProfilesAsync(
         bool includeSystem = true, CancellationToken cancellationToken = default)
     {
-        var dbRows = await finalizerRepo.ListAsync(cancellationToken);
+        var dbRows = (await finalizerRepo.ListAsync(cancellationToken)).Where(p => !p.FinalizerType.IsRetired()).ToList();
         if (!includeSystem)
             return dbRows.Where(p => !p.IsSystem).ToList();
         var system = SystemCrew.FinalizerProfiles.Values.ToList();
@@ -255,6 +262,7 @@ internal sealed class CrewService(
         profile = profile.ForSave();
         if (SystemCrew.IsSystemFinalizerName(profile.Name))
             throw new InvalidOperationException(ReadOnlyFinalizerMessage);
+        EnsureTypeNotRetired(profile);
         var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
         var uniqueName = await UniqueNameAsync(baseName, n => finalizerRepo.GetByNameAsync(n, cancellationToken));
         var normalized = profile with { Name = uniqueName, IsSystem = false, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
@@ -268,6 +276,7 @@ internal sealed class CrewService(
         profile = profile.ForSave();
         if (SystemCrew.IsSystemFinalizerName(profile.Name))
             throw new InvalidOperationException(ReadOnlyFinalizerMessage);
+        EnsureTypeNotRetired(profile);
         var updated = profile with { UpdatedAt = DateTimeOffset.UtcNow };
         await finalizerRepo.UpdateAsync(updated, cancellationToken);
         return updated;

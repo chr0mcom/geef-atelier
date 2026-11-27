@@ -602,20 +602,12 @@ internal sealed class CrewSpecValidator(
         {
             issues.Add(new CrewSpecValidationIssue(
                 Field:      $"{path}.finalizer_type",
-                Message:    $"Unknown finalizer_type '{part.FinalizerType}'. Valid values: {string.Join(", ", Enum.GetNames<FinalizerType>())}.",
+                Message:    $"Unknown finalizer_type '{part.FinalizerType}'. Valid values: {string.Join(", ", FinalizerTypeExtensions.Usable)}.",
                 IsCritical: true));
             return;
         }
 
         var type = CrewPartSettingsPolicy.ParseFinalizerType(part.FinalizerType);
-        if (CrewPartSettingsPolicy.ReuseOnlyFinalizerTypes.Contains(type))
-        {
-            issues.Add(new CrewSpecValidationIssue(
-                Field:      $"{path}.finalizer_type",
-                Message:    $"Finalizer type '{type}' sends the result to an external target; reuse an existing sink profile instead of defining it inline.",
-                IsCritical: true));
-            return;
-        }
 
         var dropped = part.DroppedFinalizerKeys(type);
         if (dropped.Count > 0)

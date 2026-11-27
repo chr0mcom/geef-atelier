@@ -4,16 +4,31 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 namespace Geef.Atelier.Tests.Domain.Crew.Finalizers;
 
 /// <summary>
-/// Verifies SystemCrew exposes all 19 finalizer profiles as documented and
-/// that the FinalizerProfiles dictionary is coherent.
+/// Verifies SystemCrew exposes its finalizer profiles as documented and that the FinalizerProfiles dictionary is coherent.
+/// The two ExternalSink profiles were retired in stage 8c (D-089).
 /// </summary>
 public sealed class SystemCrewFinalizerConstantsTests
 {
     [Fact]
-    public void FinalizerProfiles_Contains19Entries()
+    public void FinalizerProfiles_Contains18Entries()
     {
-        // 19 original + 1 auto-crew (crew-materializer)
-        Assert.Equal(20, SystemCrew.FinalizerProfiles.Count);
+        Assert.Equal(18, SystemCrew.FinalizerProfiles.Count);
+    }
+
+    [Theory]
+    [InlineData("webhook-sink")]
+    [InlineData("email-sink")]
+    public void The_retired_sink_profiles_are_gone(string name)
+    {
+        Assert.False(SystemCrew.FinalizerProfiles.ContainsKey(name));
+    }
+
+    [Fact]
+    public void Only_ExternalSink_is_retired_and_no_system_profile_uses_it()
+    {
+        Assert.Equal([(FinalizerType)2], Enum.GetValues<FinalizerType>().Where(t => t.IsRetired()));
+        Assert.DoesNotContain((FinalizerType)2, FinalizerTypeExtensions.Usable);
+        Assert.DoesNotContain(SystemCrew.FinalizerProfiles.Values, p => p.FinalizerType.IsRetired());
     }
 
     [Theory]
@@ -26,8 +41,6 @@ public sealed class SystemCrewFinalizerConstantsTests
     [InlineData("add-front-matter",    FinalizerType.MetadataEnrich)]
     [InlineData("add-word-count-footer", FinalizerType.MetadataEnrich)]
     [InlineData("add-reading-level",   FinalizerType.MetadataEnrich)]
-    [InlineData("webhook-sink",        FinalizerType.ExternalSink)]
-    [InlineData("email-sink",          FinalizerType.ExternalSink)]
     [InlineData("anti-ai-voice",       FinalizerType.Transform)]
     [InlineData("tone-formalization",  FinalizerType.Transform)]
     [InlineData("tone-casual",         FinalizerType.Transform)]

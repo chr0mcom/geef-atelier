@@ -23,9 +23,6 @@ internal static class CrewPartSettingsPolicy
     public static readonly IReadOnlySet<string> DroppedInlineGroundingTypes =
         new HashSet<string>(["url-fetch"], StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Finalizer types that send the run result to an external target and are never accepted inline.</summary>
-    public static readonly IReadOnlySet<FinalizerType> ReuseOnlyFinalizerTypes = new HashSet<FinalizerType> { FinalizerType.ExternalSink };
-
     /// <summary>Parses a composer finalizer type by name; unknown or numeric values become <see cref="FinalizerType.FileExport"/>.</summary>
     public static FinalizerType ParseFinalizerType(string? raw) =>
         TryParseFinalizerType(raw, out var type) ? type : FinalizerType.FileExport;
@@ -37,7 +34,6 @@ internal static class CrewPartSettingsPolicy
         {
             "fileexport" => FinalizerType.FileExport,
             "metadataenrich" => FinalizerType.MetadataEnrich,
-            "externalsink" => FinalizerType.ExternalSink,
             "transform" => FinalizerType.Transform,
             "learningextract" => FinalizerType.LearningExtract,
             "learningpublish" => FinalizerType.LearningPublish,

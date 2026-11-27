@@ -46,7 +46,7 @@ internal static class ComposerModelCatalog
         sb.AppendLine("**Transform finalizers:** `TransformRewrite` for voice/tone rewrites, `TransformCondense` for summaries, takeaways and glossaries.");
         sb.AppendLine("**Grounding refinement:** to filter grounding results with an LLM, set `settings: { \"refinementMode\": \"0\" }` on an inline grounding provider — the refiner model is assigned automatically.");
         sb.AppendLine("**Reuse rule:** use `reuse: \"learning-extractor\"` for the output finalizer; reuse existing reviewers/advisors/grounding only when they truly fit — reused profiles keep their own role.");
-        sb.AppendLine("**Reuse-only types:** `url-fetch` grounding providers and `ExternalSink` finalizers need operator-configured targets — never define them inline, only reuse existing profiles.");
+        sb.AppendLine("**Reuse-only types:** `url-fetch` grounding providers need operator-configured targets — never define them inline, only reuse existing profiles.");
 
         var types = groundingProviderTypes.OrderBy(t => t, StringComparer.Ordinal).ToList();
         if (types.Count > 0)

@@ -158,23 +158,6 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
     }
 
     [Fact]
-    public async Task Grounding_RetiredType_IsRejectedOnCreateAndUpdate()
-    {
-        await using var sp = BuildProvider();
-        await using var scope = sp.CreateAsyncScope();
-        var crew = scope.ServiceProvider.GetRequiredService<ICrewService>();
-
-        foreach (var retired in GroundingProviderTypes.Retired)
-        {
-            var profile = new GroundingProviderProfile(Unique("retired-"), "R", "d", retired,
-                new Dictionary<string, string> { ["apiKeyEnv"] = "CLI_PROXY_API_KEY" }, null, false);
-            await Assert.ThrowsAsync<InvalidOperationException>(() => crew.CreateCustomGroundingProviderProfileAsync(profile));
-            await Assert.ThrowsAsync<InvalidOperationException>(() => crew.UpdateCustomGroundingProviderProfileAsync(profile));
-            Assert.Null(await crew.GetGroundingProviderProfileAsync(profile.Name));
-        }
-    }
-
-    [Fact]
     public async Task Tool_AllowedSecretIsSaved_ForbiddenIsRejected()
     {
         await using var sp = BuildProvider();

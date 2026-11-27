@@ -103,7 +103,7 @@ public sealed class RunOrchestratorFinalizerCancellationTests(PostgresFixture fi
         var runId = await CreateRunAsync(finalizers:
         [
             new FinalizerProfile("rewrite", "Rewrite", "d", FinalizerType.Transform, [], false),
-            new FinalizerProfile("deliver", "Deliver", "d", FinalizerType.ExternalSink, [], false),
+            new FinalizerProfile("deliver", "Deliver", "d", FinalizerType.FileExport, [], false),
         ]);
         await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient(), FastOptions(),
             services => services.AddSingleton<IFinalizerExecutorFactory>(finalizers));

@@ -48,28 +48,6 @@ public sealed class SettingsRecordTests
     }
 
     [Fact]
-    public void WebhookSinkSettings_RoundTrip()
-    {
-        var original = new WebhookSinkSettings("https://hook.example.com", "Bearer token123", "application/json", 15);
-        var dict = original.ToDict();
-        var restored = WebhookSinkSettings.From(dict);
-
-        Assert.Equal(original.Url, restored.Url);
-        Assert.Equal(original.AuthHeader, restored.AuthHeader);
-        Assert.Equal(original.ContentType, restored.ContentType);
-        Assert.Equal(original.TimeoutSeconds, restored.TimeoutSeconds);
-    }
-
-    [Fact]
-    public void WebhookSinkSettings_NullAuthHeader_OmittedFromDict()
-    {
-        var original = new WebhookSinkSettings("https://hook.example.com", null, "application/json", 30);
-        var dict = original.ToDict();
-
-        Assert.False(dict.ContainsKey(WebhookSinkSettings.KeyAuthHeader));
-    }
-
-    [Fact]
     public void TransformSettings_RoundTrip()
     {
         var original = new TransformSettings("You are a professional editor.", "codex-cli", "gpt-5.5", 2048);
@@ -97,7 +75,7 @@ public sealed class SettingsRecordTests
     {
         Assert.Equal(0, (int)FinalizerType.FileExport);
         Assert.Equal(1, (int)FinalizerType.MetadataEnrich);
-        Assert.Equal(2, (int)FinalizerType.ExternalSink);
+        Assert.Equal("ExternalSink", ((FinalizerType)2).ToString());
         Assert.Equal(3, (int)FinalizerType.Transform);
     }
 }

@@ -89,7 +89,7 @@ public sealed class Step22FinalizersMigrationTests : IAsyncLifetime
 
         Assert.Equal(6, profiles.Count(p => p.FinalizerType == FinalizerType.FileExport));
         Assert.Equal(3, profiles.Count(p => p.FinalizerType == FinalizerType.MetadataEnrich));
-        Assert.Equal(2, profiles.Count(p => p.FinalizerType == FinalizerType.ExternalSink));
+        Assert.Equal(2, profiles.Count(p => p.FinalizerType.IsRetired()));
         Assert.Equal(6, profiles.Count(p => p.FinalizerType == FinalizerType.Transform));
     }
 }
