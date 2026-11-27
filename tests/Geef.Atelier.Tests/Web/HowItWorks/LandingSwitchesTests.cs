@@ -17,7 +17,7 @@ namespace Geef.Atelier.Tests.Web.HowItWorks;
 public sealed class LandingSwitchesTests : TestContext
 {
     [Fact]
-    public void As_shipped_it_offers_questions_and_changing_and_says_research_is_off_and_the_fact_check_changes_nothing()
+    public void As_shipped_it_offers_questions_changing_and_looking_things_up_and_says_the_fact_check_changes_nothing()
     {
         this.AddTestAuthorization().SetNotAuthorized();
         UseShippedSettings(Services);
@@ -29,9 +29,10 @@ public sealed class LandingSwitchesTests : TestContext
         Assert.Single(cut.FindAll("[data-testid='landing-step-questions']"));
         Assert.Single(cut.FindAll("[data-testid='landing-example-question']"));
         Assert.Contains(RevisionLines.ChangeButton, cut.Find("[data-testid='landing-step-change']").TextContent, StringComparison.Ordinal);
-        Assert.Empty(cut.FindAll("[data-testid='landing-step-research']"));
-        Assert.StartsWith("Right now it does not look things up on the web", cut.Find("[data-testid='landing-limit-web']").TextContent, StringComparison.Ordinal);
-        Assert.StartsWith("Right now nothing goes to a web search", cut.Find("[data-testid='landing-privacy-research']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("never does this when you add files", cut.Find("[data-testid='landing-step-research']").TextContent, StringComparison.Ordinal);
+        Assert.StartsWith("It looks things up on the web only for gaps", cut.Find("[data-testid='landing-limit-web']").TextContent, StringComparison.Ordinal);
+        Assert.StartsWith("To look things up, a web search service gets a few short search words", cut.Find("[data-testid='landing-privacy-research']").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("Right now nothing goes to a web search", text, StringComparison.Ordinal);
         Assert.Contains("It does not change the text.", cut.Find("[data-testid='landing-step-factcheck']").TextContent, StringComparison.Ordinal);
         Assert.Contains(OrderCheckLines.FactsComparedLeadNoFiles + OrderCheckLines.FactsOpenOne, cut.Find("[data-testid='landing-example-checks']").TextContent, StringComparison.Ordinal);
         Assert.Contains(OrderCheckLines.Limits, cut.Find("[data-testid='landing-example-checks']").TextContent, StringComparison.Ordinal);
@@ -83,8 +84,27 @@ public sealed class LandingSwitchesTests : TestContext
         var cut = RenderComponent<Landing>();
 
         Assert.Contains("never does this when you add files", cut.Find("[data-testid='landing-step-research']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("shows which search words were sent", cut.Find("[data-testid='landing-step-research']").TextContent, StringComparison.Ordinal);
         Assert.StartsWith("It looks things up on the web only for gaps", cut.Find("[data-testid='landing-limit-web']").TextContent, StringComparison.Ordinal);
-        Assert.Contains("Your files never go into a web search.", cut.Find("[data-testid='landing-privacy-research']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("A page it finds can be wrong", cut.Find("[data-testid='landing-limit-web']").TextContent, StringComparison.Ordinal);
+        var privacy = cut.Find("[data-testid='landing-privacy-research']").TextContent;
+        Assert.Contains("only when you add no files", privacy, StringComparison.Ordinal);
+        Assert.Contains(OrderResearchLines.SearchPrivacy, privacy, StringComparison.Ordinal);
+        Assert.DoesNotContain("private details", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void With_research_switched_off_again_it_says_nothing_goes_to_a_web_search()
+    {
+        this.AddTestAuthorization().SetNotAuthorized();
+        UseShippedSettings(Services);
+        Services.Configure<ResearchOptions>(o => o.Mode = ResearchMode.Off);
+
+        var cut = RenderComponent<Landing>();
+
+        Assert.Empty(cut.FindAll("[data-testid='landing-step-research']"));
+        Assert.StartsWith("Right now it does not look things up on the web", cut.Find("[data-testid='landing-limit-web']").TextContent, StringComparison.Ordinal);
+        Assert.StartsWith("Right now nothing goes to a web search", cut.Find("[data-testid='landing-privacy-research']").TextContent, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -313,6 +313,73 @@ public sealed class OrderIntakeServiceTests
     }
 
     [Fact]
+    public async Task Research_topics_with_words_of_the_about_me_details_the_clarifier_read_are_left_out_and_counted()
+    {
+        var profile = new Geef.Atelier.Core.Domain.Profiles.UserProfileEntity
+        {
+            Username = "intake-user", Organization = "Kranichsteiner GmbH", CreatedAt = Now, UpdatedAt = Now,
+        };
+        var memory = new ProfileMemoryResolution(new SingleProfile(profile));
+        var service = new OrderIntakeService(_orders, _sources, _shadows, memory, _clarifier, _starter, _notifier, Options.Create(_options),
+            NullLogger<OrderIntakeService>.Instance, _time, _deferrals);
+        var order = _orders.Add("Schreib einen Aushang zum neuen Mindestlohn, etwa 150 Wörter.");
+        _clarifier.Enqueue(OutputWith() with { ResearchTopics = ["Kranichsteiner Mindestlohn Tarif", "Mindestlohn 2027 Höhe"] });
+
+        await service.ProcessAsync(order.Id, CancellationToken.None);
+
+        var record = Assert.Single(_starter.Requests).Record!;
+        Assert.Equal(["Mindestlohn 2027 Höhe"], record.ResearchTopics);
+        Assert.Equal(1, record.ResearchWithheld);
+        Assert.Equal(1, IntakeRecordJson.TryParse(IntakeRecordJson.Serialize(record))!.ResearchWithheld);
+    }
+
+    [Theory]
+    [InlineData(ResearchMode.On, OrderMode.Direct, true)]
+    [InlineData(ResearchMode.Off, OrderMode.Direct, false)]
+    [InlineData(ResearchMode.On, OrderMode.Careful, false)]
+    public async Task The_record_says_whether_research_was_switched_on_for_the_person_when_the_request_was_read(ResearchMode mode, OrderMode orderMode, bool allowed)
+    {
+        var service = new OrderIntakeService(_orders, _sources, _shadows, _memory, _clarifier, _starter, _notifier, Options.Create(_options),
+            NullLogger<OrderIntakeService>.Instance, _time, _deferrals, Options.Create(new ResearchOptions { Mode = mode }));
+        var order = _orders.Add("Schreib einen Aushang zum neuen Mindestlohn, etwa 150 Wörter.", mode: orderMode);
+        _clarifier.Enqueue(OutputWith() with { ResearchTopics = ["Mindestlohn 2027 Höhe"] });
+
+        await service.ProcessAsync(order.Id, CancellationToken.None);
+
+        var record = Assert.Single(_starter.Requests).Record!;
+        Assert.Equal(allowed ? true : null, record.ResearchAllowed);
+        Assert.Equal(allowed ? true : null, IntakeRecordJson.TryParse(IntakeRecordJson.Serialize(record))!.ResearchAllowed);
+    }
+
+    [Fact]
+    public async Task An_exception_per_person_at_the_time_of_reading_decides_the_record()
+    {
+        var research = new ResearchOptions { Mode = ResearchMode.On, ModeOverrides = new(StringComparer.OrdinalIgnoreCase) { ["intake-user"] = ResearchMode.Off } };
+        var service = new OrderIntakeService(_orders, _sources, _shadows, _memory, _clarifier, _starter, _notifier, Options.Create(_options),
+            NullLogger<OrderIntakeService>.Instance, _time, _deferrals, Options.Create(research));
+        var order = _orders.Add("Schreib einen Aushang zum neuen Mindestlohn, etwa 150 Wörter.");
+        _clarifier.Enqueue(OutputWith() with { ResearchTopics = ["Mindestlohn 2027 Höhe"] });
+
+        await service.ProcessAsync(order.Id, CancellationToken.None);
+
+        Assert.Null(Assert.Single(_starter.Requests).Record!.ResearchAllowed);
+    }
+
+    [Fact]
+    public async Task Without_about_me_details_the_research_topics_stay_as_the_gate_left_them()
+    {
+        var order = _orders.Add("Schreib einen Aushang zum neuen Mindestlohn, etwa 150 Wörter.");
+        _clarifier.Enqueue(OutputWith() with { ResearchTopics = ["Kranichsteiner Mindestlohn Tarif", "Mindestlohn 2027 Höhe"] });
+
+        await Service().ProcessAsync(order.Id, CancellationToken.None);
+
+        var record = Assert.Single(_starter.Requests).Record!;
+        Assert.Equal(["Kranichsteiner Mindestlohn Tarif", "Mindestlohn 2027 Höhe"], record.ResearchTopics);
+        Assert.Null(record.ResearchWithheld);
+        Assert.DoesNotContain("researchWithheld", IntakeRecordJson.Serialize(record), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_stuck_order_that_keeps_failing_neither_blocks_the_younger_ones_nor_fills_the_batch()
     {
         var broken = _orders.Add("A");

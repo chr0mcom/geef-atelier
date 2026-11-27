@@ -167,6 +167,10 @@
                 <p class="order-note" data-testid="order-note">@result.Note</p>
             }
         }
+        else if (_result is { Text: null, LookedUp.SearchWords.Count: > 0 } withoutText)
+        {
+            <OrderLookedUp LookedUp="withoutText.LookedUp" />
+        }
 
         @if (_result is { Text: not null, Version: int shownWarningsVersion, LatestVersion: int newWarningsVersion } && shownWarningsVersion < newWarningsVersion)
         {
@@ -415,7 +419,8 @@
         try
         {
             var view = await Orders.GetAsync(OrderId, _requestingUser);
-            var result = view is not null && (view.Display.HasText || view.Runs.Count(r => r.Kind == RunKind.Standard && r.Version is not null) > 1)
+            var result = view is not null && (view.Display.HasText || view.Display.State is OrderDisplayState.Failed or OrderDisplayState.Stopped
+                    || view.Runs.Count(r => r.Kind == RunKind.Standard && r.Version is not null) > 1)
                 ? await Orders.GetResultAsync(OrderId, _requestingUser, _viewer)
                 : null;
             _view = view;

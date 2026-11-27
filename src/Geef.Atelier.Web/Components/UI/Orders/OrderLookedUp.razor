@@ -33,6 +33,18 @@
         {
             <p class="order-looked-up-note" data-testid="order-looked-up-note">@lookedUp.Note</p>
         }
+        @if (lookedUp.SearchWords is { Count: > 0 } words)
+        {
+            <div class="order-looked-up-words" data-testid="order-looked-up-words">
+                <p class="order-looked-up-subline">@OrderResearchLines.SearchWordsLead</p>
+                <ul>
+                    @foreach (var word in words)
+                    {
+                        <li><q data-testid="order-looked-up-word">@word</q></li>
+                    }
+                </ul>
+            </div>
+        }
     </section>
 }
 

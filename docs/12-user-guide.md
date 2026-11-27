@@ -2,7 +2,7 @@
 
 *[Deutsch](12-user-guide_de.md) · **English***
 
-*Last updated: 2026-11-26 (Tell Atelier once, D-083; before that after review: web search only on the standard way, storage, wording)*
+*Last updated: 2026-11-27 (Tell Atelier once with its promise, addendum to D-083; looking things up on the web switched on for everyone, addendum to D-074; before that Tell Atelier once, D-083; before that after review: web search only on the standard way, storage, wording)*
 
 This guide is for everyone who uses Atelier in the web browser. You need no technical knowledge. The page **How it works**
 (`/how-it-works`, also open without signing in) shows the same in short, with the features that are switched on for you right
@@ -71,6 +71,7 @@ The page of your request shows, from top to bottom:
 | **What was checked** | Only the checks that really ran (see below). Always ends with: "These checks look for the problems named here. They do not prove that everything in the text is right." |
 | **Open points** | "Fill these in before you send the text" (the gaps), checks that were not met, passages that may not be backed by what you gave, problems found in your files. |
 | **Assumptions** | What you did not say and what was assumed. |
+| **Looked up** | Only when Atelier looked something up on the web for this request: the search words that were sent (only you see them), and passages copied word for word from the pages, with the page and the day. They show what the pages say, not that it is true. If nothing could be looked up, one sentence says why (for example, the daily limit was reached). |
 | **From your files** | Which files were used and how. |
 | **How it was made** | Your request, the steps and the versions. |
 
@@ -103,7 +104,8 @@ Only you can change it.
 **Tell Atelier once.** When a text had to guess or leave open your name, how you sign off, how readers are addressed or your
 language, and About me has nothing on it yet, the result shows a field for it with **Save**. What you save there goes into About me;
 if that field was filled under About me in the meantime, nothing is overwritten and the result says “Already saved under About me”.
-Atelier uses it for your next requests: the writer gets it with every new request. The text you are looking at keeps the details it was written with, and so does every change you ask for to it with
+From your next request on, Atelier takes it from About me instead of guessing or asking, and the writer gets it with every new
+request (hence the heading “Tell Atelier once – your next requests get it from About me”). The text you are looking at keeps the details it was written with, and so does every change you ask for to it with
 “Change something” – also a detail you have deleted under About me since then. To have the new value in this text, write it into
 your change. The result also says what the writer got from About me with that request (“With this request the writer got from
 About me: …”). You change or delete it under About me; that counts for your next requests. Whether the writer really uses it, for
@@ -113,10 +115,14 @@ example your sign-off word for word, depends on the text: check the result as al
 
 - Your request, your answers, your About me details and your files go to the AI services this Atelier uses to write and check the
   text.
-- Looking things up on the web, when it is switched on, happens only on the standard way and only when you add no files. The
-  search gets only short topics taken from your request; topics with words from your About me details are held back (this compares
-  words, so it can miss a word in another language). "Extra careful" never searches the web. Teams that administrators set up
-  in the workshop can have their own web search.
+- Atelier may look things up on the web, but only on the standard way and only when you add no files. Then a web search service
+  gets a few short search words taken from your request. Atelier tries to leave out email addresses, phone numbers, account numbers and street addresses that it recognizes. It does
+  not recognize every form, and names or other personal details in your request can end up in the search words. Your answers and
+  files are never sent. Words from your About me details are held back unless you also wrote them in your request, but a
+  translated or reworded detail can slip through. The result shows which search words were sent. A change of a finished
+  text uses what was looked up the first time and does not search again. There is a daily limit; once it is reached, the text is
+  written without looking things up, and the result says so. "Extra careful" never searches the web. Teams that administrators
+  set up in the workshop can have their own web search.
 - Only you and the administrators of this Atelier can see your requests.
 - Atelier keeps your request, your text and what it read from your files until you delete the request under My work. Deleting it
   also deletes the files that no other request uses. The original file is removed about 30 days after the last request that used it

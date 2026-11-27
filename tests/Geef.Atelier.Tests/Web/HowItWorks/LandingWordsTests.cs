@@ -59,7 +59,7 @@ public sealed class LandingWordsTests : TestContext
         Assert.Contains("It can still be wrong.", text, StringComparison.Ordinal);
     }
 
-    public static TheoryData<string> SwitchStates => new() { "shipped", "all-off", "research-on", "fact-check-on", "signed-in-exception", "workshop-open" };
+    public static TheoryData<string> SwitchStates => new() { "shipped", "all-off", "research-off", "fact-check-on", "signed-in-exception", "workshop-open" };
 
     [Theory]
     [MemberData(nameof(SwitchStates))]
@@ -75,15 +75,15 @@ public sealed class LandingWordsTests : TestContext
                 Services.Configure<DirectOptions>(o => o.FactCheckMode = FactCheckMode.Off);
                 Services.Configure<LearningOptions>(o => o.Enabled = true);
                 break;
-            case "research-on":
-                Services.Configure<ResearchOptions>(o => o.Mode = ResearchMode.On);
+            case "research-off":
+                Services.Configure<ResearchOptions>(o => o.Mode = ResearchMode.Off);
                 break;
             case "fact-check-on":
                 Services.Configure<DirectOptions>(o => o.FactCheckMode = FactCheckMode.On);
                 break;
             case "signed-in-exception":
                 Services.Configure<OrderOptions>(o => { o.Revise = ReviseMode.Off; o.ReviseOverrides["tester"] = ReviseMode.On; });
-                Services.Configure<ResearchOptions>(o => o.ModeOverrides["tester"] = ResearchMode.On);
+                Services.Configure<ResearchOptions>(o => o.ModeOverrides["tester"] = ResearchMode.Off);
                 auth.SetAuthorized("tester");
                 break;
             case "workshop-open":

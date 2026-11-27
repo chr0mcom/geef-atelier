@@ -2466,6 +2466,54 @@ eine neue, größere Auftragsmenge, bei der der Klärer verlässlich Suchthemen 
 ungedeckt; der Klärer bot einmal geratene Daten als Antworten an, obwohl sein Prompt das verbietet; Zitate zeigen
 Formatzeichen der Quellseite.
 
+### Zusatz zu D-074 — Messtor R3′ bestanden, Recherche für alle eingeschaltet (2026-11-27)
+
+**Messung R3′ (Restplan, Paket 2):** neue, frei erfundene Aufträge ohne Dateien, geschrieben ohne Kenntnis des Tors; erst der
+Arm mit Recherche, dann für dieselben Aufträge der Arm ohne, beide ohne Faktenprüfung. Kriterien, Schwelle T (Rauschen des
+Jurors aus den gespeicherten R3-Daten) und Auswertung standen vor dem ersten Aufruf fest; „gedeckt“ entschied für Angaben mit
+Ziffern der Code, für den Rest ein zweiter blinder Leser mit Kontrollfällen, keine Handentscheidung. **Ergebnis: bestanden,
+alle drei Kriterien.** Texte mit Recherche gewannen deutlich öfter (a), ließen weniger nachschlagbare Lücken offen (c) und
+enthielten je Text nicht mehr, sondern weniger Angaben ohne Beleg (b′) – auch ohne die Toleranz T.
+
+**Folge:** `Research:Mode = On` in `appsettings.json` (Code-Standard bleibt `Off`), eigener Commit; Tagesgrenzen unverändert
+(`Research:DailyOrderCap`, `Research:DailyOrderCapPerUser`). Ist eine Grenze erreicht, wird der Text ohne Nachschlagen
+geschrieben, und das Ergebnis sagt es; der Auftrag scheitert nicht.
+
+**Vor dem Einschalten am Code nachgeprüft (für jedes Konto):** keine Suche mit angehängten Dateien; keine bei „Extra careful“
+(D-079; jetzt zusätzlich im Recherchedienst selbst gesperrt, nicht nur durch die Wahl des Ablaufs); an den Suchdienst gehen nur
+die kurzen Suchthemen des Klärers (höchstens fünf, je höchstens 120 Zeichen, höchstens vier Suchen), nie Antworten, Dateiinhalte
+oder bei einem Fehlschlag der Auftragstext, ein Wort aus About me nur, wenn es auch im Auftrag steht; gesucht wird nur, wenn die Rückfragen-Stufe lief
+(ohne geklärten Datensatz keine Themen); eine Änderung („Change something“) sucht nicht neu, sie nutzt die gespeicherte
+Recherche der ersten Version. **Gefundene Lücke, behoben:** Die Suchthemen wurden nur gegen die About-me-Angaben zum Start des
+Laufs geprüft. Wer zwischen Rückfrage und Start eine Angabe änderte oder löschte, deren Wort der Klärer in ein Thema übernommen
+hatte, hätte dieses Wort gesendet. Jetzt prüft schon das Lesen gegen die Angaben, die der Klärer sah; zurückgehaltene Themen
+zählen weiter als zurückgehalten. Damit gilt der Satz „es gilt das Profil des Briefings“ oben nur noch zusätzlich.
+
+**Nachbesserung nach der Datenschutz-Prüfung (vor dem Einschalten):** Eine unabhängige Prüfung zeigte, dass Namen, Anschriften,
+Telefon- und Kontonummern, Geburtsdaten und Gesundheitsangaben aus dem Auftrag ungefiltert in ein Suchthema gelangen konnten und ein
+Ergebnissatz das Gegenteil behauptete („… so that no private details could reach a search engine.“). Folgen: (1) Ein Code-Filter
+ohne Modell versucht, Suchthemen mit Mailadresse, Telefonnummer (auch mit Klammern, Punkten oder Gedankenstrich), IBAN, langer oder
+als Konto-, Kunden- oder Vertragsnummer bezeichneter Ziffernfolge, Geburtsdatum (nur mit einem Wort für Geburt), Straße mit
+Hausnummer (auch „Hauptstr 7“, „Nr. 7“, „Am Markt 3“) oder Postleitzahl mit Ort zurückzuhalten, auch wenn der Auftrag sie nennt; er
+erkennt nicht jede Schreibweise; Jahreszahlen, Zeiträume, Paragraphen, Beträge und Normnummern gehen
+weiter durch, ebenso Rangplätze, Dauern („Kitaplatz 3 Jahre“), Listen von Jahren und historische Daten. Klärer-Prompt und
+-Schema unverändert. (2) Die Texte sagen jetzt, dass die Suchwörter aus dem Auftrag stammen und
+Namen oder andere persönliche Angaben darin landen können; die Sätze zu zurückgehaltenen Wörtern nennen Ursachen nur als Beispiele.
+(3) Das Ergebnis zeigt der Person, der der Auftrag gehört, welche Suchwörter gesendet wurden (Web und MCP `lookedUp.searchWords`),
+auch ohne Text und wenn die gezeigte Fassung die Stellen nicht nutzte, nie anderen, auch nicht der Administration. Alle Seiten
+nutzen denselben Satz: Atelier versucht wegzulassen, was es erkennt, erkennt nicht jede Schreibweise, Namen und andere Angaben aus
+dem Auftrag können in den Suchwörtern landen, Antworten und Dateien nie, About-me-Wörter nur, wenn sie auch im Auftrag stehen (eine
+übersetzte oder umformulierte Angabe kann durchrutschen). (4) Gesucht wird nur, wenn beim Lesen des Auftrags die Recherche für die Person an war
+und das im Datensatz steht (`IntakeRecord.ResearchAllowed`): Aufträge, die vor dem Einschalten gelesen wurden und noch warten,
+suchen nie, auch nicht beim Fortsetzen. (5) Fremde Seiten: Stellen mit Steuer- oder Richtungszeichen werden verworfen, Seitentitel
+gekürzt, Antworten des Suchdienstes über 4 MiB nicht gelesen. **Grenzen, bewusst:** Namen, Gesundheitsangaben und andere Angaben in
+Worten erkennt der Filter nicht; eine Mailadresse mit Leerzeichen statt Zeichen („name beispiel example org“) ebenfalls nicht.
+
+**Rückweg:** `Research__Mode=Off` (Umgebungsvariable, Neustart von `web`, kein neues Image). Ausnahmen je Konto bleiben über
+`Research__ModeOverrides__<konto>` möglich. Ohne Suchschlüssel geht nichts an einen Suchdienst; wer Atelier selbst betreibt und
+keinen Schlüssel setzt, schaltet `Research:Mode` aus, sonst meldet jedes recherchierbare Ergebnis, dass das Nachschlagen nicht
+geklappt hat.
+
 ## D-075 — Etappe 5, Teil A: Befunde aus echten Läufen (2026-11-25)
 
 **Status:** Von vier vorgesehenen Änderungen wird **eine** ausgeliefert: (c). (a), (b) und (d) wurden gebaut, gemessen und
@@ -3413,6 +3461,16 @@ Stilvorlagen (kein Fall), „Remember this?“, die Übernahme der früheren Ler
 Annahme und keine Lücke zum Thema, und die gespeicherte Unterschrift steht wörtlich im Text. Testkonto B sieht nichts von A. Bestanden →
 `Orders:TellOnce = On`. Verfehlt der Schreiber das trotz Profil: eine Reparatur am Profilblock, ein Auftrag neu, höchstens zwei Runden;
 danach bleibt `WithoutPromise`.
+
+**Zusatz (2026-11-27): Abnahme bestanden.** Gemessen mit zwei Testkonten und frei erfundenen Aufträgen derselben Textsorte, ohne
+Faktenprüfung: Nach dem Speichern hatte der zweite Auftrag von Konto A keine Lücke und keine Rückfrage zum gespeicherten Thema, die
+gespeicherte Unterschrift stand wörtlich im Text, und Konto B sah nichts von Konto A (Profil leer, keine fremden Aufträge, fremdes
+Ergebnis abgewiesen). **Folge:** `Orders:TellOnce = On` in `appsettings.json` (Code-Standard bleibt `WithoutPromise`), eigener
+Commit. Die Überschrift ist enger gefasst: „Tell Atelier once – your next requests get it from About me“ statt „… it will not leave
+this open again“, weil der Code nur zusichert, dass jeder neue Auftrag die Angabe bekommt (und ein zuerst gelesener Auftrag sie nicht
+mehr annimmt oder erfragt; Aufträge, die das Lesen überspringen, werden nicht gelesen); der gezeigte Text und jede Änderung daran behalten
+die Angaben, mit denen er entstand. Erklärseite und Handbuch sagen es ebenso. **Rückweg:** `Orders__TellOnce=WithoutPromise`
+(Angebot ohne Zusage) oder `Orders__TellOnce=Off`.
 
 ## D-084 — Startseite sagt, was Atelier für alle tut (2026-11-26)
 

@@ -75,6 +75,18 @@ public sealed class GetOrderResultLookedUpTests
         Assert.Contains(OrderDtoMappings.LookedUpNote, dto.Note!, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task The_search_words_reach_the_client_and_are_null_when_none_are_listed()
+    {
+        var with = await GetAsync(new OrderLookedUpView(ResearchStatus.NothingFound, OrderResearchLines.NothingFound, 0, [], ["Mindestlohn 2027 Höhe"]));
+        var without = await GetAsync(new OrderLookedUpView(ResearchStatus.NothingFound, OrderResearchLines.NothingFound, 0, []));
+
+        Assert.Equal(["Mindestlohn 2027 Höhe"], with.LookedUp!.SearchWords);
+        Assert.Null(without.LookedUp!.SearchWords);
+        Assert.Contains(OrderDtoMappings.SearchWordsNote, with.Note!, StringComparison.Ordinal);
+        Assert.DoesNotContain(OrderDtoMappings.SearchWordsNote, without.Note ?? string.Empty, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("javascript:alert(1)")]
     [InlineData("file:///etc/passwd")]
@@ -122,7 +134,7 @@ public sealed class GetOrderResultLookedUpTests
 
         Assert.Equal(["lookedUp", "latestVersion", "earlierOpenPoints", "assumptionsVersion", "lengthNotice", "unansweredQuestions", "fromAboutMe", "aboutMeMissing"], root.EnumerateObject().Select(p => p.Name).SkipWhile(n => n != "lookedUp"));
         var lookedUp = root.GetProperty("lookedUp");
-        Assert.Equal(["status", "note", "withheld", "entries"], lookedUp.EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["status", "note", "withheld", "entries", "searchWords"], lookedUp.EnumerateObject().Select(p => p.Name));
         Assert.Equal(["quote", "url", "title", "retrievedAt"], lookedUp.GetProperty("entries")[0].EnumerateObject().Select(p => p.Name));
         Assert.Equal("found", lookedUp.GetProperty("status").GetString());
     }

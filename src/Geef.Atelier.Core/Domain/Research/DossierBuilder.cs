@@ -107,7 +107,7 @@ public static class DossierBuilder
 
         if (excerpt.WordCount() < MinWords)
             return ResearchDropReason.TooShort;
-        if (IntakeContentGuard.IsUnsafe(excerpt, requestText))
+        if (excerpt.HasHiddenControls() || IntakeContentGuard.IsUnsafe(excerpt, requestText))
             return ResearchDropReason.Unsafe;
         var candidate = excerpt;
         if (entries.Any(e => QuoteVerifier.ContainsWholeWords(e.Entry.Quote, candidate)))

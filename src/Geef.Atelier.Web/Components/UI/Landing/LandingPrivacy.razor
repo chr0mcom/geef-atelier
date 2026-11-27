@@ -1,3 +1,4 @@
+@using Geef.Atelier.Application.Orders
 <section class="lp-section lp-privacy" id="privacy" aria-labelledby="lp-privacy-title" data-testid="landing-privacy">
     <div class="lp-container lp-privacy-grid">
         <div>
@@ -9,7 +10,7 @@
                 <li>Your request, your answers, your About me details and your files go to the AI services this Atelier uses to write and check the text.</li>
                 @if (Features.WebResearch)
                 {
-                    <li data-testid="landing-privacy-research">A web search gets only short topics taken from your request, and only when you add no files; topics with words from your About me details are held back (this compares words, so it can miss one). Your files never go into a web search.</li>
+                    <li data-testid="landing-privacy-research">To look things up, a web search service gets a few short search words, and only when you add no files. They are taken from your request. @OrderResearchLines.SearchPrivacy</li>
                 }
                 else
                 {

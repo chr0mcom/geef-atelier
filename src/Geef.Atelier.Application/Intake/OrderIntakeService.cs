@@ -3,6 +3,7 @@ using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Profiles;
+using Geef.Atelier.Core.Domain.Research;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Core.Persistence.Intake;
@@ -30,7 +31,8 @@ internal sealed class OrderIntakeService(
     IOptions<IntakeOptions> options,
     ILogger<OrderIntakeService> logger,
     TimeProvider time,
-    IntakeSweepDeferrals deferrals) : IOrderIntakeService
+    IntakeSweepDeferrals deferrals,
+    IOptions<ResearchOptions>? research = null) : IOrderIntakeService
 {
     /// <summary>Error code when sources or profile could not be loaded.</summary>
     public const string PrepareFailedCode = "prepare_failed";
@@ -190,6 +192,7 @@ internal sealed class OrderIntakeService(
         var analysis = IntakeAnalysis.Analyse(order.RequestText, request.Candidates(), output, memory.Resolve(facts, output.TextType), settings.MaxQuestions);
         var gate = analysis.Gate;
         var revision = analysis.Revision;
+        var topics = ResearchTopics(gate.ResearchTopics, order.RequestText, request.ProfileBlock, analysis.Output.Language);
         var record = new IntakeRecord(
             IntakeRecord.CurrentSchemaVersion,
             IntakeRecordStatus.Ok,
@@ -201,11 +204,36 @@ internal sealed class OrderIntakeService(
             gate.Questions,
             gate.Assumptions,
             gate.FromMemory,
-            gate.ResearchTopics,
+            topics.Topics,
             order.Mode == OrderMode.Direct ? revision?.SourceId : null,
             settings.BriefMode,
-            gate.HeldBack);
+            gate.HeldBack,
+            topics.Withheld > 0 ? topics.Withheld : null,
+            ResearchAllowed(order) ? true : null);
         return new Analysis(record, gate.Questions.Count, true);
+    }
+
+    /// <summary>
+    /// Whether looking things up on the web is switched on for the person of <paramref name="order"/> now, while the request is read: only
+    /// for the standard way (<see cref="OrderMode.Direct"/>) and only by <see cref="ResearchOptionsExtensions.ModeFor"/>. Without research
+    /// options it is off.
+    /// </summary>
+    private bool ResearchAllowed(OrderEntity order) =>
+        order.Mode == OrderMode.Direct && research?.Value is { } settings && settings.ModeFor(order.CreatedByUser) == ResearchMode.On;
+
+    /// <summary>
+    /// The research topics of the gate without those that <see cref="ResearchQueryGate"/> withholds against the About me details the
+    /// clarifier read (<paramref name="profileBlock"/>), and how many it withheld. The research checks again against the details of the
+    /// run; this check covers details that were changed or removed between the reading and the run. Without details the topics stay as
+    /// they are.
+    /// </summary>
+    internal static (IReadOnlyList<string> Topics, int Withheld) ResearchTopics(IReadOnlyList<string> topics, string requestText, string? profileBlock, string? language)
+    {
+        if (topics.Count == 0 || string.IsNullOrWhiteSpace(profileBlock))
+            return (topics, 0);
+        var profile = ProfilePrompt.Values(profileBlock);
+        var selection = ResearchQueryGate.Select(topics, requestText, [], profile.Text, int.MaxValue, profile.HasFreeText ? language : null);
+        return (selection.Sent, selection.Withheld);
     }
 
     private async Task<ClarifierCallResult> CallAsync(ClarifierRequest request, IntakeOptions settings, CancellationToken ct)
