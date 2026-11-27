@@ -3,6 +3,7 @@ using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Composition;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
+using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Core.Domain.Tools;
@@ -149,6 +150,16 @@ internal sealed class CrewSpecValidator(
                     skipSystemPromptRequired: !isTransform);
 
                 ValidateInlineFinalizerSettings(spec.Finalizers[i], $"finalizers[{i}]", issues);
+
+                if (!string.IsNullOrWhiteSpace(spec.Finalizers[i].Reuse)
+                    && await crewService.GetFinalizerProfileAsync(spec.Finalizers[i].Reuse!, cancellationToken) is { } reusedFinalizer
+                    && reusedFinalizer.FinalizerType.IsRetired())
+                {
+                    issues.Add(new CrewSpecValidationIssue(
+                        Field:      $"finalizers[{i}].reuse",
+                        Message:    $"Finalizer profile '{spec.Finalizers[i].Reuse}' has a type that was removed; choose another finalizer.",
+                        IsCritical: true));
+                }
             }
         }
 
@@ -174,9 +185,16 @@ internal sealed class CrewSpecValidator(
                 issues, cancellationToken,
                 skipSystemPromptRequired: true);
 
-            // For inline definitions the provider_type must be a registered discriminator; otherwise
-            // the materialized crew fails at its Grounding phase ("No grounding provider is registered
-            // for type ..."). Reuse references are skipped — they resolve to an existing valid profile.
+            if (!string.IsNullOrWhiteSpace(groundingRef.Reuse)
+                && await crewService.GetGroundingProviderProfileAsync(groundingRef.Reuse, cancellationToken) is { } reusedGrounding
+                && reusedGrounding.ProviderType.IsRetiredGroundingType())
+            {
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      $"grounding_providers[{i}].reuse",
+                    Message:    $"Grounding provider profile '{groundingRef.Reuse}' has a type that was removed; choose another source.",
+                    IsCritical: true));
+            }
+
             if (string.IsNullOrWhiteSpace(groundingRef.Reuse))
             {
                 ValidateInlineGroundingSettings(groundingRef, $"grounding_providers[{i}]", issues);

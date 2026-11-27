@@ -598,9 +598,16 @@ public static class SystemCrew
     public static bool IsSystemAdvisorName(string name) =>
         AdvisorProfiles.ContainsKey(name);
 
-    /// <summary>True when the supplied name matches a system grounding-provider profile.</summary>
+    /// <summary>
+    /// Names of system grounding-provider profiles whose type was retired in stage 8c (D-089). They are no longer offered, but their
+    /// stored rows stay protected like every system profile: they cannot be renamed, changed or deleted.
+    /// </summary>
+    public static readonly IReadOnlySet<string> RetiredGroundingProviderNames =
+        new HashSet<string>(["academic-default", "tavily-news"], StringComparer.Ordinal);
+
+    /// <summary>True when the supplied name matches a system grounding-provider profile, including the retired ones.</summary>
     public static bool IsSystemGroundingProviderName(string name) =>
-        GroundingProviderProfiles.ContainsKey(name) || name == OrderSourcesProfile.Name;
+        GroundingProviderProfiles.ContainsKey(name) || name == OrderSourcesProfile.Name || RetiredGroundingProviderNames.Contains(name);
 
     // ── System Finalizer Profiles ──────────────────────────────────────────────────
 
@@ -817,9 +824,16 @@ public static class SystemCrew
             [CrewMaterializerProfile.Name]    = CrewMaterializerProfile,
         };
 
-    /// <summary>True when the supplied name matches a system finalizer profile.</summary>
+    /// <summary>True when the supplied name matches a system finalizer profile, including the retired ones.</summary>
     public static bool IsSystemFinalizerName(string name) =>
-        FinalizerProfiles.ContainsKey(name);
+        FinalizerProfiles.ContainsKey(name) || RetiredFinalizerNames.Contains(name);
+
+    /// <summary>
+    /// Names of system finalizer profiles whose type was retired in stage 8c (D-089). They are no longer offered, but their stored rows
+    /// stay protected like every system profile: they cannot be renamed, changed or deleted.
+    /// </summary>
+    public static readonly IReadOnlySet<string> RetiredFinalizerNames =
+        new HashSet<string>(["webhook-sink", "email-sink"], StringComparer.Ordinal);
 
     /// <summary>Ensures the supplied name carries the <c>"custom-"</c> prefix; idempotent.</summary>
     public static string EnsureCustomPrefix(string name) =>

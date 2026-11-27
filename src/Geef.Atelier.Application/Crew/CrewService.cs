@@ -161,7 +161,7 @@ internal sealed class CrewService(
         bool includeSystem = true, CancellationToken cancellationToken = default)
     {
         var dbProfiles = await groundingRepo.ListAsync(cancellationToken);
-        var customOnly = dbProfiles.Where(p => !p.IsSystem).ToList();
+        var customOnly = dbProfiles.Where(p => !p.IsSystem && !p.ProviderType.IsRetiredGroundingType()).ToList();
         if (!includeSystem)
             return customOnly;
 
