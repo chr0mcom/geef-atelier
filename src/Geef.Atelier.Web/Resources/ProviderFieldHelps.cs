@@ -4,16 +4,16 @@ namespace Geef.Atelier.Web.Resources;
 public static class ProviderFieldHelps
 {
     public const string Name =
-        "Unique identifier for this provider. Used internally and as a reference in profile forms. Lowercase letters, digits and hyphens only. Automatically prefixed with 'custom-'.";
+        "Unique identifier for this provider, used internally and in saved settings. Lowercase letters, digits and hyphens only. Automatically prefixed with 'custom-'.";
 
     public const string DisplayName =
-        "Display name in the UI, e.g. in the provider dropdown during profile creation.";
+        "Name shown in the app, for example in the provider list.";
 
     public const string Description =
         "Description of what this provider is suited for — shown in the provider list.";
 
     public const string IsActive =
-        "Inactive providers are not shown in new profile forms. Existing profiles that reference this provider continue to work.";
+        "Atelier leaves an inactive provider out when it lists providers and their models.";
 
     // CLI-specific
     public const string CliKind =

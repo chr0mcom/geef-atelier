@@ -1515,19 +1515,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
   padding: 6px 10px 0 0;
   color: var(--hero-deep);
 }
-.manuscript .signature {
-  margin-top: 36px;
-  border-top: 1px solid var(--paper-rule);
-  padding-top: 18px;
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--paper-ink-2);
-}
-
 /* --- Reconnect modal --- */
 #blazor-error-ui { display: none; }
 .reconnect {

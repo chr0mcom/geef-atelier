@@ -2,7 +2,7 @@
 
 *[English](07-design-system.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-17 (Mock-Stub-Status auf aktuellen Feature-Stand gebracht; Tokens/Themes/Typografie unverändert seit PS-3-Design-Translation)*
+*Letzte Aktualisierung: 2026-11-27 (D-091: mit dem Rückbau entfallene Teile gestrichen, Namen entfernter Aufstellungen; davor 2026-05-17, Mock-Stub-Status auf damaligen Stand gebracht; Tokens/Themes/Typografie unverändert seit PS-3-Design-Translation)*
 
 Das Atelier-Design-System ist aus dem Mockup (`docs/design/atelier-mockups/`) in die Blazor-Server-App übertragen worden (PS-3). Dieser Leitfaden beschreibt Tokens, Themes, Typografie, Komponenten-Inventar und Mock-Stubs für zukünftige Entwicklung.
 
@@ -83,7 +83,12 @@ Code-Klassen bleiben unverändert (keine Breaking Changes in Persistenz/Schema):
 |-----------|-----------|
 | `BriefingTreueReviewer` | `BriefingFidelity` |
 | `KlarheitReviewer` | `Clarity` |
+| `requirements-check` (entfernt) | `Request check` |
 | Alle anderen | Unverändert (Fallback) |
+
+Entfernte eingebaute Aufstellungen behalten auf der technischen Laufseite ihren früheren Namen (`GetTemplateDisplay`: `klassik` →
+`Classic`, `juristisch` → `Legal`, `akademisch` → `Academic`, `marketing` → `Marketing`, `crew-composer` → `Crew Composer`,
+`direct-outline` → `Extra careful`).
 
 Implementierung: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 
@@ -100,7 +105,6 @@ Implementierung: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 | `RunRow.razor` | Grid-Zeile in der Runs-Liste |
 | `FilterPill.razor` | Status-Filter-Button mit Count |
 | `ProgressPip.razor` | Iterations-Fortschritts-Pip |
-| `Press.razor` | Pipeline-Stage-Visualisierung (3 Seals + 2 Ribbons) |
 | `Manuscript.razor` | Finales Manuskript mit Copy-Button |
 | `Icons/Icon*.razor` | 16 hairline SVG-Icons |
 
@@ -123,7 +127,7 @@ UI-Elemente. Aktueller Status (Mai 2026):
 
 | Element | Damaliger Stub | Heutiger Stand |
 |---------|----------------|----------------|
-| Welcome-Stats | `—` in Stat-Tiles | ✅ Implementiert (`IRunService.GetWelcomeStatsAsync`, pro Nutzer isoliert) |
+| Welcome-Stats | `—` in Stat-Tiles | Entfallen mit dem Dashboard (D-091) |
 | Cost-Anzeige (RunDetail) | `$ —` | ✅ Implementiert (Cost-Tracking, `Runs.CostTotal` / `IterationActorCosts`) |
 | Account-Funktionen | Disabled | ✅ Implementiert: Multi-User (`/admin/users`), verbundene Clients (`/account/connected-clients`) |
 | „Profile"-Eintrag im `UserMenu` | Disabled | ⏳ Weiterhin Stub (`.coming-soon`) — der separate Profil-Menüpunkt selbst ist noch nicht angebunden |
@@ -151,12 +155,11 @@ Zahl stammt aus den Einstellungen.
 Beispiel als Korrekturbogen mit Randnotizen, gebaut aus den festen Sätzen von `OrderCheckLines` und den Einleitungen von
 `HowItWorks`), `LandingSteps` (vier oder fünf Schritte des Standardwegs, „one more try, at most“),
 `LandingCapabilities` (sechs Punkte und „What Atelier does not do“), `LandingAudiences` (#for-whom), `LandingPrivacy`,
-`LandingWorkshop` (#teams; folgt `Ui:WorkshopForAdminsOnly`), `LandingFilm` (unverändert; bis zum neuen Video hinter „For teams“, eine Zeile in
-`Landing.razor` setzt ihn wieder nach oben), `LandingClosing`, `LandingFooter`. Inline-SVGs in
-`LandingIllustrations.razor` über `Name`.
+`LandingFilm` (Video unverändert, bis ein neues vorliegt; der Begleittext sagt, dass es eine frühere Version zeigt), `LandingClosing`,
+`LandingFooter`. Inline-SVGs in `LandingIllustrations.razor` über `Name`.
 
 **CSS:** `wwwroot/atelier-landing.css`, nur Tokens der drei Paletten. Präfixe: `lp-*`, `ex-*`/`proof-*` (Beispiel), `lp-flow*`
-(Schritte), `cap`, `aud`, `team-sheet`. Neben Presse und Film nur eine orchestrierte Bewegung (die Schritte).
+(Schritte), `cap`, `aud`. Neben Presse und Film nur eine orchestrierte Bewegung (die Schritte).
 
 **JS:** `wwwroot/js/landing.js` — reines IIFE. Schritte: ein Durchlauf über `.lp-flow-step` (`is-active`/`has-passed`), der Bogen
 `.lp-flow-retry` erscheint, solange der Prüfschritt aktiv ist. `prefers-reduced-motion` markiert alle Schritte sofort.

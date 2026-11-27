@@ -3819,8 +3819,9 @@ longer mapped; their tables and the columns `Runs.GroundingCostEur`, `FinalizerC
 properties of older snapshots are ignored. Finished older runs and orders stay readable in lists, "My work", the order and result
 pages, exports and the technical run page (which names the setup and says that its way of working no longer exists). A pending run
 of a removed setup (older review loop, composed team, learning run) fails with "This task was set up for a way of working that no
-longer exists, so it cannot run. Please start it again."; continuing such a run is refused in the same words. Crash recovery and
-cleanup treat older runs as before.
+longer exists, so it cannot run. Please start it again."; continuing such a run is refused with "This task was set up for a way of
+working that no longer exists, so it cannot be continued. Please start it again." Crash recovery and cleanup treat older runs as
+before.
 
 **Rules kept.** Order per part: navigation → registration → code → tests → seeds; thematically separate commits; hand-written
 migrations only.

@@ -3966,8 +3966,9 @@ neue Snapshots lesen kann, und unbekannte Eigenschaften älterer Snapshots werde
 in den Listen, in „My work“, auf Auftrags- und Ergebnisseite, in Exporten und auf der technischen Laufseite lesbar (sie nennt die
 Aufstellung und sagt, dass deren Arbeitsweise nicht mehr existiert). Ein wartender Lauf einer entfernten Aufstellung (ältere
 Prüfschleife, zusammengestelltes Team, Lernlauf) scheitert mit „This task was set up for a way of working that no longer exists, so it
-cannot run. Please start it again.“; das Fortsetzen eines solchen Laufs wird mit denselben Worten abgelehnt. Wiederherstellung nach
-Absturz und Aufräumer behandeln ältere Läufe wie bisher.
+cannot run. Please start it again.“; das Fortsetzen eines solchen Laufs wird mit „This task was set up for a way of working that no
+longer exists, so it cannot be continued. Please start it again.“ abgelehnt. Wiederherstellung nach Absturz und Aufräumer behandeln
+ältere Läufe wie bisher.
 
 **Beibehaltene Regeln.** Reihenfolge je Teil: Navigation → Registrierung → Code → Tests → Seeds; thematisch getrennte Commits; nur
 handgeschriebene Migrationen.

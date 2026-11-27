@@ -2,7 +2,7 @@
 
 *[Deutsch](07-design-system_de.md) · **English***
 
-*Last updated: 2026-05-17 (mock-stub status brought up to the current feature state; tokens/themes/typography unchanged since the PS-3 design translation)*
+*Last updated: 2026-11-27 (D-091: parts removed with the cleanup taken out, names of removed setups; before that 2026-05-17, mock-stub status brought up to the feature state of that time; tokens/themes/typography unchanged since the PS-3 design translation)*
 
 The Atelier design system was ported from the mockup (`docs/design/atelier-mockups/`) into the Blazor Server app (PS-3). This guide describes tokens, themes, typography, the component inventory and the mock stubs for future development.
 
@@ -83,7 +83,12 @@ Code class names stay unchanged (no breaking changes in persistence/schema):
 |-----------|-----------|
 | `BriefingTreueReviewer` | `BriefingFidelity` |
 | `KlarheitReviewer` | `Clarity` |
+| `requirements-check` (removed) | `Request check` |
 | All others | Unchanged (fallback) |
+
+Removed built-in setups keep their former name on the technical run page (`GetTemplateDisplay`: `klassik` → `Classic`,
+`juristisch` → `Legal`, `akademisch` → `Academic`, `marketing` → `Marketing`, `crew-composer` → `Crew Composer`,
+`direct-outline` → `Extra careful`).
 
 Implementation: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 
@@ -100,7 +105,6 @@ Implementation: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 | `RunRow.razor` | Grid row in the runs list |
 | `FilterPill.razor` | Status filter button with count |
 | `ProgressPip.razor` | Iteration-progress pip |
-| `Press.razor` | Pipeline stage visualization (3 seals + 2 ribbons) |
 | `Manuscript.razor` | Final manuscript with copy button |
 | `Icons/Icon*.razor` | 16 hairline SVG icons |
 
@@ -122,7 +126,7 @@ This list was, at the PS-3 design translation, the state of the not-yet-connecte
 
 | Element | Stub back then | State today |
 |---------|----------------|----------------|
-| Welcome stats | `—` in stat tiles | ✅ Implemented (`IRunService.GetWelcomeStatsAsync`, per-user isolated) |
+| Welcome stats | `—` in stat tiles | Removed with the dashboard (D-091) |
 | Cost display (RunDetail) | `$ —` | ✅ Implemented (cost tracking, `Runs.CostTotal` / `IterationActorCosts`) |
 | Account functions | Disabled | ✅ Implemented: multi-user (`/admin/users`), connected clients (`/account/connected-clients`) |
 | "Profile" entry in `UserMenu` | Disabled | ⏳ Still a stub (`.coming-soon`) — the separate profile menu item itself is not yet wired up |
@@ -147,11 +151,12 @@ settings.
 **Sections (in order):** `LandingNav` (signed in: My work / Write something), `LandingHero`, `LandingExample` (made-up example as an
 annotated proof sheet, built from the fixed sentences of `OrderCheckLines` and the leads of `HowItWorks`), `LandingSteps` (four or
 five steps of the standard way, "one more try, at most"), `LandingCapabilities` (six points and "What
-Atelier does not do"), `LandingAudiences` (#for-whom), `LandingPrivacy`, `LandingWorkshop` (#teams; follows
-`Ui:WorkshopForAdminsOnly`), `LandingFilm` (unchanged; placed after "For teams" until the new video, one line in `Landing.razor` moves it back), `LandingClosing`, `LandingFooter`. Inline SVGs in `LandingIllustrations.razor` via `Name`.
+Atelier does not do"), `LandingAudiences` (#for-whom), `LandingPrivacy`, `LandingFilm` (video unchanged until a new one exists; the
+text next to it says that it shows an earlier version), `LandingClosing`, `LandingFooter`. Inline SVGs in
+`LandingIllustrations.razor` via `Name`.
 
 **CSS:** `wwwroot/atelier-landing.css`, tokens of the three palettes only. Prefixes: `lp-*`, `ex-*`/`proof-*` (example),
-`lp-flow*` (steps), `cap`, `aud`, `team-sheet`. Only one orchestrated motion (the steps) besides the press and the film.
+`lp-flow*` (steps), `cap`, `aud`. Only one orchestrated motion (the steps) besides the press and the film.
 
 **JS:** `wwwroot/js/landing.js` — plain IIFE. Steps: one pass over `.lp-flow-step` (`is-active`/`has-passed`), the arc
 `.lp-flow-retry` shows while the check step is active. `prefers-reduced-motion` marks every step at once. Scroll reveal only for
