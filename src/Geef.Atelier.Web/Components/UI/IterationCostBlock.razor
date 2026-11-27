@@ -15,13 +15,6 @@
                 <span class="cost-eur">@FormatCost(Iteration.ReviewersTotalCostEur.Value)</span>
             </div>
         }
-        @if (Iteration.AdvisorsTotalCostEur.HasValue)
-        {
-            <div class="cost-row advisor-cost">
-                <span class="cost-label">Advisors</span>
-                <span class="cost-eur">@FormatCost(Iteration.AdvisorsTotalCostEur.Value)</span>
-            </div>
-        }
     </div>
 }
 
@@ -31,8 +24,7 @@
     bool HasCostData =>
         Iteration is not null &&
         (Iteration.ExecutorInputTokens.HasValue ||
-         Iteration.ReviewersTotalCostEur.HasValue ||
-         Iteration.AdvisorsTotalCostEur.HasValue);
+         Iteration.ReviewersTotalCostEur.HasValue);
 
     static string FormatNullableCost(decimal? eur) =>
         eur.HasValue ? FormatCost(eur.Value) : "—";

@@ -1,6 +1,6 @@
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Tests.Fakes;
 
 namespace Geef.Atelier.Tests.Domain.Crew;
 
@@ -37,10 +37,10 @@ public sealed class CrewSnapshotTests
     {
         var snapshot = new CrewSnapshot(
             CrewSnapshot.CurrentSchemaVersion, "klassik",
-            SystemCrew.DefaultExecutorProfile,
-            [SystemCrew.BriefingFidelityProfile],
+            TestLoop.Writer,
+            [TestLoop.Reviewers[0]],
             EvaluationStrategy.Parallel, null,
-            Array.Empty<AdvisorProfile>());
+            []);
 
         Assert.Empty(snapshot.Advisors);
     }

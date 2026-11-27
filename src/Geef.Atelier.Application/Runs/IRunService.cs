@@ -56,11 +56,11 @@ public interface IRunService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns a <see cref="RunWithGroundingViewModel"/> that groups advisor consultations by trigger type,
-    /// or null if the run does not exist or belongs to a different user (when <paramref name="requestingUsername"/> is non-null).
-    /// Pass null to bypass the ownership check (admin mode).
+    /// Returns the <see cref="RunViewModel"/> of the run (details, setup read tolerantly, warnings), or null if the run does not exist or
+    /// belongs to a different user (when <paramref name="requestingUsername"/> is non-null). Pass null to bypass the ownership check
+    /// (admin mode). A run of a removed way of working is shown with what this version can still read.
     /// </summary>
-    Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(
+    Task<RunViewModel?> GetRunViewAsync(
         Guid runId,
         string? requestingUsername,
         CancellationToken cancellationToken = default);

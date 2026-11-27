@@ -1,4 +1,3 @@
-using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Models;
 
 namespace Geef.Atelier.Tests.Domain.Crew.Models;
@@ -40,14 +39,6 @@ public sealed class ModelParserTests
     [InlineData(ModelActorKind.Advisor, ModelSlot.Executor, false)]
     public void SlotsAreRestrictedPerActorKind(ModelActorKind kind, ModelSlot slot, bool allowed) =>
         Assert.Equal(allowed, slot.IsAllowedFor(kind));
-
-    [Theory]
-    [InlineData(AdvisorMode.Strategic, ModelSlot.StrategicAdvisor)]
-    [InlineData(AdvisorMode.Critical, ModelSlot.CriticalAdvisor)]
-    [InlineData(AdvisorMode.DevilsAdvocate, ModelSlot.CriticalAdvisor)]
-    [InlineData(AdvisorMode.DomainExpert, ModelSlot.DomainExpertAdvisor)]
-    public void AdvisorModesMapToSlots(AdvisorMode mode, ModelSlot expected) =>
-        Assert.Equal(expected, mode.DefaultSlot());
 
     [Fact]
     public void EveryComposerSlotHasADescription()

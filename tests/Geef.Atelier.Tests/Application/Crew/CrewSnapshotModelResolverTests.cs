@@ -1,8 +1,5 @@
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
 namespace Geef.Atelier.Tests.Application.Crew;
@@ -23,8 +20,7 @@ public sealed class CrewSnapshotModelResolverTests
                 .ToList(),
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null,
-            Advisors: [new AdvisorProfile("adv", "Adv", "d", "p", "claude-cli", "claude-sonnet-latest", 512,
-                AdvisorMode.Strategic, AdvisorTrigger.BeforeFirstExecution, false)]);
+            Advisors: []);
 
     [Fact]
     public async Task ResolvesAliasesToConcreteIdsInTheSnapshot()
@@ -40,7 +36,6 @@ public sealed class CrewSnapshotModelResolverTests
 
         Assert.Equal("claude-opus-5", resolved.Executor.Model);
         Assert.Equal("claude-sonnet-5", resolved.Reviewers[0].Model);
-        Assert.Equal("claude-sonnet-5", resolved.Advisors[0].Model);
     }
 
     [Fact]
@@ -66,73 +61,6 @@ public sealed class CrewSnapshotModelResolverTests
         var resolved = await CrewSnapshotModelResolver.ResolveAsync(snapshot, new ThrowingModelCatalog());
 
         Assert.Equal("claude-opus-latest", resolved.Executor.Model);
-    }
-
-    [Fact]
-    public async Task ResolvesTheRefinerModelAGroundingProviderKeepsInItsSettings()
-    {
-        var catalog = new MappingModelCatalog(new Dictionary<string, string>
-        {
-            ["claude-opus-latest"] = "claude-opus-5",
-        });
-        var snapshot = BuildSnapshot("claude-opus-4-8") with
-        {
-            GroundingProviders =
-            [
-                new GroundingProviderProfile("g", "G", "d", "tavily", new Dictionary<string, string>
-                {
-                    [GroundingProviderProfile.KeyRefinementProvider] = "claude-cli",
-                    [GroundingProviderProfile.KeyRefinementModel] = "claude-opus-latest",
-                }, false),
-            ],
-        };
-
-        var resolved = await CrewSnapshotModelResolver.ResolveAsync(snapshot, catalog);
-
-        Assert.Equal("claude-opus-5",
-            resolved.GroundingProviders![0].ProviderSettings[GroundingProviderProfile.KeyRefinementModel]);
-    }
-
-    [Fact]
-    public async Task ResolvesTheModelATransformFinalizerKeepsInItsSettings()
-    {
-        var catalog = new MappingModelCatalog(new Dictionary<string, string>
-        {
-            ["claude-opus-latest"] = "claude-opus-5",
-        });
-        var snapshot = BuildSnapshot("claude-opus-4-8") with
-        {
-            Finalizers =
-            [
-                new FinalizerProfile("f", "F", "d", FinalizerType.Transform, new Dictionary<string, string>
-                {
-                    [TransformSettings.KeyProvider] = "claude-cli",
-                    [TransformSettings.KeyModel] = "claude-opus-latest",
-                }, false),
-            ],
-        };
-
-        var resolved = await CrewSnapshotModelResolver.ResolveAsync(snapshot, catalog);
-
-        Assert.Equal("claude-opus-5", resolved.Finalizers![0].Settings[TransformSettings.KeyModel]);
-    }
-
-    [Fact]
-    public async Task LeavesSettingsWithoutAModelBindingUntouched()
-    {
-        var catalog = new MappingModelCatalog(new Dictionary<string, string>());
-        var snapshot = BuildSnapshot("claude-opus-4-8") with
-        {
-            Finalizers =
-            [
-                new FinalizerProfile("f", "F", "d", FinalizerType.FileExport,
-                    new Dictionary<string, string> { ["Path"] = "/tmp/x" }, false),
-            ],
-        };
-
-        var resolved = await CrewSnapshotModelResolver.ResolveAsync(snapshot, catalog);
-
-        Assert.Equal("/tmp/x", resolved.Finalizers![0].Settings["Path"]);
     }
 
     [Fact]

@@ -31,7 +31,7 @@ public sealed class BestEffortIterationMatchesSdkTests
             Reviewers: TestLoop.Reviewers,
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 3, AbortOnCritical: false, DetectRegression: false, StagnationThreshold: null),
-            Advisors: Array.Empty<Geef.Atelier.Core.Domain.Crew.Advisors.AdvisorProfile>());
+            Advisors: []);
         var scripted = new Dictionary<string, IReviewer>
         {
             [TestLoop.Reviewers[0].Name] = new ScriptedReviewer("always-rejects", 1, 2, 3),

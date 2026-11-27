@@ -5,12 +5,9 @@ using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Domain.Orders;
-using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.Orders;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -20,10 +17,8 @@ namespace Geef.Atelier.Application.Runs;
 internal sealed class RunService(
     IRunPersistenceService                persistence,
     IRunRepository                        repository,
-    IAdvisorConsultationRepository        consultationRepository,
     ILogger<RunService>                   logger,
     IRunWarningRepository                 warningRepository,
-    IGroundingConsultationRepository?     groundingConsultationRepository = null,
     IOrderRepository?                     orderRepository = null,
     IOptions<OrderOptions>?               orderOptions = null) : IRunService
 {
@@ -207,7 +202,7 @@ internal sealed class RunService(
     }
 
     /// <inheritdoc/>
-    public async Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
+    public async Task<RunViewModel?> GetRunViewAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
     {
         var details = await repository.GetDetailsAsync(runId, cancellationToken);
         if (details is null)
@@ -215,52 +210,10 @@ internal sealed class RunService(
         if (requestingUsername is not null && details.Run.CreatedByUser != requestingUsername)
             return null;
 
-        var snapshot = details.Run.CrewSnapshot is { } s ? CrewSnapshot.Deserialize(s) : null;
-        var groundedBrief = details.Run.BriefingText;
-
-        var consultations = await consultationRepository.GetByRunIdAsync(runId, cancellationToken);
-
-        // Build a name→trigger lookup from the snapshot's advisor profiles (null-safe).
-        var triggerDict = snapshot is not null
-            ? snapshot.Advisors.ToDictionary(a => a.Name, a => a.Trigger, StringComparer.OrdinalIgnoreCase)
-            : new Dictionary<string, AdvisorTrigger>(StringComparer.OrdinalIgnoreCase);
-
-        var recoveryAdvisors = consultations
-            .Where(c => c.IterationNumber == -1)
-            .ToList();
-
-        var nonRecovery = consultations
-            .Where(c => c.IterationNumber != -1)
-            .ToList();
-
-        var groundingAdvisors = nonRecovery
-            .Where(c => triggerDict.TryGetValue(c.AdvisorProfileName, out var t)
-                        && t == AdvisorTrigger.BeforeFirstExecution)
-            .ToList();
-
-        // This covers BeforeEveryExecution as well as fallback for profiles not found in the snapshot.
-        var iterationSet = new HashSet<Guid>(groundingAdvisors.Select(c => c.Id));
-        var advisorsByIteration = nonRecovery
-            .Where(c => !iterationSet.Contains(c.Id))
-            .ToLookup(c => c.IterationNumber);
-
-        IReadOnlyList<GroundingConsultation> groundingConsultations = groundingConsultationRepository is not null
-            ? await groundingConsultationRepository.GetByRunIdAsync(runId, cancellationToken)
-            : [];
-
-        IReadOnlyList<RunWarningEntity> warnings = warningRepository is not null
-            ? await warningRepository.ListByRunAsync(runId, cancellationToken)
-            : [];
-
-        return new RunWithGroundingViewModel(
+        return new RunViewModel(
             details,
-            snapshot,
-            groundedBrief,
-            groundingAdvisors,
-            recoveryAdvisors,
-            advisorsByIteration,
-            groundingConsultations,
-            warnings);
+            CrewSnapshot.Deserialize(details.Run.CrewSnapshot),
+            await warningRepository.ListByRunAsync(runId, cancellationToken));
     }
 
     /// <inheritdoc/>

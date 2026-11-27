@@ -2,7 +2,6 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Geef.Atelier.Core.Configuration;
-using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Research;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,7 +32,6 @@ public sealed class TavilySearchClientTests
 
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddGroundingProviders(configuration);
         services.AddResearch(configuration);
         services.AddHttpClient(TavilySearchClient.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler);
         if (research is not null)
@@ -330,7 +328,6 @@ public sealed class TavilySearchClientTests
         var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddGroundingProviders(configuration);
         services.AddResearch(configuration);
         using var provider = services.BuildServiceProvider();
 

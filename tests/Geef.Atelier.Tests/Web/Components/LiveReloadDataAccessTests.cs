@@ -155,7 +155,6 @@ public sealed class LiveReloadDataAccessTests : TestContext
         Services.AddSingleton<IRunService>(probe);
         Services.AddSingleton<IRunUpdateFeed>(feed);
         Services.AddScoped<CircuitDataGate>();
-        Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         this.AddTestAuthorization().SetAuthorized("user");
         return (probe, feed, runId);
@@ -188,7 +187,6 @@ public sealed class LiveReloadDataAccessTests : TestContext
         Services.AddSingleton<IRunService>(runService);
         Services.AddSingleton<IRunUpdateFeed>(feed);
         Services.AddScoped<CircuitDataGate>();
-        Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         this.AddTestAuthorization().SetAuthorized("user");
         return runService;
@@ -253,10 +251,10 @@ public sealed class LiveReloadDataAccessTests : TestContext
 
         public int DetailLoads => Volatile.Read(ref _detailLoads);
 
-        public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default)
+        public Task<RunViewModel?> GetRunViewAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref _detailLoads);
-            return inner.GetRunWithGroundingAsync(id, requestingUsername, cancellationToken);
+            return inner.GetRunViewAsync(id, requestingUsername, cancellationToken);
         }
 
         public Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => inner.ListRunWarningsAsync(id, requestingUsername, cancellationToken);

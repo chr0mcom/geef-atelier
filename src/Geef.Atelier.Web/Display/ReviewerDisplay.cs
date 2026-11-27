@@ -1,116 +1,25 @@
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
 
 namespace Geef.Atelier.Web.Display;
 
+/// <summary>Display names of the checks and setups on the technical run page.</summary>
 public static class ReviewerDisplay
 {
-    private static readonly Dictionary<string, string> DisplayNames = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string> RetiredDisplayNames = new(StringComparer.Ordinal)
     {
-        // PS-5 slug-based names (canonical)
         ["briefing-fidelity"] = "BriefingFidelity",
         ["clarity"]           = "Clarity",
-        // Pre-PS-5 class-name-based names (historical, defensive fallback)
         ["BriefingTreueReviewer"] = "BriefingFidelity",
         ["KlarheitReviewer"]      = "Clarity",
     };
 
+    /// <summary>Display name of the check <paramref name="reviewerName"/>; checks of the removed review loop keep their old short names.</summary>
     public static string ToDisplay(string reviewerName) =>
-        DisplayNames.TryGetValue(reviewerName, out var display) ? display
-        : SystemCrew.CodeOnlyReviewerProfiles.TryGetValue(reviewerName, out var codeOnly) ? codeOnly.DisplayName
+        SystemCrew.CodeOnlyReviewerProfiles.TryGetValue(reviewerName, out var codeOnly) ? codeOnly.DisplayName
+        : RetiredDisplayNames.TryGetValue(reviewerName, out var display) ? display
         : reviewerName;
 
-    /// <summary>
-    /// Returns the display name for an executor profile.
-    /// Looks up <see cref="SystemCrew.ExecutorProfiles"/> first, then <see cref="SystemCrew.CodeOnlyExecutorProfiles"/>;
-    /// falls back to <paramref name="fallbackDisplayName"/> or <paramref name="profileName"/>.
-    /// </summary>
-    public static string GetExecutorDisplay(string profileName, string? fallbackDisplayName = null) =>
-        SystemCrew.ExecutorProfiles.TryGetValue(profileName, out var profile) ? profile.DisplayName
-        : SystemCrew.CodeOnlyExecutorProfiles.TryGetValue(profileName, out var codeOnly) ? codeOnly.DisplayName
-        : fallbackDisplayName ?? profileName;
-
-    /// <summary>
-    /// Returns the display name for a crew template.
-    /// Looks up <see cref="SystemCrew.CrewTemplates"/> first, then <see cref="SystemCrew.CodeOnlyTemplates"/>; falls back
-    /// to <paramref name="templateName"/>.
-    /// </summary>
+    /// <summary>Display name of the setup <paramref name="templateName"/>, or the name itself for a setup this version no longer has.</summary>
     public static string GetTemplateDisplay(string templateName) =>
-        SystemCrew.CrewTemplates.TryGetValue(templateName, out var template) ? template.DisplayName
-        : SystemCrew.CodeOnlyTemplates.TryGetValue(templateName, out var codeOnly) ? codeOnly.DisplayName
-        : templateName;
-
-    /// <summary>Returns a human-readable label for an <see cref="EvaluationStrategy"/> value.</summary>
-    public static string GetEvaluationStrategyDisplay(EvaluationStrategy strategy) =>
-        strategy switch
-        {
-            EvaluationStrategy.Parallel   => "Parallel",
-            EvaluationStrategy.Sequential => "Sequential",
-            EvaluationStrategy.FailFast   => "FailFast",
-            EvaluationStrategy.Priority   => "Priority",
-            _                             => strategy.ToString()
-        };
-
-    /// <summary>
-    /// Returns the display name for an advisor profile.
-    /// Looks up <see cref="SystemCrew.AdvisorProfiles"/> first; falls back to
-    /// <paramref name="fallbackDisplayName"/> or <paramref name="profileName"/>.
-    /// </summary>
-    public static string GetAdvisorDisplay(string profileName, string? fallbackDisplayName = null) =>
-        SystemCrew.AdvisorProfiles.TryGetValue(profileName, out var profile)
-            ? profile.DisplayName
-            : fallbackDisplayName ?? profileName;
-
-    /// <summary>Returns a human-readable label for an <see cref="AdvisorMode"/> value.</summary>
-    public static string GetAdvisorModeDisplay(AdvisorMode mode) =>
-        mode switch
-        {
-            AdvisorMode.Strategic      => "Strategic",
-            AdvisorMode.Critical       => "Critical",
-            AdvisorMode.DevilsAdvocate => "Devil's Advocate",
-            AdvisorMode.DomainExpert   => "Domain Expert",
-            _                          => mode.ToString()
-        };
-
-    /// <summary>Returns a human-readable label for an <see cref="AdvisorTrigger"/> value.</summary>
-    public static string GetAdvisorTriggerDisplay(AdvisorTrigger trigger) =>
-        trigger switch
-        {
-            AdvisorTrigger.BeforeFirstExecution => "Pre-Run (Grounding)",
-            AdvisorTrigger.BeforeEveryExecution => "Per-Iteration",
-            AdvisorTrigger.OnConvergenceFailure => "On Convergence Failure (Recovery)",
-            _                                   => trigger.ToString()
-        };
-
-    /// <summary>Returns a human-readable label for a grounding provider type string.</summary>
-    public static string GetGroundingProviderTypeDisplay(string providerType) =>
-        providerType switch
-        {
-            "tavily"       => "Tavily Web Search",
-            "vector-store" => "Vector Store",
-            _              => providerType
-        };
-
-    /// <summary>
-    /// Returns the display name for a grounding provider profile.
-    /// Looks up <see cref="SystemCrew.GroundingProviderProfiles"/> first; falls back to
-    /// <paramref name="fallbackDisplayName"/> or <paramref name="profileName"/>.
-    /// </summary>
-    public static string GetGroundingProviderDisplay(string profileName, string? fallbackDisplayName = null) =>
-        SystemCrew.GroundingProviderProfiles.TryGetValue(profileName, out var profile)
-            ? profile.DisplayName
-            : fallbackDisplayName ?? profileName;
-
-    /// <summary>
-    /// Returns a short domain label for a crew template name, or <c>null</c> for generic templates.
-    /// Used by <c>DomainBadge</c> to show a visual domain indicator on template cards.
-    /// </summary>
-    public static string? GetTemplateDomain(string? templateName) =>
-        templateName switch
-        {
-            "juristisch" => "Legal",
-            "akademisch" => "Academic",
-            "marketing"  => "Marketing",
-            _            => null
-        };
+        SystemCrew.CodeOnlyTemplates.TryGetValue(templateName, out var codeOnly) ? codeOnly.DisplayName : templateName;
 }

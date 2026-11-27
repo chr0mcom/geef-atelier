@@ -86,7 +86,6 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
     private void RegisterDetailServices(IRunService runService)
     {
         Services.AddSingleton(runService);
-        Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
         this.AddTestAuthorization().SetAuthorized("user");
     }
 
@@ -174,11 +173,11 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
 
         public bool Entered { get; private set; }
 
-        public async Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default)
+        public async Task<RunViewModel?> GetRunViewAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default)
         {
             Entered = true;
             await Hold.Task;
-            return await _inner.GetRunWithGroundingAsync(id, requestingUsername, cancellationToken);
+            return await _inner.GetRunViewAsync(id, requestingUsername, cancellationToken);
         }
 
         public Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => _inner.ListRunWarningsAsync(id, requestingUsername, cancellationToken);

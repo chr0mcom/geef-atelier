@@ -23,8 +23,7 @@ public sealed class DirectTemplateFactCheckTests
         Assert.Equal("Fact check", profile.DisplayName);
         Assert.Equal(ModelSlot.FactReviewer, profile.ModelSlot);
         Assert.Equal(ModelMatrix.Primary(ModelSlot.FactReviewer).Model, profile.Model);
-        Assert.True(SystemCrew.IsSystemName(profile.Name));
-        Assert.DoesNotContain(profile.Name, SystemCrew.ReviewerProfiles.Keys);
+        Assert.True(profile.IsSystem);
     }
 
     [Fact]

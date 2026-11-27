@@ -1,8 +1,5 @@
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Persistence;
 
 namespace Geef.Atelier.Tests.Fakes;
@@ -29,37 +26,12 @@ internal sealed class StubRunService(RunDetails details, IReadOnlyList<Geef.Atel
     public Task<RunDetails?> GetRunDetailsAsync(Guid id, string? user, CancellationToken ct = default) =>
         Task.FromResult<RunDetails?>(details);
 
-    public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid id, string? user, CancellationToken ct = default) =>
-        Task.FromResult<RunWithGroundingViewModel?>(new RunWithGroundingViewModel(
-            Details: details,
-            Snapshot: null,
-            GroundedBrief: details.Run.BriefingText,
-            GroundingAdvisors: [],
-            RecoveryAdvisors: [],
-            AdvisorsByIteration: Enumerable.Empty<AdvisorConsultation>().ToLookup(x => x.IterationNumber),
-            GroundingConsultations: Array.Empty<GroundingConsultation>(),
-            Warnings: warnings));
+    public Task<RunViewModel?> GetRunViewAsync(Guid id, string? user, CancellationToken ct = default) =>
+        Task.FromResult<RunViewModel?>(new RunViewModel(details, null, warnings ?? []));
 
     public Task<Guid> ResumeRunAsync(ResumeOptions options, string? user, CancellationToken ct = default) =>
         throw new NotImplementedException();
 
     public Task<bool> DeleteRunAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) =>
         Task.FromResult(true);
-}
-
-/// <summary>Shared <see cref="IRunArtifactRepository"/> stub serving a fixed artifact list.</summary>
-internal sealed class StubArtifactRepository(IReadOnlyList<RunArtifact> artifacts)
-    : IRunArtifactRepository
-{
-    public Task<IReadOnlyList<RunArtifact>> ListByRunAsync(Guid runId, CancellationToken ct) =>
-        Task.FromResult(artifacts);
-
-    public Task<RunArtifact?> GetByIdAsync(Guid artifactId, CancellationToken ct) =>
-        Task.FromResult(artifacts.FirstOrDefault(a => a.Id == artifactId));
-
-    public Task<RunArtifact> CreateAsync(RunArtifact a, CancellationToken ct) =>
-        Task.FromResult(a);
-
-    public Task DeleteByRunAsync(Guid runId, CancellationToken ct) =>
-        Task.CompletedTask;
 }

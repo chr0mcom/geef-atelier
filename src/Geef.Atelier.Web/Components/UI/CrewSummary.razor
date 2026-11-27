@@ -1,11 +1,9 @@
 @using Geef.Atelier.Core.Domain.Crew
-@using Geef.Atelier.Core.Domain.Crew.Advisors
-@using Geef.Atelier.Core.Domain.Crew.Grounding
 @using Geef.Atelier.Web.Display
 
 <div class="crew-summary" data-testid="crew-summary">
     <button class="collapsible-header" @onclick="Toggle" data-testid="crew-summary-toggle" type="button">
-        <span>Crew: @_headerLabel</span>
+        <span>Setup: @_headerLabel</span>
         <span class="chevron @(_expanded ? "up" : "down")">▾</span>
     </button>
 
@@ -13,46 +11,28 @@
     {
         <div class="crew-summary-body" data-testid="crew-summary-body">
             <div class="crew-summary-executor">
-                <strong>Executor:</strong>
+                <strong>Writer:</strong>
                 @Snapshot.Executor.DisplayName · @Snapshot.Executor.Provider/@Snapshot.Executor.Model
             </div>
             <div class="crew-summary-reviewers">
-                <strong>Reviewers:</strong>
+                <strong>Checks:</strong>
                 <ul>
                     @foreach (var r in Snapshot.Reviewers)
                     {
-                        <li>@r.DisplayName · @r.Provider/@r.Model</li>
+                        <li>@r.DisplayName@(string.IsNullOrWhiteSpace(r.Model) ? "" : $" · {r.Provider}/{r.Model}")</li>
                     }
                 </ul>
             </div>
-            <div class="crew-summary-strategy">
-                <strong>Strategy:</strong>
-                @ReviewerDisplay.GetEvaluationStrategyDisplay(Snapshot.EvaluationStrategy)
-            </div>
-            @if (Snapshot.Advisors?.Count > 0)
-            {
-                <div class="crew-summary-advisors" data-testid="crew-summary-advisors">
-                    <strong>Advisors:</strong>
-                    @string.Join(" · ", Snapshot.Advisors.Select(a =>
-                        $"{a.DisplayName} ({ReviewerDisplay.GetAdvisorModeDisplay(a.Mode)}, {ReviewerDisplay.GetAdvisorTriggerDisplay(a.Trigger)})"))
-                </div>
-            }
-            @if (Snapshot.GroundingProviders?.Count > 0)
-            {
-                <div class="crew-summary-grounding" data-testid="crew-summary-grounding">
-                    <strong>Grounding:</strong>
-                    @string.Join(" · ", Snapshot.GroundingProviders.Select(g =>
-                        g.ProviderType == "vector-store"
-                            ? FormatVectorStoreProvider(g)
-                            : $"{g.DisplayName} ({ReviewerDisplay.GetGroundingProviderTypeDisplay(g.ProviderType)})"))
-                </div>
-            }
             @if (Snapshot.ConvergenceOverride != null)
             {
                 <div class="crew-summary-override">
                     <strong>Override:</strong>
                     @FormatOverride(Snapshot.ConvergenceOverride)
                 </div>
+            }
+            @if (!SystemCrew.IsDirectPathTemplate(Snapshot.TemplateName))
+            {
+                <p class="text-muted" data-testid="crew-summary-retired">This setup belongs to a way of working that no longer exists; further details are no longer available.</p>
             }
         </div>
     }
@@ -65,8 +45,8 @@
     private bool _expanded;
 
     private string _headerLabel => Snapshot != null
-        ? $"{ReviewerDisplay.GetTemplateDisplay(Snapshot.TemplateName ?? FallbackTemplateName ?? "custom")} · 1 Executor + {Snapshot.Reviewers.Count} Reviewer{(Snapshot.Reviewers.Count != 1 ? "s" : "")}"
-        : $"{FallbackTemplateName ?? "Classic"} (system default)";
+        ? $"{ReviewerDisplay.GetTemplateDisplay(Snapshot.TemplateName ?? FallbackTemplateName ?? "custom")} · writer + {Snapshot.Reviewers.Count} check{(Snapshot.Reviewers.Count != 1 ? "s" : "")}"
+        : $"{FallbackTemplateName ?? "unknown"} (details no longer available)";
 
     private void Toggle() => _expanded = !_expanded;
 
@@ -79,14 +59,5 @@
         if (o.StagnationThreshold.HasValue) parts.Add($"StagnationThreshold={o.StagnationThreshold}");
         if (o.MaxElapsedMinutes.HasValue) parts.Add($"MaxElapsedMinutes={o.MaxElapsedMinutes}");
         return string.Join(", ", parts);
-    }
-
-    private static string FormatVectorStoreProvider(Geef.Atelier.Core.Domain.Crew.Grounding.GroundingProviderProfile g)
-    {
-        g.ProviderSettings.TryGetValue("TopK", out var topKStr);
-        g.ProviderSettings.TryGetValue("TagFilter", out var tagFilter);
-        var topK = int.TryParse(topKStr, out var k) ? k : 5;
-        var tags = string.IsNullOrWhiteSpace(tagFilter) ? "all" : tagFilter;
-        return $"{g.DisplayName} (Knowledge Base, TopK={topK}, Tags: {tags})";
     }
 }

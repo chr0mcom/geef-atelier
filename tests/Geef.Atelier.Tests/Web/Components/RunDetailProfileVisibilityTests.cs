@@ -32,7 +32,6 @@ public sealed class RunDetailProfileVisibilityTests : TestContext
         Services.AddSingleton<Geef.Atelier.Web.Notifications.IRunUpdateFeed>(sp => new Geef.Atelier.Web.Notifications.InProcessRunUpdateFeed(
             sp.GetRequiredService<IServiceScopeFactory>(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<Geef.Atelier.Web.Notifications.InProcessRunUpdateFeed>.Instance));
-        Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         var auth = this.AddTestAuthorization();
         auth.SetAuthorized(viewer);
@@ -70,18 +69,4 @@ public sealed class RunDetailProfileVisibilityTests : TestContext
         Assert.Equal("Schreib eine Einladung.", cut.Find("h1").TextContent.Trim());
     }
 
-    [Theory]
-    [InlineData("alice", false, true)]
-    [InlineData("admin", true, false)]
-    public void The_opened_grounded_brief_shows_the_profile_only_to_the_owner(string viewer, bool admin, bool seesProfile)
-    {
-        var cut = Render(viewer, admin);
-
-        cut.Find("[data-testid='grounding-brief'] .sub-section-toggle").Click();
-        var grounded = cut.Find("[data-testid='grounding-brief'] .briefing-text").TextContent;
-
-        Assert.Contains("Schreib eine Einladung.", grounded);
-        Assert.Equal(seesProfile, grounded.Contains(Marker, StringComparison.Ordinal));
-        Assert.Equal(!seesProfile, grounded.Contains(BriefingSections.ProfileHiddenNote, StringComparison.Ordinal));
-    }
 }

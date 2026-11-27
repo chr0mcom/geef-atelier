@@ -2,7 +2,6 @@ using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Persistence;
-using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Mcp.Tools;
 using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Mcp.Orders;

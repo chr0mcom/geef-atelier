@@ -1,18 +1,15 @@
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
-using Geef.Atelier.Core.Domain.Crew.Profiles;
-using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Tests.Fakes;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Geef.Atelier.Tests.Application.Crew;
 
 /// <summary>
-/// Verifies the wiring, not just the helper: a snapshot produced by
-/// <see cref="CrewService.ResolveSnapshotAsync"/> carries concrete model ids, while the stored
-/// profile keeps its always-latest alias so the next run still follows new releases.
+/// Verifies the wiring, not just the helper: a snapshot produced by <see cref="CrewService.ResolveCodeTemplateSnapshotAsync"/> is built
+/// from the code-only profiles of the template, takes the models of the model assignment and carries concrete model ids, so an
+/// always-latest alias of the matrix is pinned for the run.
 /// </summary>
 public sealed class CrewServiceResolvesSnapshotModelsTests
 {
@@ -21,12 +18,6 @@ public sealed class CrewServiceResolvesSnapshotModelsTests
     private const string SonnetAlias = "claude-sonnet-latest";
     private const string SonnetConcrete = "claude-sonnet-5";
 
-    private static readonly ExecutorProfile AliasedExecutor =
-        new("exec", "Exec", "d", "p", "claude-cli", OpusAlias, 32000, false);
-
-    private static readonly ReviewerProfile AliasedReviewer =
-        new("rev", "Rev", "d", "p", "claude-cli", SonnetAlias, 8000, false);
-
     private static (CrewService Service, ResolvingModelCatalog Catalog) Build()
     {
         var catalog = new ResolvingModelCatalog(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -34,45 +25,34 @@ public sealed class CrewServiceResolvesSnapshotModelsTests
             [OpusAlias] = OpusConcrete,
             [SonnetAlias] = SonnetConcrete,
         });
-
-        var service = new CrewService(
-            new OneReviewerRepo(),
-            new OneExecutorRepo(),
-            new NoAdvisorRepo(),
-            new NoGroundingRepo(),
-            new InMemoryFinalizerProfileRepository(),
-            new NoTemplateRepo(),
-            new InMemorySpecializationPackRepository(),
-            catalog,
-            new Geef.Atelier.Tests.Fakes.PassThroughModelAssignmentService(),
-            NullLogger<CrewService>.Instance);
-
-        return (service, catalog);
+        return (new CrewService(catalog, new AliasingModelAssignment()), catalog);
     }
 
-    private static CrewSpec Spec() =>
-        new(AliasedExecutor.Name, [AliasedReviewer.Name], EvaluationStrategy.Parallel, null);
+    [Theory]
+    [InlineData(SystemCrew.DirectTemplateName)]
+    [InlineData(SystemCrew.DirectOutlineTemplateName)]
+    public async Task SnapshotIsBuiltFromTheCodeOnlyProfilesOfTheTemplate(string templateName)
+    {
+        var (service, _) = Build();
+        var template = SystemCrew.CodeOnlyTemplates[templateName];
+
+        var resolved = await service.ResolveCodeTemplateSnapshotAsync(template);
+
+        Assert.Equal(templateName, resolved.Snapshot.TemplateName);
+        Assert.Equal(template.ExecutorProfileName, resolved.Snapshot.Executor.Name);
+        Assert.Equal(template.ReviewerProfileNames, resolved.Snapshot.Reviewers.Select(r => r.Name));
+        Assert.Empty(resolved.Snapshot.Advisors);
+    }
 
     [Fact]
     public async Task SnapshotCarriesTheConcreteModelForEveryActor()
     {
         var (service, _) = Build();
 
-        var snapshot = await service.ResolveSnapshotAsync(crewTemplateName: null, customCrew: Spec());
+        var resolved = await service.ResolveCodeTemplateSnapshotAsync(SystemCrew.DirectTemplate);
 
-        Assert.Equal(OpusConcrete, snapshot.Executor.Model);
-        Assert.Equal(SonnetConcrete, Assert.Single(snapshot.Reviewers).Model);
-    }
-
-    [Fact]
-    public async Task TheStoredProfileKeepsItsAlias()
-    {
-        var (service, _) = Build();
-
-        await service.ResolveSnapshotAsync(crewTemplateName: null, customCrew: Spec());
-
-        var stored = await service.GetExecutorProfileAsync(AliasedExecutor.Name);
-        Assert.Equal(OpusAlias, stored!.Model);
+        Assert.Equal(OpusConcrete, resolved.Snapshot.Executor.Model);
+        Assert.All(resolved.Snapshot.Reviewers.Where(r => r.Model.Length > 0), r => Assert.Equal(SonnetConcrete, r.Model));
     }
 
     [Fact]
@@ -80,78 +60,45 @@ public sealed class CrewServiceResolvesSnapshotModelsTests
     {
         var (service, catalog) = Build();
 
-        await service.ResolveSnapshotAsync(crewTemplateName: null, customCrew: Spec());
+        await service.ResolveCodeTemplateSnapshotAsync(SystemCrew.DirectTemplate);
 
         Assert.Contains(OpusAlias, catalog.ResolveCalls);
         Assert.Contains(SonnetAlias, catalog.ResolveCalls);
     }
 
-    private sealed class OneExecutorRepo : IExecutorProfileRepository
+    [Fact]
+    public async Task WarningsOfTheModelAssignmentAreHandedOn()
     {
-        public Task<IReadOnlyList<ExecutorProfile>> ListAsync(bool includeSystem = true, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<ExecutorProfile>>([AliasedExecutor]);
-        public Task<ExecutorProfile?> GetByNameAsync(string name, CancellationToken ct = default)
-            => Task.FromResult(name == AliasedExecutor.Name ? AliasedExecutor : null);
-        public Task UpsertAsync(ExecutorProfile profile, CancellationToken ct = default) => Task.CompletedTask;
-        public Task DeleteAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
-        public Task RenameAsync(string oldName, string newName, CancellationToken ct = default) => Task.CompletedTask;
-        public Task CreateAsync(ExecutorProfile item, CancellationToken ct = default) => Task.CompletedTask;
-        public Task UpdateAsync(ExecutorProfile item, CancellationToken ct = default) => Task.CompletedTask;
+        var (service, _) = Build();
+
+        var resolved = await service.ResolveCodeTemplateSnapshotAsync(SystemCrew.DirectTemplate);
+
+        Assert.Equal(AliasingModelAssignment.Warning, Assert.Single(resolved.Warnings));
     }
 
-    private sealed class OneReviewerRepo : IReviewerProfileRepository
+    private sealed class AliasingModelAssignment : IModelAssignmentService
     {
-        public Task<IReadOnlyList<ReviewerProfile>> ListAsync(bool includeSystem = true, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<ReviewerProfile>>([AliasedReviewer]);
-        public Task<ReviewerProfile?> GetByNameAsync(string name, CancellationToken ct = default)
-            => Task.FromResult(name == AliasedReviewer.Name ? AliasedReviewer : null);
-        public Task UpsertAsync(ReviewerProfile profile, CancellationToken ct = default) => Task.CompletedTask;
-        public Task DeleteAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
-        public Task RenameAsync(string oldName, string newName, CancellationToken ct = default) => Task.CompletedTask;
-        public Task CreateAsync(ReviewerProfile item, CancellationToken ct = default) => Task.CompletedTask;
-        public Task UpdateAsync(ReviewerProfile item, CancellationToken ct = default) => Task.CompletedTask;
-    }
+        public static readonly ModelAssignmentWarning Warning = new("test-writer", "Assigned an alias for the test.");
 
-    private sealed class NoAdvisorRepo : IAdvisorProfileRepository
-    {
-        public Task<IReadOnlyList<AdvisorProfile>> ListAsync(bool includeSystem = true, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<AdvisorProfile>>([]);
-        public Task<AdvisorProfile?> GetByNameAsync(string name, CancellationToken ct = default)
-            => Task.FromResult<AdvisorProfile?>(null);
-        public Task UpsertAsync(AdvisorProfile profile, CancellationToken ct = default) => Task.CompletedTask;
-        public Task DeleteAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
-        public Task RenameAsync(string oldName, string newName, CancellationToken ct = default) => Task.CompletedTask;
-        public Task CreateAsync(AdvisorProfile item, CancellationToken ct = default) => Task.CompletedTask;
-        public Task UpdateAsync(AdvisorProfile item, CancellationToken ct = default) => Task.CompletedTask;
-    }
+        private readonly PassThroughModelAssignmentService _inner = new();
 
-    private sealed class NoGroundingRepo : IGroundingProviderProfileRepository
-    {
-        public Task<IReadOnlyList<GroundingProviderProfile>> ListAsync(bool includeSystem = true, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<GroundingProviderProfile>>([]);
-        public Task<GroundingProviderProfile?> GetByNameAsync(string name, CancellationToken ct = default)
-            => Task.FromResult<GroundingProviderProfile?>(null);
-        public Task UpsertAsync(GroundingProviderProfile profile, CancellationToken ct = default) => Task.CompletedTask;
-        public Task DeleteAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
-        public Task RenameAsync(string oldName, string newName, CancellationToken ct = default) => Task.CompletedTask;
-        public Task<GroundingProviderProfile> CreateAsync(GroundingProviderProfile item, CancellationToken ct = default)
-            => Task.FromResult(item);
-        public Task<GroundingProviderProfile> UpdateAsync(GroundingProviderProfile item, CancellationToken ct = default)
-            => Task.FromResult(item);
-        public Task<IReadOnlyList<GroundingProviderProfile>> ListAsync(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<GroundingProviderProfile>>([]);
-    }
+        public Task<ModelAssignment> AssignAsync(ModelSlot slot, ModelDomain domain, ModelCandidate? executor = null, CancellationToken ct = default) =>
+            _inner.AssignAsync(slot, domain, executor, ct);
 
-    private sealed class NoTemplateRepo : ICrewTemplateRepository
-    {
-        public Task<IReadOnlyList<CrewTemplate>> ListAsync(bool includeSystem = true, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<CrewTemplate>>([]);
-        public Task<CrewTemplate?> GetByNameAsync(string name, CancellationToken ct = default)
-            => Task.FromResult<CrewTemplate?>(null);
-        public Task UpsertAsync(CrewTemplate template, CancellationToken ct = default) => Task.CompletedTask;
-        public Task DeleteAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
-        public Task RenameAsync(string oldName, string newName, CancellationToken ct = default) => Task.CompletedTask;
-        public Task CreateAsync(CrewTemplate item, CancellationToken ct = default) => Task.CompletedTask;
-        public Task UpdateAsync(CrewTemplate item, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<IReadOnlyList<ModelAssignment>> AssignReviewersAsync(
+            IReadOnlyList<ReviewerAssignmentRequest> reviewers, ModelDomain crewDomain, ModelCandidate executor, CancellationToken ct = default) =>
+            _inner.AssignReviewersAsync(reviewers, crewDomain, executor, ct);
+
+        public Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, CancellationToken ct = default) => ApplyAsync(snapshot, [], ct);
+
+        public Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, ICollection<ModelAssignmentWarning> warnings, CancellationToken ct = default)
+        {
+            warnings.Add(Warning);
+            return Task.FromResult(snapshot with
+            {
+                Executor = snapshot.Executor with { Model = OpusAlias },
+                Reviewers = snapshot.Reviewers.Select(r => r.Model.Length == 0 ? r : r with { Model = SonnetAlias }).ToList(),
+            });
+        }
     }
 }

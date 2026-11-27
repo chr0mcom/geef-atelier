@@ -24,7 +24,6 @@ public sealed class RunPagesUnknownUserTests : TestContext
     {
         Services.AddSingleton(NeverCalled<IRunService>.Create());
         Services.AddSingleton(NeverCalled<IRunUpdateFeed>.Create());
-        Services.AddSingleton(NeverCalled<IRunArtifactRepository>.Create());
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         Services.AddScoped<CircuitDataGate>();
         JSInterop.Mode = JSRuntimeMode.Loose;

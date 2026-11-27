@@ -5,7 +5,6 @@ using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Core.Domain.Research;
-using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Research;
 using Microsoft.Extensions.Configuration;
@@ -758,7 +757,6 @@ public sealed class OrderResearchServiceTests
         }).Build();
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddGroundingProviders(configuration);
         services.AddResearch(configuration);
         services.AddHttpClient(TavilySearchClient.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => tavily);
         var orders = new ResearchOrders();

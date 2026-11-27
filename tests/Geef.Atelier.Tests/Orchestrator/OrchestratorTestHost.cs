@@ -1,10 +1,8 @@
 using Geef.Atelier.Infrastructure.Pipeline.Assembly;
-using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
-using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Fakes;
@@ -67,8 +65,6 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                     Options.Create(new ConvergenceOptions()));
                 services.AddSingleton<IRunNotifier, NoOpRunNotifier>();
                 configureServices?.Invoke(services);
-                services.TryAddSingleton<IGroundingProviderFactory>(sp =>
-                    new GroundingProviderFactory(sp.GetServices<IGroundingProvider>()));
                 services.AddPipelineAssemblers();
                 services.AddTestLoopAssembler();
                 services.AddHostedService<RunOrchestratorService>();

@@ -1,4 +1,3 @@
-using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -24,5 +23,4 @@ internal sealed record PipelineAssemblyContext(
     IGeefEventSink EventSink,
     ICostAccumulator? CostAccumulator,
     IRunWarningSink WarningSink,
-    IGroundingProviderFactory? GroundingProviderFactory,
     IPricingCatalog? PricingCatalog);

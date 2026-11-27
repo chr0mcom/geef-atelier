@@ -64,7 +64,6 @@ public sealed class RunDetailWarningsTests : TestContext
         Services.AddSingleton<Geef.Atelier.Web.Notifications.IRunUpdateFeed>(sp => new Geef.Atelier.Web.Notifications.InProcessRunUpdateFeed(
             sp.GetRequiredService<IServiceScopeFactory>(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<Geef.Atelier.Web.Notifications.InProcessRunUpdateFeed>.Instance));
-        Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         this.AddTestAuthorization().SetAuthorized("user");
     }

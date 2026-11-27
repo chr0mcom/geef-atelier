@@ -43,22 +43,11 @@ public sealed class RunEntity
     // Cost tracking — null for runs before Step16 migration or when CostTracking:Enabled=false.
     public decimal? TotalCostEur { get; set; }
     public decimal? LlmCostEur { get; set; }
-    public decimal? GroundingCostEur { get; set; }
 
     // Token breakdown (Step43) — run-level sums of the cached-input / reasoning token subsets
     // across all actor calls. Null when none were reported (e.g. pre-Step43 runs).
     public int? CachedInputTokens { get; set; }
     public int? ReasoningTokens { get; set; }
-
-    // Finalizer tracking — null when no finalizers ran or when the run predates Step22.
-    public decimal? FinalizerCostEur { get; set; }
-
-    /// <summary>
-    /// Set when one or more finalizer steps fail. The run status remains <c>Completed</c>;
-    /// this field captures the partial-failure description for display in the UI. Plain-English sentences that name
-    /// steps by their display name, without technical details (same rule as <see cref="ErrorMessage"/>).
-    /// </summary>
-    public string? FinalizerErrorMessage { get; set; }
 
     /// <summary>
     /// Set when this run was created as a resume of an existing run.

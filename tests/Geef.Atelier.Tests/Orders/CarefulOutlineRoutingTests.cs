@@ -78,14 +78,13 @@ public sealed class CarefulOutlineRoutingTests
     }
 
     [Fact]
-    public async Task The_outline_template_is_the_direct_template_under_its_own_name_and_keeps_the_files_out_of_the_crew_grounding()
+    public async Task The_outline_template_is_the_direct_template_under_its_own_name()
     {
         var crew = new RecordingCrew();
 
         var resolved = await crew.Service.ResolveOrderSnapshotAsync(OrderMode.Careful, CancellationToken.None);
 
         Assert.Equal(SystemCrew.DirectOutlineTemplateName, resolved.Snapshot.TemplateName);
-        Assert.Null(resolved.Snapshot.GroundingProviders);
         Assert.Equal(SystemCrew.DirectTemplate with
         {
             Name = SystemCrew.DirectOutlineTemplateName,
@@ -96,10 +95,9 @@ public sealed class CarefulOutlineRoutingTests
         Assert.Equal([.. SystemCrew.DirectTemplate.ReviewerProfileNames, SystemCrew.RequirementsCheckProfile.Name], SystemCrew.DirectOutlineTemplate.ReviewerProfileNames);
         Assert.True(SystemCrew.IsDirectPathTemplate(SystemCrew.DirectOutlineTemplateName));
         Assert.True(SystemCrew.IsDirectPathTemplate(SystemCrew.DirectTemplateName));
-        Assert.False(SystemCrew.IsDirectPathTemplate(SystemCrew.KlassikTemplateName));
+        Assert.False(SystemCrew.IsDirectPathTemplate("klassik"));
         Assert.False(SystemCrew.IsDirectPathTemplate(null));
         Assert.Same(SystemCrew.DirectOutlineTemplate, SystemCrew.CodeOnlyTemplates[SystemCrew.DirectOutlineTemplateName]);
-        Assert.DoesNotContain(SystemCrew.DirectOutlineTemplateName, SystemCrew.CrewTemplates.Keys);
     }
 
     [Theory]
@@ -118,7 +116,7 @@ public sealed class CarefulOutlineRoutingTests
 
     [Theory]
     [InlineData(SystemCrew.DirectOutlineTemplateName, OrderMode.Careful, OrderMode.Direct)]
-    [InlineData(SystemCrew.KlassikTemplateName, OrderMode.Careful, OrderMode.Careful)]
+    [InlineData("klassik", OrderMode.Careful, OrderMode.Careful)]
     [InlineData(SystemCrew.DirectTemplateName, OrderMode.Careful, OrderMode.Careful)]
     [InlineData(SystemCrew.DirectTemplateName, OrderMode.Direct, OrderMode.Direct)]
     [InlineData(null, OrderMode.Careful, OrderMode.Careful)]
@@ -192,7 +190,6 @@ public sealed class CarefulOutlineRoutingTests
             Reviewers: [SystemCrew.DeterministicChecksProfile],
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null,
-            Advisors: [],
-            GroundingProviders: null);
+            Advisors: []);
     }
 }

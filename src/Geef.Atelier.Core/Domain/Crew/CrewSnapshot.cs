@@ -1,53 +1,27 @@
 using System.Text.Json;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
-using Geef.Atelier.Core.Domain.Crew.Specialization;
 
 namespace Geef.Atelier.Core.Domain.Crew;
 
 /// <summary>
-/// Frozen, fully-dereferenced snapshot of the crew configuration used for a single run.
-/// Persisted as JSONB on <c>RunEntity.CrewSnapshot</c> so that runs remain reproducible even
-/// after referenced profiles are renamed or deleted.
+/// Frozen, fully-dereferenced snapshot of the setup used for a single run, persisted as JSON in <c>RunEntity.CrewSnapshot</c> so that a
+/// run stays reproducible. Snapshots of the removed ways of working (D-091) name more fields (advisors with content, grounding sources,
+/// finishers, tool bindings, pack compositions); they are read here without those fields and are never run again.
 /// </summary>
 /// <param name="SchemaVersion">
-/// Format version. Increment when the snapshot schema changes; <see cref="DeserializeForRun"/> throws on
-/// unknown versions to surface format drift early.
+/// Format version. Increment when the snapshot schema changes; <see cref="DeserializeForRun"/> throws on unknown versions to surface
+/// format drift early.
 /// </param>
-/// <param name="TemplateName">
-/// Name of the template the snapshot was built from, or null when the run was submitted with
-/// an inline <see cref="CrewSpec"/>.
-/// </param>
-/// <param name="Executor">Embedded executor profile (full content, not just a reference).</param>
-/// <param name="Reviewers">Embedded reviewer profiles in the order required by the evaluation strategy.</param>
-/// <param name="EvaluationStrategy">Strategy used for reviewer orchestration.</param>
+/// <param name="TemplateName">Name of the code-only template the snapshot was built from.</param>
+/// <param name="Executor">Embedded writer profile (full content, not just a reference).</param>
+/// <param name="Reviewers">Embedded check profiles in the order required by the evaluation strategy.</param>
+/// <param name="EvaluationStrategy">Strategy used for the checks.</param>
 /// <param name="ConvergenceOverride">Convergence-policy overrides applied for this run, if any.</param>
-/// <param name="Advisors">Embedded advisor profiles. Empty when no advisors are configured.</param>
-/// <param name="GroundingProviders">
-/// Fully-dereferenced grounding-provider profiles. Empty for templates without web-research.
-/// Grounding runs once at the start of a run (not per iteration).
+/// <param name="Advisors">
+/// Always empty for new runs. Kept in the stored format because images before stage 8d refuse a snapshot without the list; snapshots
+/// of the removed review loop may carry advisor entries, which are kept as they are and never used.
 /// </param>
-/// <param name="Finalizers">
-/// Fully-dereferenced finalizer profiles in execution order. Null or empty for templates without
-/// post-processing steps. Trailing-optional so snapshots created before this field was introduced
-/// remain deserializable.
-/// </param>
-/// <param name="RunFinalizersOnMaxAttempts">
-/// When <c>true</c>, finalizers also execute if the run exhausts max iterations without converging.
-/// Trailing-optional; defaults to <c>false</c> for backward compatibility.
-/// </param>
-/// <param name="PromptCompositions">
-/// Per-actor record of how each generic role prompt was composed with its bound specialization packs
-/// (role prompt + composed effective prompt + pack provenance). Populated at snapshot-build time for
-/// every actor that has bound packs. <c>null</c> when no actor uses packs (v1/v2 snapshots read as null).
-/// The embedded actor profiles already carry the composed prompt in their <c>SystemPrompt</c>; this
-/// field preserves the role prompt and provenance for the audit UI. Trailing-optional.
-/// </param>
-/// <param name="CrewDomain">
-/// Domain the crew ran in, used for model-matrix assignment (D-066). Audit field; additive without a schema
-/// version bump — snapshots created before D-066 read as <c>null</c>.
-/// </param>
+/// <param name="CrewDomain">Domain the setup ran in, used for model-matrix assignment (D-066); <c>null</c> for snapshots before D-066.</param>
 public sealed record CrewSnapshot(
     int SchemaVersion,
     string? TemplateName,
@@ -55,11 +29,7 @@ public sealed record CrewSnapshot(
     IReadOnlyList<ReviewerProfile> Reviewers,
     EvaluationStrategy EvaluationStrategy,
     ConvergencePolicyOverride? ConvergenceOverride,
-    IReadOnlyList<Advisors.AdvisorProfile> Advisors,
-    IReadOnlyList<GroundingProviderProfile>? GroundingProviders = null,
-    IReadOnlyList<FinalizerProfile>? Finalizers = null,
-    bool RunFinalizersOnMaxAttempts = false,
-    IReadOnlyList<ActorPromptComposition>? PromptCompositions = null,
+    IReadOnlyList<JsonElement> Advisors,
     Models.ModelDomain? CrewDomain = null)
 {
     /// <summary>Current snapshot schema version. Bump when the format changes incompatibly.</summary>
@@ -70,7 +40,7 @@ public sealed record CrewSnapshot(
 
     /// <summary>
     /// Tolerant read for display purposes: returns <c>null</c> if <paramref name="json"/> is null, empty, or cannot
-    /// be parsed. Never use it to decide which crew a run executes; use <see cref="DeserializeForRun"/>.
+    /// be parsed. Never use it to decide which setup a run executes; use <see cref="DeserializeForRun"/>.
     /// </summary>
     public static CrewSnapshot? Deserialize(string? json)
     {
@@ -102,8 +72,8 @@ public sealed record CrewSnapshot(
 
     /// <summary>
     /// Strict read for executing a run. Throws <see cref="InvalidCrewSnapshotException"/> with a user-facing
-    /// reason when the snapshot is missing, unreadable, of an unknown schema version or lacks the executor or the
-    /// reviewer and advisor lists. There is no fallback crew.
+    /// reason when the snapshot is missing, unreadable, of an unknown schema version or lacks the writer or the
+    /// list of checks or advisors. There is no fallback setup.
     /// </summary>
     public static CrewSnapshot DeserializeForRun(string? json)
     {

@@ -1,6 +1,4 @@
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Models;
 
 namespace Geef.Atelier.Tests.Domain.Crew.Models;
@@ -8,74 +6,46 @@ namespace Geef.Atelier.Tests.Domain.Crew.Models;
 public sealed class SystemCrewModelMatrixTests
 {
     [Fact]
-    public void EveryLlmSystemProfileCarriesAnAllowedSlot()
+    public void EveryLlmCodeOnlyProfileWithASlotCarriesAnAllowedSlot()
     {
-        foreach (var e in SystemCrew.ExecutorProfiles.Values)
+        foreach (var e in SystemCrew.CodeOnlyExecutorProfiles.Values)
             Assert.True(e.ModelSlot is { } s && s.IsAllowedFor(ModelActorKind.Executor), e.Name);
-        foreach (var r in SystemCrew.ReviewerProfiles.Values)
-            Assert.True(r.ModelSlot is { } s && s.IsAllowedFor(ModelActorKind.Reviewer), r.Name);
-        foreach (var a in SystemCrew.AdvisorProfiles.Values)
-            Assert.True(a.ModelSlot is { } s && s.IsAllowedFor(ModelActorKind.Advisor), a.Name);
+        foreach (var r in SystemCrew.CodeOnlyReviewerProfiles.Values.Where(r => r.ModelSlot is not null))
+            Assert.True(r.ModelSlot!.Value.IsAllowedFor(ModelActorKind.Reviewer), r.Name);
     }
 
     [Fact]
-    public void SystemProfileBindingsAreTheMatrixPrimaries()
+    public void CodeOnlyProfileBindingsAreTheMatrixPrimaries()
     {
-        foreach (var r in SystemCrew.ReviewerProfiles.Values.Where(r => r.ModelSlot is not null))
+        foreach (var e in SystemCrew.CodeOnlyExecutorProfiles.Values)
+            Assert.Equal(ModelMatrix.Primary(e.ModelSlot!.Value, e.ModelDomain ?? ModelDomain.General), new ModelCandidate(e.Provider, e.Model));
+        foreach (var r in SystemCrew.CodeOnlyReviewerProfiles.Values.Where(r => r.ModelSlot is not null))
             Assert.Equal(ModelMatrix.Primary(r.ModelSlot!.Value, r.ModelDomain ?? ModelDomain.General), new ModelCandidate(r.Provider, r.Model));
-        foreach (var a in SystemCrew.AdvisorProfiles.Values)
-            Assert.Equal(ModelMatrix.Primary(a.ModelSlot!.Value, a.ModelDomain ?? ModelDomain.General), new ModelCandidate(a.Provider, a.Model));
     }
 
     [Fact]
-    public void SystemTemplatesDeclareTheirDomain()
+    public void CodeOnlyTemplatesDeclareTheGeneralDomain()
     {
-        Assert.Equal(ModelDomain.General, SystemCrew.KlassikTemplate.Domain);
-        Assert.Equal(ModelDomain.Legal, SystemCrew.JuristischTemplate.Domain);
-        Assert.Equal(ModelDomain.Academic, SystemCrew.AkademischTemplate.Domain);
-        Assert.Equal(ModelDomain.Marketing, SystemCrew.MarketingTemplate.Domain);
+        Assert.All(SystemCrew.CodeOnlyTemplates.Values, t => Assert.Equal(ModelDomain.General, t.Domain));
     }
 
     [Fact]
-    public void NoSystemTemplateReviewerSharesTheExecutorsPrimaryModel()
+    public void NoCodeOnlyTemplateCheckSharesTheWritersPrimaryModel()
     {
-        foreach (var template in SystemCrew.CrewTemplates.Values)
+        foreach (var template in SystemCrew.CodeOnlyTemplates.Values)
         {
-            var executor = SystemCrew.ExecutorProfiles[template.ExecutorProfileName];
+            var executor = SystemCrew.CodeOnlyExecutorProfiles[template.ExecutorProfileName];
             var domain = template.Domain ?? ModelDomain.General;
             var executorModel = ModelMatrix.Primary(executor.ModelSlot!.Value, domain).Model;
 
             foreach (var name in template.ReviewerProfileNames)
             {
-                var reviewer = SystemCrew.ReviewerProfiles[name];
-                if (reviewer.ModelSlot is not { } slot)
+                var reviewer = SystemCrew.CodeOnlyReviewerProfiles[name];
+                var model = reviewer.ModelSlot is { } slot ? ModelMatrix.CandidatesFor(slot, reviewer.ModelDomain ?? domain)[0].Model : reviewer.Model;
+                if (model.Length == 0)
                     continue;
-                var first = ModelMatrix.CandidatesFor(slot, reviewer.ModelDomain ?? domain)[0];
-                Assert.False(CliRoute.IsSameModel(first.Model, executorModel), $"{template.Name}/{name}");
+                Assert.False(CliRoute.IsSameModel(model, executorModel), $"{template.Name}/{name}");
             }
         }
     }
-
-    [Fact]
-    public void SystemRefinersAndTransformsAreManagedByTheMatrix()
-    {
-        foreach (var g in SystemCrew.GroundingProviderProfiles.Values.Where(g => g.RefinementBinding is not null))
-        {
-            Assert.Equal(ModelSlot.GroundingRefiner, g.RefinementModelSlot);
-            Assert.Equal("claude-cli", g.ProviderSettings[GroundingProviderProfile.KeyRefinementProvider]);
-        }
-
-        var transforms = SystemCrew.FinalizerProfiles.Values.Where(f => f.FinalizerType == FinalizerType.Transform).ToList();
-        Assert.Equal(6, transforms.Count);
-        foreach (var t in transforms)
-        {
-            var settings = TransformSettings.From(t.Settings);
-            Assert.NotNull(settings.ModelSlot);
-            Assert.Equal(ModelMatrix.Primary(settings.ModelSlot!.Value), new ModelCandidate(settings.Provider, settings.Model));
-        }
-
-        Assert.Equal(ModelSlot.TransformRewrite, TransformSettings.From(SystemCrew.AntiAiVoiceProfile.Settings).ModelSlot);
-        Assert.Equal(ModelSlot.TransformCondense, TransformSettings.From(SystemCrew.GlossaryProfile.Settings).ModelSlot);
-    }
-
 }

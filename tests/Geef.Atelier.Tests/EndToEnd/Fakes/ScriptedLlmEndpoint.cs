@@ -30,7 +30,7 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
     public const string DefaultExecutorText =
         "E2E draft. This text was produced by the scripted executor of the end-to-end test.";
 
-    private static readonly string ExecutorPromptPrefix = SystemPrompts.Executor.Trim()[..60];
+    private static readonly string ExecutorPromptPrefix = SystemPrompts.DirectWriter.Trim()[..60];
 
     /// <summary>Text the executor returns in every iteration.</summary>
     public string ExecutorText { get; set; } = DefaultExecutorText;

@@ -71,7 +71,7 @@ public sealed class OrderRunStarterTests
         }),
         ScriptedProxy<ICrewService>.Create((method, _) => method.Name switch
         {
-            nameof(ICrewService.ResolveCodeTemplateSnapshotAsync) or nameof(ICrewService.ResolveSnapshotWithWarningsAsync) =>
+            nameof(ICrewService.ResolveCodeTemplateSnapshotAsync) =>
                 Task.FromResult(new ResolvedCrewSnapshot(Snapshot, [])),
             _ => throw new InvalidOperationException(method.Name),
         }),
@@ -94,8 +94,7 @@ public sealed class OrderRunStarterTests
         Reviewers: [SystemCrew.DeterministicChecksProfile],
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
-        Advisors: [],
-        GroundingProviders: null);
+        Advisors: []);
 
     private sealed class RecordingComposer : IOrderBriefComposer
     {

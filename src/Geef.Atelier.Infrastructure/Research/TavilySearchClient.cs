@@ -4,7 +4,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Research;
-using Geef.Atelier.Infrastructure.Grounding;
 using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Research;

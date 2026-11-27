@@ -50,10 +50,6 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
             .HasColumnType("numeric(10,6)")
             .IsRequired(false);
 
-        builder.Property(r => r.GroundingCostEur)
-            .HasColumnType("numeric(10,6)")
-            .IsRequired(false);
-
         builder.HasIndex(r => r.Status);
 
         builder.Property(r => r.ParentRunId).IsRequired(false);

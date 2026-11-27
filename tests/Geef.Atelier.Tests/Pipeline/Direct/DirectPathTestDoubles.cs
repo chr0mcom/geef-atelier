@@ -1,13 +1,11 @@
 using System.Collections.Concurrent;
 using Geef.Atelier.Application.Research;
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Research;
 using Geef.Atelier.Core.Domain.Writing;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence;
-using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Core.Persistence.Sources;
 
@@ -157,23 +155,6 @@ internal sealed class RecordingRunReportWriter : IRunReportWriter
         Reports[runId] = reportJson;
         return Task.CompletedTask;
     }
-}
-
-/// <summary>Keeps every grounding consultation.</summary>
-internal sealed class RecordingConsultationRepository : IGroundingConsultationRepository
-{
-    public ConcurrentQueue<GroundingConsultation> Created { get; } = new();
-
-    public Task<GroundingConsultation> CreateAsync(GroundingConsultation consultation, CancellationToken ct)
-    {
-        Created.Enqueue(consultation);
-        return Task.FromResult(consultation);
-    }
-
-    public Task<IReadOnlyList<GroundingConsultation>> GetByRunIdAsync(Guid runId, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<GroundingConsultation>>(Created.Where(c => c.RunId == runId).ToList());
-
-    public Task UpdateRefinementOutcomeAsync(Guid consultationId, RefinementOutcome outcome, CancellationToken ct) => Task.CompletedTask;
 }
 
 /// <summary>One call of <see cref="IOrderResearchService.EnsureAsync"/> as the grounding step made it.</summary>

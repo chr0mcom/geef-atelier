@@ -1,6 +1,5 @@
 using Bunit;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Web.Components.UI;
 
@@ -38,7 +37,7 @@ public sealed class CrewSummaryTests : TestContext
             Reviewers: reviewers ?? new[] { MakeReviewer("r1", "Reviewer One"), MakeReviewer("r2", "Reviewer Two") },
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: convergenceOverride,
-            Advisors: Array.Empty<AdvisorProfile>());
+            Advisors: []);
 
     [Fact]
     public void NullSnapshot_RendersFallbackLabel()
@@ -50,7 +49,7 @@ public sealed class CrewSummaryTests : TestContext
         });
 
         Assert.Contains("MyFallback", cut.Markup);
-        Assert.Contains("system default", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("details no longer available", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -62,9 +61,8 @@ public sealed class CrewSummaryTests : TestContext
             p.Add(c => c.FallbackTemplateName, (string?)null);
         });
 
-        // Default fallback is "Classic"
-        Assert.Contains("Classic", cut.Markup);
-        Assert.Contains("system default", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("unknown", cut.Markup);
+        Assert.Contains("details no longer available", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -73,11 +71,7 @@ public sealed class CrewSummaryTests : TestContext
         var snapshot = MakeSnapshot();
         var cut = RenderComponent<CrewSummary>(p => p.Add(c => c.Snapshot, snapshot));
 
-        // Should show executor + reviewer count in header
-        Assert.Contains("1 Executor", cut.Markup);
-        Assert.Contains("2 Reviewers", cut.Markup);
-
-        // Body should not be visible when collapsed
+        Assert.Contains("writer + 2 checks", cut.Markup);
         Assert.Throws<Bunit.ElementNotFoundException>(() => cut.Find("[data-testid='crew-summary-body']"));
     }
 
@@ -131,5 +125,27 @@ public sealed class CrewSummaryTests : TestContext
 
         var body = cut.Find("[data-testid='crew-summary-body']");
         Assert.DoesNotContain("Override", body.TextContent);
+    }
+
+    [Fact]
+    public void A_setup_of_a_removed_way_of_working_says_that_its_details_are_gone()
+    {
+        var cut = RenderComponent<CrewSummary>(p => p.Add(c => c.Snapshot, MakeSnapshot("klassik")));
+
+        cut.Find("[data-testid='crew-summary-toggle']").Click();
+
+        Assert.Contains("no longer exists", cut.Find("[data-testid='crew-summary-retired']").TextContent);
+    }
+
+    [Theory]
+    [InlineData(SystemCrew.DirectTemplateName, "Direct")]
+    [InlineData(SystemCrew.DirectOutlineTemplateName, "Extra careful")]
+    public void A_direct_setup_shows_its_name_and_no_retired_note(string template, string display)
+    {
+        var cut = RenderComponent<CrewSummary>(p => p.Add(c => c.Snapshot, MakeSnapshot(template)));
+
+        Assert.Contains($"Setup: {display}", cut.Find("[data-testid='crew-summary-toggle']").TextContent);
+        cut.Find("[data-testid='crew-summary-toggle']").Click();
+        Assert.Empty(cut.FindAll("[data-testid='crew-summary-retired']"));
     }
 }

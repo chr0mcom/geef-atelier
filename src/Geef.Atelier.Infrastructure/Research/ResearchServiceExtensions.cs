@@ -9,10 +9,18 @@ namespace Geef.Atelier.Infrastructure.Research;
 /// <summary>DI registration of the research before the first run of an order.</summary>
 public static class ResearchServiceExtensions
 {
-    /// <summary>Binds <see cref="ResearchOptions"/> and registers search, passage picker and research service; the Tavily client comes from the grounding registration.</summary>
+    /// <summary>
+    /// Binds <see cref="ResearchOptions"/> and <see cref="TavilyOptions"/>, registers the named HTTP client of the search
+    /// (<see cref="TavilySearchClient.HttpClientName"/>) and the search, passage picker and research service.
+    /// </summary>
     public static IServiceCollection AddResearch(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<ResearchOptions>(configuration.GetSection(ResearchOptions.SectionName));
+        services.Configure<TavilyOptions>(configuration.GetSection(TavilyOptions.SectionName));
+        var endpoint = configuration[$"{TavilyOptions.SectionName}:Endpoint"] ?? new TavilyOptions().Endpoint;
+        if (!endpoint.EndsWith('/'))
+            endpoint += '/';
+        services.AddHttpClient(TavilySearchClient.HttpClientName, client => client.BaseAddress = new Uri(endpoint));
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<ITavilySearchClient, TavilySearchClient>();
         services.TryAddScoped<IDossierCondenser, LlmDossierCondenser>();

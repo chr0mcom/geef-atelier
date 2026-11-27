@@ -1,5 +1,4 @@
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
@@ -22,7 +21,7 @@ public sealed class AtelierPipelineFactoryWithSnapshotTests
         Reviewers: TestLoop.Reviewers,
         EvaluationStrategy: strategy,
         ConvergenceOverride: null,
-        Advisors: Array.Empty<AdvisorProfile>());
+        Advisors: []);
 
     [Theory]
     [InlineData(EvaluationStrategy.Parallel)]
@@ -51,7 +50,7 @@ public sealed class AtelierPipelineFactoryWithSnapshotTests
             Reviewers: [TestLoop.Reviewers[0]],
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
-            Advisors: Array.Empty<AdvisorProfile>());
+            Advisors: []);
 
         var ex = Record.Exception(() =>
             TestLoop.Build(snapshot, resolver, Options.Create(new ConvergenceOptions())));

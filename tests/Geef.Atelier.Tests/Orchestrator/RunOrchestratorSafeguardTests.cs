@@ -1,17 +1,17 @@
 using System.Collections.Concurrent;
-using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Web.Services;
+using Geef.Sdk;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,15 +20,12 @@ namespace Geef.Atelier.Tests.Orchestrator;
 
 /// <summary>
 /// The two safeguards around a delivered text (finding 4 of the second test review of Etappe 0): when the results of
-/// the finishing steps cannot be stored, the delivered text stays, the outcome is still a delivered one and the run
-/// gets a <see cref="RunWarningCodes.FinalizerFailed"/> warning; a failing live-update notifier never changes the run
+/// the run kind cannot be stored, the delivered text stays and the outcome is still a delivered one; a failing live-update notifier never changes the run
 /// and is not treated as a failure of the run. Both are checked on the converged path and on the best-effort path.
 /// </summary>
 [Collection("Postgres")]
 public sealed class RunOrchestratorSafeguardTests(PostgresFixture fixture)
 {
-    private const string FinishingStepsNotCompletedMessage = "The finishing steps could not be completed.";
-
     private static OrchestratorOptions FastOptions() => new()
     {
         PollingInterval = TimeSpan.FromMilliseconds(100),
@@ -40,15 +37,11 @@ public sealed class RunOrchestratorSafeguardTests(PostgresFixture fixture)
     [Theory(Timeout = 30_000)]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task FailedStoringOfTheFinishingStepResultsKeepsTheDeliveredTextAndWarns(bool bestEffort)
+    public async Task FailedStoringOfTheRunKindResultsKeepsTheDeliveredText(bool bestEffort)
     {
-        var briefing = Briefing();
-        var runId = await CreateRunAsync(briefing, SnapshotJson(bestEffort, withFinalizer: true));
-        await using var trigger = await RunRowTrigger.CreateAsync(fixture, briefing,
-            $"""NEW."FinalText" = '{TransformingFinalizerFactory.TransformedText}'""",
-            "RAISE EXCEPTION 'injected finishing step write failure';");
+        var runId = await CreateRunAsync(Briefing(), SnapshotJson(bestEffort));
         await using var host = new OrchestratorTestHost(fixture, LlmFor(bestEffort), FastOptions(),
-            services => services.AddSingleton<IFinalizerExecutorFactory>(new TransformingFinalizerFactory()));
+            services => services.AddSingleton<IPipelineAssembler, ThrowingFinishAssembler>());
         await host.StartAsync();
 
         var run = await WaitForOutcomeAsync(runId);
@@ -56,13 +49,8 @@ public sealed class RunOrchestratorSafeguardTests(PostgresFixture fixture)
         Assert.Equal(bestEffort ? RunOutcome.DeliveredWithOpenPoints : RunOutcome.Converged, run.Outcome);
         Assert.Equal(bestEffort ? RunStatus.Failed : RunStatus.Completed, run.Status);
         Assert.False(string.IsNullOrWhiteSpace(run.FinalText));
-        Assert.NotEqual(TransformingFinalizerFactory.TransformedText, run.FinalText);
         Assert.NotEqual(RunOrchestratorService.UnexpectedErrorMessage, run.ErrorMessage);
-        var warnings = await WarningsAsync(runId);
-        var warning = Assert.Single(warnings, w => w.Code == RunWarningCodes.FinalizerFailed);
-        Assert.Equal(RunWarningSources.Finalizer, warning.Source);
-        Assert.Equal(FinishingStepsNotCompletedMessage, warning.Message);
-        Assert.DoesNotContain(warnings, w => w.Code == RunWarningCodes.ResultNotSaved);
+        Assert.DoesNotContain(await WarningsAsync(runId), w => w.Code == RunWarningCodes.ResultNotSaved);
     }
 
     [Theory(Timeout = 30_000)]
@@ -72,7 +60,7 @@ public sealed class RunOrchestratorSafeguardTests(PostgresFixture fixture)
     {
         var notifier = new FailingRunNotifier();
         var logs = new CapturingLoggerProvider();
-        var runId = await CreateRunAsync(Briefing(), SnapshotJson(bestEffort, withFinalizer: false));
+        var runId = await CreateRunAsync(Briefing(), SnapshotJson(bestEffort));
         var host = new OrchestratorTestHost(fixture, LlmFor(bestEffort), FastOptions(), services =>
         {
             services.AddSingleton<IRunNotifier>(notifier);
@@ -101,22 +89,12 @@ public sealed class RunOrchestratorSafeguardTests(PostgresFixture fixture)
 
     private static ILlmClient LlmFor(bool bestEffort) => bestEffort ? new RejectingFakeLlmClient() : new FakeLlmClient();
 
-    private static string SnapshotJson(bool bestEffort, bool withFinalizer)
-    {
-        var snapshot = TestCrewSnapshots.Runnable;
-        if (bestEffort)
-            snapshot = snapshot with
-            {
-                ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
-                RunFinalizersOnMaxAttempts = withFinalizer,
-            };
-        if (withFinalizer)
-            snapshot = snapshot with
-            {
-                Finalizers = [new FinalizerProfile("transforming-step", "Transforming step", "d", FinalizerType.Transform, [], false)],
-            };
-        return TestCrewSnapshots.Serialize(snapshot);
-    }
+    private static string SnapshotJson(bool bestEffort) => TestCrewSnapshots.Serialize(bestEffort
+        ? TestCrewSnapshots.Runnable with
+        {
+            ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
+        }
+        : TestCrewSnapshots.Runnable);
 
     private async Task<Guid> CreateRunAsync(string briefing, string snapshotJson)
     {
@@ -148,19 +126,18 @@ public sealed class RunOrchestratorSafeguardTests(PostgresFixture fixture)
         return await db.RunWarnings.AsNoTracking().Where(w => w.RunId == runId).ToListAsync();
     }
 
-    private sealed class TransformingFinalizerFactory : IFinalizerExecutorFactory
+    private sealed class ThrowingFinishAssembler : IPipelineAssembler
     {
-        public const string TransformedText = "Text after the transforming step.";
+        private readonly TestLoopAssembler _inner = new();
 
-        public IFinalizerExecutor GetExecutor(FinalizerType type) => new Transforming(type);
+        public int Priority => 0;
 
-        private sealed class Transforming(FinalizerType type) : IFinalizerExecutor
-        {
-            public FinalizerType Type => type;
+        public bool CanAssemble(RunEntity run, CrewSnapshot snapshot) => _inner.CanAssemble(run, snapshot);
 
-            public Task<FinalizerExecutionResult> ExecuteAsync(FinalizerProfile profile, FinalizerExecutionContext context, CancellationToken cancellationToken) =>
-                Task.FromResult(new FinalizerExecutionResult(TransformedText, null, null, profile.Name));
-        }
+        public GeefPipelineRunner<FinalizedDocument> Assemble(PipelineAssemblyContext context) => _inner.Assemble(context);
+
+        public Task OnRunFinishedAsync(PipelineAssemblyContext context, GeefPipelineResult<FinalizedDocument> result, CancellationToken ct) =>
+            throw new InvalidOperationException("injected failure while storing the results of the run kind");
     }
 
     private sealed class FailingRunNotifier : IRunNotifier

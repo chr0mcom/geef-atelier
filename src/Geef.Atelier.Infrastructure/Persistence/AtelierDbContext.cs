@@ -1,16 +1,10 @@
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
-using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.OAuth;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
-using Geef.Atelier.Infrastructure.Persistence.Entities;
 using Geef.Atelier.Infrastructure.Persistence.Providers;
 using Geef.Atelier.Infrastructure.Persistence.SiteSettings;
 using Microsoft.EntityFrameworkCore;
@@ -36,24 +30,7 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     public DbSet<UserProfileEntity> UserProfiles => Set<UserProfileEntity>();
     public DbSet<OrderIntakeShadowEntity> OrderIntakeShadows => Set<OrderIntakeShadowEntity>();
 
-    public DbSet<ReviewerProfile> ReviewerProfiles => Set<ReviewerProfile>();
-    public DbSet<ExecutorProfile> ExecutorProfiles => Set<ExecutorProfile>();
-    public DbSet<CrewTemplate> CrewTemplates => Set<CrewTemplate>();
-    public DbSet<AdvisorProfile> AdvisorProfiles => Set<AdvisorProfile>();
-    public DbSet<AdvisorConsultation> AdvisorConsultations => Set<AdvisorConsultation>();
-
-    public DbSet<GroundingProviderProfile> GroundingProviderProfiles => Set<GroundingProviderProfile>();
-    public DbSet<GroundingConsultation> GroundingConsultations => Set<GroundingConsultation>();
-    public DbSet<GroundingActorCost> GroundingActorCosts => Set<GroundingActorCost>();
-
-    public DbSet<FinalizerProfile> FinalizerProfiles => Set<FinalizerProfile>();
-    public DbSet<RunArtifact> RunArtifacts => Set<RunArtifact>();
-    public DbSet<FinalizationActorCost> FinalizationActorCosts => Set<FinalizationActorCost>();
-
     public DbSet<IterationActorCostEntity> IterationActorCosts => Set<IterationActorCostEntity>();
-
-
-
 
     internal DbSet<AtelierUser> Users => Set<AtelierUser>();
 
@@ -66,10 +43,6 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<OAuthAccessToken> OAuthAccessTokens => Set<OAuthAccessToken>();
     internal DbSet<OAuthRefreshToken> OAuthRefreshTokens => Set<OAuthRefreshToken>();
     internal DbSet<OAuthAuditLogEntry> OAuthAuditLog => Set<OAuthAuditLogEntry>();
-
-
-
-    internal DbSet<SpecializationPackEntity> SpecializationPacks => Set<SpecializationPackEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

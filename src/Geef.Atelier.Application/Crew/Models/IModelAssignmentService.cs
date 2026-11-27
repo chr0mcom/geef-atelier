@@ -11,8 +11,8 @@ namespace Geef.Atelier.Application.Crew.Models;
 public interface IModelAssignmentService
 {
     /// <summary>
-    /// Assigns a single actor. With <paramref name="executor"/> the executor's model is excluded (advisors);
-    /// reviewer slots additionally prefer a vendor family different from the executor's.
+    /// Assigns a single actor. With <paramref name="executor"/> the executor's model is excluded; reviewer slots additionally prefer a
+    /// vendor family different from the executor's.
     /// </summary>
     /// <param name="slot">Role of the actor.</param>
     /// <param name="domain">Effective domain (profile override or crew domain).</param>
@@ -37,9 +37,8 @@ public interface IModelAssignmentService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Returns <paramref name="snapshot"/> with every managed actor (profiles with a model slot, grounding
-    /// refiners and Transform finalizers carrying a slot marker) bound to its assigned model. Manual actors
-    /// are returned unchanged. Never throws because of catalog problems.
+    /// Returns <paramref name="snapshot"/> with every managed actor (writer and check profiles with a model slot) bound to its assigned
+    /// model. Actors without a slot are returned unchanged. Never throws because of catalog problems.
     /// </summary>
     Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, CancellationToken ct = default) =>
         ApplyAsync(snapshot, new List<ModelAssignmentWarning>(), ct);

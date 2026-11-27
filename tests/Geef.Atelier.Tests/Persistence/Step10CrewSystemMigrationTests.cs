@@ -112,10 +112,8 @@ public sealed class Step10CrewSystemMigrationTests : IAsyncLifetime
         await using var context = new AtelierDbContext(options);
         await context.Database.MigrateAsync();
 
-        // Tables exist if these counts don't throw.
-        // (Later migrations seed system profiles; counts are > 0 after full migration.)
-        Assert.True(await context.ReviewerProfiles.CountAsync() >= 0);
-        Assert.True(await context.ExecutorProfiles.CountAsync() >= 0);
-        Assert.True(await context.CrewTemplates.CountAsync() >= 0);
+        Assert.True(await context.Database.SqlQueryRaw<int>("""SELECT count(*)::int AS "Value" FROM "ReviewerProfiles" """).SingleAsync() >= 0);
+        Assert.True(await context.Database.SqlQueryRaw<int>("""SELECT count(*)::int AS "Value" FROM "ExecutorProfiles" """).SingleAsync() >= 0);
+        Assert.True(await context.Database.SqlQueryRaw<int>("""SELECT count(*)::int AS "Value" FROM "CrewTemplates" """).SingleAsync() >= 0);
     }
 }

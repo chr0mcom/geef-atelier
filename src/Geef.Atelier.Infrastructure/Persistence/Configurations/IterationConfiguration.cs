@@ -30,8 +30,5 @@ internal sealed class IterationConfiguration : IEntityTypeConfiguration<Iteratio
             .HasColumnType("numeric(10,6)")
             .IsRequired(false);
 
-        builder.Property(i => i.AdvisorsTotalCostEur)
-            .HasColumnType("numeric(10,6)")
-            .IsRequired(false);
     }
 }

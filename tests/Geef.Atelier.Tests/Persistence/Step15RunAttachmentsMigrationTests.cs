@@ -65,20 +65,4 @@ public sealed class Step15RunAttachmentsMigrationTests : IAsyncLifetime
         });
     }
 
-    [Fact]
-    public async Task Migration_GroundingProviderProfiles_ContainsRunAttachmentsEntry()
-    {
-        await using var context = NewContext();
-        await context.Database.MigrateAsync();
-
-        var profile = await context.GroundingProviderProfiles
-            .FirstOrDefaultAsync(p => p.Name == "run-attachments");
-
-        Assert.NotNull(profile);
-        Assert.Equal("Run Attachments", profile!.DisplayName);
-        Assert.Equal("vector-store", profile.ProviderType);
-        Assert.True(profile.IsSystem);
-        Assert.True(profile.ProviderSettings.ContainsKey("Scope"));
-        Assert.Equal("run-local", profile.ProviderSettings["Scope"]);
-    }
 }

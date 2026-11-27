@@ -4,11 +4,9 @@ using Geef.Atelier.Application.Research;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Core.Persistence;
-using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Core.Persistence.Runs;
 using Geef.Atelier.Core.Persistence.Sources;
@@ -59,7 +57,6 @@ internal sealed class DirectPipelineHarness
         services.AddSingleton<IOrderRepository>(Orders);
         services.AddSingleton<ISourceRepository>(Sources);
         services.AddSingleton<IRunReportWriter>(Reports);
-        services.AddSingleton<IGroundingConsultationRepository>(Consultations);
         services.AddSingleton<IRunFactCheckModeStore>(FactCheckModes);
         services.AddSingleton<IOptions<DirectOptions>>(_ => Options.Create(DirectOptions));
         services.AddSingleton<IOrderResearchService>(Research);
@@ -75,7 +72,6 @@ internal sealed class DirectPipelineHarness
     public InMemoryOrderRepository Orders { get; } = new();
     public InMemorySourceRepository Sources { get; } = new();
     public RecordingRunReportWriter Reports { get; } = new();
-    public RecordingConsultationRepository Consultations { get; } = new();
     public RecordingRunFactCheckModeStore FactCheckModes { get; } = new();
     public DirectOptions DirectOptions { get; } = new() { FactCheckMode = FactCheckMode.Off, WriterNotes = false };
     public InMemoryRunWarnings Warnings { get; } = new();
@@ -97,7 +93,7 @@ internal sealed class DirectPipelineHarness
         Reviewers: [SystemCrew.DeterministicChecksProfile],
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: SystemCrew.DirectTemplate.ConvergenceOverride,
-        Advisors: Array.Empty<AdvisorProfile>(),
+        Advisors: [],
         CrewDomain: SystemCrew.DirectTemplate.Domain);
 
     /// <summary>
@@ -124,7 +120,7 @@ internal sealed class DirectPipelineHarness
 
     public PipelineAssemblyContext Context(RunEntity run) => new(
         run, Snapshot, Services, Services.GetRequiredService<IServiceScopeFactory>(), Resolver,
-        Options.Create(new ConvergenceOptions()), NullLoggerFactory.Instance, new CountingEventSink(), Costs, Warnings, null, null);
+        Options.Create(new ConvergenceOptions()), NullLoggerFactory.Instance, new CountingEventSink(), Costs, Warnings, null);
 
     /// <summary>Builds and runs the pipeline, then lets the assembler store the report, like the orchestrator.</summary>
     public async Task<DirectRunOutcome> RunAsync(RunEntity run)

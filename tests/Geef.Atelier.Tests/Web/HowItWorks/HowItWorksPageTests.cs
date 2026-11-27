@@ -314,7 +314,6 @@ public sealed class HowItWorksPageTests : TestContext
     [Fact]
     public void The_standard_way_reaches_the_web_only_through_the_research_service()
     {
-        Assert.Empty(Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplate.GroundingProviderNames);
         Assert.Equal(Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName, Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplate.Name);
     }
 

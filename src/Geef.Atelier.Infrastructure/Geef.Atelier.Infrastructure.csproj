@@ -13,7 +13,6 @@
   <ItemGroup>
     <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="Geef.Sdk" />
-    <PackageReference Include="HtmlAgilityPack" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
     <PackageReference Include="Markdig" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />

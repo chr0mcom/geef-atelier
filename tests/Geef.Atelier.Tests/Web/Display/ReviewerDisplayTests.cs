@@ -25,7 +25,6 @@ public sealed class ReviewerDisplayTests
     public void CodeOnlyProfilesAndTemplatesShowTheirDisplayNames()
     {
         Assert.Equal("Automatic checks", ReviewerDisplay.ToDisplay("deterministic-checks"));
-        Assert.Equal("Writer", ReviewerDisplay.GetExecutorDisplay("direct-writer"));
         Assert.Equal("Direct", ReviewerDisplay.GetTemplateDisplay("direct"));
     }
 

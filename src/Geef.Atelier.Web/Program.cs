@@ -10,7 +10,6 @@ using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
-using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Intake;
 using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Atelier.Infrastructure.Llm;
@@ -20,7 +19,6 @@ using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using Geef.Atelier.Infrastructure.Research;
 using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Infrastructure.Sources.Extraction;
-using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.Orders;
 using Geef.Atelier.Mcp;
 using Geef.Atelier.Web.Auth;
@@ -72,14 +70,12 @@ builder.Services.AddAtelierPersistence();
 builder.Services.AddAtelierApplication();
 
 
-builder.Services.AddGroundingProviders(builder.Configuration);
 builder.Services.AddResearch(builder.Configuration);
 
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection("Pricing"));
 builder.Services.Configure<CostTrackingOptions>(builder.Configuration.GetSection("CostTracking"));
 builder.Services.AddSingleton<IPricingCatalog, PricingCatalog>();
 builder.Services.AddSingleton<DocsService>();
-builder.Services.AddFinalizers(builder.Configuration);
 
 builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
 builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));
@@ -158,7 +154,7 @@ builder.Services.AddRazorComponents()
 var app = builder.Build();
 
 await app.Services.MigrateDatabaseOrFailAsync();
-app.Configuration.WarnAboutMissingGroundingKeys(app.Services.GetRequiredService<ILogger<Program>>());
+app.Configuration.WarnAboutMissingResearchKey(app.Services.GetRequiredService<ILogger<Program>>());
 
 await app.Services.SeedAdminUserFromOptionsAsync();
 
@@ -207,7 +203,6 @@ app.MapAuthEndpoints();
 app.MapWellKnownEndpoints();
 app.MapOAuthEndpoints();
 app.MapSettingsEndpoints();
-app.MapArtifactEndpoints();
 app.MapProviderEndpoints();
 app.MapSourceEndpoints();
 app.MapUploadEndpoints();

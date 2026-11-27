@@ -1,6 +1,5 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
@@ -38,7 +37,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
             Reviewers: TestLoop.Reviewers,
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null,
-            Advisors: Array.Empty<AdvisorProfile>());
+            Advisors: []);
 
         var runner = TestLoop.Build(
             snapshot,
@@ -95,7 +94,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
             Reviewers: TestLoop.Reviewers,
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null,
-            Advisors: Array.Empty<AdvisorProfile>());
+            Advisors: []);
 
         var runner = TestLoop.Build(
             snapshot,

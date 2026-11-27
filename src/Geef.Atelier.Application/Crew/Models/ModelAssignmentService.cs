@@ -1,6 +1,4 @@
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Models;
 using Microsoft.Extensions.Logging;
 
@@ -55,93 +53,11 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
             })
             .ToList();
 
-        var advisors = new List<Core.Domain.Crew.Advisors.AdvisorProfile>(snapshot.Advisors.Count);
-        foreach (var advisor in snapshot.Advisors)
-        {
-            if (advisor.ModelSlot is not { } advisorSlot)
-            {
-                advisors.Add(advisor);
-                continue;
-            }
-
-            var assignment = await session.AssignSingleAsync(advisorSlot, advisor.ModelDomain ?? crewDomain, executorBinding);
-            ReportTo(warnings, advisor.Name, advisor.DisplayName, assignment);
-            advisors.Add(advisor with { Provider = assignment.Candidate.Provider, Model = assignment.Candidate.Model });
-        }
-
         return snapshot with
         {
             Executor = executor,
             Reviewers = reviewers,
-            Advisors = advisors,
-            GroundingProviders = await AssignGroundingAsync(session, snapshot.GroundingProviders, crewDomain, warnings),
-            Finalizers = await AssignFinalizersAsync(session, snapshot.Finalizers, crewDomain, warnings),
         };
-    }
-
-    private async Task<IReadOnlyList<GroundingProviderProfile>?> AssignGroundingAsync(
-        Session session, IReadOnlyList<GroundingProviderProfile>? providers, ModelDomain crewDomain, ICollection<ModelAssignmentWarning> warnings)
-    {
-        if (providers is not { Count: > 0 })
-            return providers;
-
-        var result = new List<GroundingProviderProfile>(providers.Count);
-        foreach (var profile in providers)
-        {
-            if (profile.RefinementModelSlot is not { } slot)
-            {
-                result.Add(profile);
-                continue;
-            }
-
-            var assignment = await session.AssignSingleAsync(slot, crewDomain, executor: null);
-            ReportTo(warnings, profile.Name, profile.DisplayName, assignment);
-            var settings = new Dictionary<string, string>(profile.ProviderSettings)
-            {
-                [GroundingProviderProfile.KeyRefinementProvider] = assignment.Candidate.Provider,
-                [GroundingProviderProfile.KeyRefinementModel] = assignment.Candidate.Model,
-            };
-            result.Add(profile with { ProviderSettings = settings });
-        }
-
-        return result;
-    }
-
-    private async Task<IReadOnlyList<FinalizerProfile>?> AssignFinalizersAsync(
-        Session session, IReadOnlyList<FinalizerProfile>? finalizers, ModelDomain crewDomain, ICollection<ModelAssignmentWarning> warnings)
-    {
-        if (finalizers is not { Count: > 0 })
-            return finalizers;
-
-        var result = new List<FinalizerProfile>(finalizers.Count);
-        foreach (var profile in finalizers)
-        {
-            if (profile.FinalizerType != FinalizerType.Transform || TransformSlotOf(profile.Settings) is not { } slot)
-            {
-                result.Add(profile);
-                continue;
-            }
-
-            var assignment = await session.AssignSingleAsync(slot, crewDomain, executor: null);
-            ReportTo(warnings, profile.Name, profile.DisplayName, assignment);
-            var settings = new Dictionary<string, string>(profile.Settings)
-            {
-                [TransformSettings.KeyProvider] = assignment.Candidate.Provider,
-                [TransformSettings.KeyModel] = assignment.Candidate.Model,
-            };
-            result.Add(profile with { Settings = settings });
-        }
-
-        return result;
-    }
-
-    private static ModelSlot? TransformSlotOf(Dictionary<string, string> settings)
-    {
-        if (ModelSlotParser.ParseOrNull(settings.GetValueOrDefault(TransformSettings.KeyModelSlot)) is { } slot)
-            return slot;
-        var hasBinding = !string.IsNullOrWhiteSpace(settings.GetValueOrDefault(TransformSettings.KeyProvider))
-                         && !string.IsNullOrWhiteSpace(settings.GetValueOrDefault(TransformSettings.KeyModel));
-        return hasBinding ? null : ModelSlot.TransformCondense;
     }
 
     private void ReportTo(ICollection<ModelAssignmentWarning> warnings, string actorName, string? displayName, ModelAssignment assignment)

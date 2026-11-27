@@ -2,84 +2,48 @@ using Geef.Atelier.Core.Domain.Crew;
 
 namespace Geef.Atelier.Tests.Domain.Crew;
 
+/// <summary>Since stage 8d (D-091) the only setups are the two code-only templates of the direct path.</summary>
 public sealed class SystemCrewConstantsTests
 {
     [Fact]
-    public void AllSystemProfiles_HaveIsSystemTrue()
+    public void AllCodeOnlyProfiles_HaveIsSystemTrue()
     {
-        Assert.True(SystemCrew.DefaultExecutorProfile.IsSystem);
-        Assert.True(SystemCrew.BriefingFidelityProfile.IsSystem);
-        Assert.True(SystemCrew.ClarityProfile.IsSystem);
+        Assert.All(SystemCrew.CodeOnlyExecutorProfiles.Values, p => Assert.True(p.IsSystem, p.Name));
+        Assert.All(SystemCrew.CodeOnlyReviewerProfiles.Values, p => Assert.True(p.IsSystem, p.Name));
     }
 
     [Fact]
-    public void KlassikTemplate_HasIsSystemTrue()
+    public void TheOnlyTemplatesAreTheDirectAndTheOutlineTemplate()
     {
-        Assert.True(SystemCrew.KlassikTemplate.IsSystem);
+        Assert.Equal([SystemCrew.DirectTemplateName, SystemCrew.DirectOutlineTemplateName], SystemCrew.CodeOnlyTemplates.Keys.Order().ToList());
+        Assert.All(SystemCrew.CodeOnlyTemplates.Keys, name => Assert.True(SystemCrew.IsDirectPathTemplate(name)));
     }
 
     [Fact]
-    public void KlassikTemplate_ReferencesExistingSystemProfiles()
+    public void EveryTemplateReferencesExistingCodeOnlyProfiles()
     {
-        var reviewerNames = SystemCrew.KlassikTemplate.ReviewerProfileNames;
-        Assert.Contains(SystemCrew.BriefingFidelityProfile.Name, reviewerNames);
-        Assert.Contains(SystemCrew.ClarityProfile.Name, reviewerNames);
-        Assert.Equal(SystemCrew.DefaultExecutorProfile.Name, SystemCrew.KlassikTemplate.ExecutorProfileName);
+        foreach (var template in SystemCrew.CodeOnlyTemplates.Values)
+        {
+            Assert.True(SystemCrew.CodeOnlyExecutorProfiles.ContainsKey(template.ExecutorProfileName), template.Name);
+            Assert.All(template.ReviewerProfileNames, name => Assert.True(SystemCrew.CodeOnlyReviewerProfiles.ContainsKey(name), $"{template.Name}/{name}"));
+        }
     }
 
     [Fact]
-    public void ReviewerProfiles_DictContainsAllSystemReviewers()
+    public void TheOutlineTemplateAddsOnlyTheRequestCheck()
     {
-        Assert.True(SystemCrew.ReviewerProfiles.ContainsKey(SystemCrew.BriefingFidelityProfile.Name));
-        Assert.True(SystemCrew.ReviewerProfiles.ContainsKey(SystemCrew.ClarityProfile.Name));
+        Assert.Equal(SystemCrew.DirectTemplate.ExecutorProfileName, SystemCrew.DirectOutlineTemplate.ExecutorProfileName);
+        Assert.Equal([.. SystemCrew.DirectTemplate.ReviewerProfileNames, SystemCrew.RequirementsCheckProfile.Name],
+            SystemCrew.DirectOutlineTemplate.ReviewerProfileNames);
+        Assert.Equal(SystemCrew.DirectTemplate.ConvergenceOverride, SystemCrew.DirectOutlineTemplate.ConvergenceOverride);
     }
 
-    [Fact]
-    public void ExecutorProfiles_DictContainsDefaultExecutor()
-    {
-        Assert.True(SystemCrew.ExecutorProfiles.ContainsKey(SystemCrew.DefaultExecutorProfile.Name));
-    }
-
-    [Fact]
-    public void CrewTemplates_DictContainsKlassik()
-    {
-        Assert.True(SystemCrew.CrewTemplates.ContainsKey(SystemCrew.KlassikTemplateName));
-    }
-
-    [Fact]
-    public void IsSystemName_RecognizesAllSystemNames()
-    {
-        Assert.True(SystemCrew.IsSystemName(SystemCrew.DefaultExecutorProfile.Name));
-        Assert.True(SystemCrew.IsSystemName(SystemCrew.BriefingFidelityProfile.Name));
-        Assert.True(SystemCrew.IsSystemName(SystemCrew.ClarityProfile.Name));
-        Assert.True(SystemCrew.IsSystemName(SystemCrew.KlassikTemplateName));
-    }
-
-    [Fact]
-    public void Code_only_names_are_reserved_like_the_other_system_names()
-    {
-        Assert.True(SystemCrew.IsSystemName(SystemCrew.DirectTemplateName));
-        Assert.True(SystemCrew.IsSystemName(SystemCrew.DirectWriterProfile.Name));
-        Assert.True(SystemCrew.IsSystemName(SystemCrew.DeterministicChecksProfile.Name));
-        Assert.True(SystemCrew.IsSystemGroundingProviderName(SystemCrew.OrderSourcesProfile.Name));
-    }
-
-    [Fact]
-    public void IsSystemName_ReturnsFalseForCustomNames()
-    {
-        Assert.False(SystemCrew.IsSystemName("custom-my-reviewer"));
-        Assert.False(SystemCrew.IsSystemName("unknown-name"));
-    }
-
-    [Fact]
-    public void EnsureCustomPrefix_AddsPrefixWhenMissing()
-    {
-        Assert.Equal("custom-my-profile", SystemCrew.EnsureCustomPrefix("my-profile"));
-    }
-
-    [Fact]
-    public void EnsureCustomPrefix_DoesNotDoublePrefixWhenAlreadyPresent()
-    {
-        Assert.Equal("custom-my-profile", SystemCrew.EnsureCustomPrefix("custom-my-profile"));
-    }
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("klassik")]
+    [InlineData("Direct")]
+    [InlineData("test-loop")]
+    public void OtherNamesAreNoDirectPathTemplate(string? name) =>
+        Assert.False(SystemCrew.IsDirectPathTemplate(name));
 }

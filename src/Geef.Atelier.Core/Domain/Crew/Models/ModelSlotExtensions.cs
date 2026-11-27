@@ -1,5 +1,3 @@
-using Geef.Atelier.Core.Domain.Crew.Advisors;
-
 namespace Geef.Atelier.Core.Domain.Crew.Models;
 
 /// <summary>Role semantics of <see cref="ModelSlot"/>: which actor may use which slot, and how slots are described.</summary>
@@ -30,14 +28,6 @@ public static class ModelSlotExtensions
 
     /// <summary>True when <paramref name="slot"/> may be used by a profile of <paramref name="kind"/>.</summary>
     public static bool IsAllowedFor(this ModelSlot slot, ModelActorKind kind) => kind.AllowedSlots().Contains(slot);
-
-    /// <summary>Default slot of an advisor with <paramref name="mode"/>.</summary>
-    public static ModelSlot DefaultSlot(this AdvisorMode mode) => mode switch
-    {
-        AdvisorMode.Critical or AdvisorMode.DevilsAdvocate => ModelSlot.CriticalAdvisor,
-        AdvisorMode.DomainExpert => ModelSlot.DomainExpertAdvisor,
-        _ => ModelSlot.StrategicAdvisor,
-    };
 
     /// <summary>One-line English description for the UI and the composer prompt.</summary>
     public static string Describe(this ModelSlot slot) => slot switch

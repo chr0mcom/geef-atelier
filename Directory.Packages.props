@@ -5,8 +5,6 @@
   <ItemGroup>
     <!-- Geef SDK — stable release, consumed from local feed until nuget.org publish is set up -->
     <PackageVersion Include="Geef.Sdk" Version="1.5.0" />
-    <!-- HTML parsing for url-fetch provider (bUnit already brings AngleSharp transitively; use HAP to avoid conflicts) -->
-    <PackageVersion Include="HtmlAgilityPack" Version="1.12.4" />
     <!-- Official OpenAI SDK — used for the Responses API path (pro/reasoning models on openai-direct) -->
     <PackageVersion Include="OpenAI" Version="2.8.0" />
     <!-- EF Core + Postgres -->
@@ -22,15 +20,11 @@
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <!-- Health Checks -->
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.0" />
-    <!-- SignalR Client (test project only: hub security tests) -->
-    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.15" />
     <!-- HTTP Client abstractions + Resilience (Polly) -->
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
     <!-- MCP Server; exact version: a range resolves to its lowest version and never picks up fixes (D-086) -->
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="[2.4.0]" />
-    <!-- MCP Client (HttpClientTransport for outbound MCP connections); same exact version as the server -->
-    <PackageVersion Include="ModelContextProtocol.Core" Version="[2.4.0]" />
     <!-- MCP Skills extension (experimental, MCPEXP005); must match the SDK version exactly (D-088) -->
     <PackageVersion Include="ModelContextProtocol.Extensions.Skills" Version="[2.4.0]" />
     <!-- PDF extraction -->

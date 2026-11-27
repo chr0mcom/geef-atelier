@@ -5,7 +5,6 @@ using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Tests.Fakes;
@@ -29,8 +28,8 @@ public sealed class RunDetailChangeLinkTests : TestContext
 
     private IRenderedComponent<RunDetail> Render(string? template, Guid? orderId, ReviseMode revise, bool withOptions = true, string? finalText = "# Text", int version = 1, string viewer = "alice", string? revisionHint = null, params string[] roles)
     {
-        var snapshot = new CrewSnapshot(CrewSnapshot.CurrentSchemaVersion, template, SystemCrew.DefaultExecutorProfile, [SystemCrew.BriefingFidelityProfile],
-            EvaluationStrategy.Parallel, null, Array.Empty<AdvisorProfile>());
+        var snapshot = new CrewSnapshot(CrewSnapshot.CurrentSchemaVersion, template, TestLoop.Writer, [TestLoop.Reviewers[0]],
+            EvaluationStrategy.Parallel, null, []);
         var run = new RunEntity
         {
             Id = _runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Failed, BriefingText = "Test briefing", ConfigJson = "{}",
@@ -41,7 +40,6 @@ public sealed class RunDetailChangeLinkTests : TestContext
         Services.AddScoped<CircuitDataGate>();
         Services.AddSingleton<IRunUpdateFeed>(sp => new InProcessRunUpdateFeed(sp.GetRequiredService<IServiceScopeFactory>(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessRunUpdateFeed>.Instance));
-        Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         if (withOptions)
         {
@@ -172,8 +170,8 @@ public sealed class RunDetailChangeLinkTests : TestContext
 
         public Task<RunDetails?> GetRunDetailsAsync(Guid id, string? user, CancellationToken ct = default) => inner.GetRunDetailsAsync(id, user, ct);
 
-        public async Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid id, string? user, CancellationToken ct = default) =>
-            (await inner.GetRunWithGroundingAsync(id, user, ct))! with { Snapshot = snapshot };
+        public async Task<RunViewModel?> GetRunViewAsync(Guid id, string? user, CancellationToken ct = default) =>
+            (await inner.GetRunViewAsync(id, user, ct))! with { Snapshot = snapshot };
 
         public Task<Guid> ResumeRunAsync(ResumeOptions options, string? user, CancellationToken ct = default) => inner.ResumeRunAsync(options, user, ct);
 

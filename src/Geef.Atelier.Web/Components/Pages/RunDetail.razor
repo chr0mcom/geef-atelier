@@ -3,7 +3,6 @@
 @attribute [Authorize]
 @implements IAsyncDisposable
 @inject IRunService RunService
-@inject IRunArtifactRepository ArtifactRepository
 @inject NavigationManager Nav
 @inject ILogger<RunDetail> Logger
 @inject AuthenticationStateProvider AuthProvider
@@ -16,9 +15,6 @@
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Configuration
 @using Microsoft.Extensions.DependencyInjection
-@using Geef.Atelier.Core.Domain.Crew.Advisors
-@using Geef.Atelier.Core.Domain.Crew.Finalizers
-@using Geef.Atelier.Core.Persistence
 @using Geef.Atelier.Web.Display
 @using Geef.Atelier.Web.Components.UI
 
@@ -59,16 +55,8 @@
             <div>
                 <div class="status-line">
                     <StatusBadge Status="_details.Run.Status" Large="true" />
-                    @if (_details.Run.Kind == RunKind.CrewComposition)
-                    {
-                        <span class="kind-badge kind-composition" title="Kompositions-Run">Kompositions-Run</span>
-                    }
-                    else if (_details.Run.Kind == RunKind.Learning)
-                    {
-                        <span class="kind-badge kind-learning" title="Lern-Run">Lern-Run</span>
-                    }
                     <span class="t-eyebrow eyebrow">
-                        Iteration @_details.Iterations.Count of 3
+                        Iteration @_details.Iterations.Count of @GetEffectiveMaxIterations()
                     </span>
                 </div>
                 <h1>@Truncate(BriefingSections.RequestPart(_details.Run.BriefingText), 100)</h1>
@@ -99,17 +87,6 @@
                         <span class="val">
                             <a href="/runs/@_details.Run.ParentRunId.Value" class="t-mono">
                                 @_details.Run.ParentRunId.Value.ToString("N")[..8].ToUpperInvariant()
-                            </a>
-                        </span>
-                    </div>
-                }
-                @if (_details.Run.ParentCompositionRunId.HasValue)
-                {
-                    <div class="row">
-                        <span class="label">Komponiert durch</span>
-                        <span class="val">
-                            <a href="/runs/@_details.Run.ParentCompositionRunId.Value" class="t-mono" data-testid="composition-run-link">
-                                @_details.Run.ParentCompositionRunId.Value.ToString("N")[..8].ToUpperInvariant()
                             </a>
                         </span>
                     </div>
@@ -165,8 +142,6 @@
 
         <CrewSummary Snapshot="_snapshot" FallbackTemplateName="@_details.Run.CrewTemplateName" />
 
-        <ActorPromptCompositionBlock Compositions="_snapshot?.PromptCompositions" />
-
         <ResumeRunDialog
             Show="@_showResumeDialog"
             HasIterations="@(_details?.Iterations.Count > 0)"
@@ -182,26 +157,12 @@
             OnConfirm="ExecuteDeleteAsync"
             OnCancel="() => _showDeleteModal = false" />
 
-        @if (_details is not null && _viewModel is not null)
-        {
-            <GroundingSection
-                Briefing="@ShownBriefing"
-                GroundedBrief="@BriefingSections.ForViewer(_viewModel.GroundedBrief, _details.Run.CreatedByUser, _viewerName)"
-                BeforeFirstAdvisors="@_viewModel.GroundingAdvisors"
-                GroundingConsultations="@_viewModel.GroundingConsultations" />
-        }
-
         <div class="iters">
             @{
                 var resolvedMap = FindingResolutionInferrer.MarkResolved(_details!.Iterations);
             }
             @foreach (var (iwf, idx) in _details.Iterations.Select((x, i) => (x, i)))
             {
-                var iterConsultations = _viewModel?.AdvisorsByIteration[iwf.Iteration.IterationNumber]?.ToList() ?? [];
-                @if (iterConsultations.Count > 0)
-                {
-                    <AdvisorConsultationsBlock Consultations="iterConsultations" />
-                }
                 <IterationPanel
                     Iteration="iwf.Iteration"
                     Findings="ProfileCopies.ForViewer(iwf.Findings, _details.Run.BriefingText, _details.Run.CreatedByUser, _viewerName)"
@@ -210,58 +171,6 @@
                 <IterationCostBlock Iteration="iwf.Iteration" />
             }
         </div>
-
-        @if (_viewModel?.RecoveryAdvisors.Count > 0)
-        {
-            <div class="advisor-recovery-section">
-                <h4>Convergence Failure Recovery</h4>
-                <AdvisorConsultationsBlock Consultations="@_viewModel.RecoveryAdvisors" IsRecovery="true" />
-            </div>
-        }
-
-        <FinalizersPipeline Snapshot="_snapshot"
-                            Artifacts="_artifacts"
-                            FinalText="@_details.Run.FinalText" />
-
-        @if (_artifacts.Any(a => a.ArtifactType is ArtifactType.File or ArtifactType.Url))
-        {
-            <div class="run-artifacts-section" data-testid="artifacts-section">
-                <h2>Downloads</h2>
-                <table class="crew-table">
-                    <thead>
-                        <tr>
-                            <th>Finalizer</th>
-                            <th>File</th>
-                            <th>Created</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var a in _artifacts.Where(x => x.ArtifactType is ArtifactType.File or ArtifactType.Url))
-                        {
-                            <tr data-testid="artifact-row-@a.Id">
-                                <td>@a.FinalizerProfileName</td>
-                                <td>
-                                    @if (a.ArtifactType == ArtifactType.File && a.Filename is not null)
-                                    {
-                                        <a href="/runs/@RunId/artifacts/@a.Id/download"
-                                           class="btn small"
-                                           data-testid="artifact-download-@a.Id">
-                                            @a.Filename (@FormatBytes(a.SizeBytes ?? 0))
-                                        </a>
-                                    }
-                                    else
-                                    {
-                                        <a href="@a.StorageUri" target="_blank" rel="noopener noreferrer"
-                                           data-testid="artifact-url-@a.Id">@a.StorageUri</a>
-                                    }
-                                </td>
-                                <td>@a.CreatedAt.ToString("HH:mm:ss")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
 
         @if ((_details.Run.Status is RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted)
              && !string.IsNullOrEmpty(_details.Run.FinalText))
@@ -274,7 +183,7 @@
 @code {
     [Parameter] public Guid RunId { get; set; }
 
-    RunWithGroundingViewModel? _viewModel;
+    RunViewModel?  _viewModel;
     RunDetails?    _details;
     bool           _notFound;
     bool           _forbidden;
@@ -284,7 +193,6 @@
     bool           _canResume;
     string?        _resumeError;
     CrewSnapshot?  _snapshot;
-    IReadOnlyList<RunArtifact> _artifacts = [];
     string? _requestingUser;
     string? _viewerName;
     bool _unknownUser;
@@ -350,7 +258,7 @@
 
     async Task LoadCoreAsync()
     {
-        _viewModel = await RunService.GetRunWithGroundingAsync(RunId, requestingUsername: _requestingUser, CancellationToken.None);
+        _viewModel = await RunService.GetRunViewAsync(RunId, requestingUsername: _requestingUser, CancellationToken.None);
         _details   = _viewModel?.Details;
         _snapshot  = _viewModel?.Snapshot;
         _canResume = CrewSnapshot.IsUsableForRun(_details?.Run.CrewSnapshot);
@@ -374,22 +282,6 @@
             _forbidden = false;
             _notFound  = false;
         }
-        try
-        {
-            _artifacts = await ArtifactRepository.ListByRunAsync(RunId, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Failed to load run artifacts for run {RunId}", RunId);
-            _artifacts = [];
-        }
-    }
-
-    static string FormatBytes(long bytes)
-    {
-        if (bytes < 1024) return $"{bytes} B";
-        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
-        return $"{bytes / (1024.0 * 1024):F1} MB";
     }
 
     async Task HandleCancelledAsync()
@@ -453,8 +345,6 @@
             return "—";
 
         var total = FormatCost(run.TotalCostEur.Value);
-        if (run.LlmCostEur.HasValue && run.GroundingCostEur.HasValue)
-            return $"{total} (LLM: {FormatCost(run.LlmCostEur.Value)}, Research: {FormatCost(run.GroundingCostEur.Value)})";
         if (run.LlmCostEur.HasValue)
             return $"{total} (LLM: {FormatCost(run.LlmCostEur.Value)})";
         return total;

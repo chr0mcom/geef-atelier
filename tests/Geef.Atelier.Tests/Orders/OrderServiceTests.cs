@@ -70,7 +70,6 @@ public sealed class OrderServiceTests(PostgresFixture postgres)
         var run = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.Id == submission.RunId));
         var snapshot = CrewSnapshot.Deserialize(run.CrewSnapshot!)!;
         Assert.Equal(SystemCrew.DirectOutlineTemplateName, snapshot.TemplateName);
-        Assert.True(snapshot.GroundingProviders is null or { Count: 0 });
         var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == submission.OrderId));
         Assert.Equal(OrderMode.Careful, order.Mode);
         Assert.Equal(OrderEntry.Mcp, order.Entry);

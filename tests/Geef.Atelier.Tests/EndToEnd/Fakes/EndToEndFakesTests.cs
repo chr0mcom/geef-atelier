@@ -12,7 +12,7 @@ public sealed class EndToEndFakesTests
         {
             ["model"] = "claude-opus-latest",
             ["messages"] = new JsonArray(
-                new JsonObject { ["role"] = "system", ["content"] = SystemPrompts.Executor },
+                new JsonObject { ["role"] = "system", ["content"] = SystemPrompts.DirectWriter },
                 new JsonObject { ["role"] = "user", ["content"] = "Briefing:\nx" }),
             ["document_mode"] = true,
             ["document"] = "",

@@ -2,12 +2,8 @@ using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Persistence;
-using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -234,7 +230,6 @@ public sealed class RunServiceUserIsolationTests
         return new RunService(
             new MinimalPersistenceService(),
             repo,
-            new MinimalAdvisorConsultationRepository(),
             NullLogger<RunService>.Instance,
             warnings);
     }
@@ -316,68 +311,5 @@ public sealed class RunServiceUserIsolationTests
             Guid parentRunId, string? seedDraftText, RunKind kind = RunKind.Standard,
             CancellationToken cancellationToken = default)
             => Task.FromResult(Guid.NewGuid());
-    }
-
-    private sealed class MinimalAdvisorConsultationRepository : IAdvisorConsultationRepository
-    {
-        public Task<AdvisorConsultation> CreateAsync(AdvisorConsultation consultation, CancellationToken ct)
-            => Task.FromResult(consultation);
-
-        public Task<IReadOnlyList<AdvisorConsultation>> GetByRunIdAsync(Guid runId, CancellationToken ct)
-            => Task.FromResult<IReadOnlyList<AdvisorConsultation>>([]);
-    }
-
-    private sealed class MinimalCrewService : ICrewService
-    {
-        public Task<CrewSnapshot> ResolveSnapshotAsync(string? crewTemplateName, CrewSpec? customCrew, CancellationToken cancellationToken = default)
-        {
-            var snapshot = new CrewSnapshot(
-                SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
-                TemplateName: crewTemplateName,
-                Executor: SystemCrew.DefaultExecutorProfile,
-                Reviewers: [SystemCrew.BriefingFidelityProfile],
-                EvaluationStrategy: EvaluationStrategy.Parallel,
-                ConvergenceOverride: null,
-                Advisors: [],
-                GroundingProviders: null);
-            return Task.FromResult(snapshot);
-        }
-
-        public Task<IReadOnlyList<ReviewerProfile>> ListReviewerProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ReviewerProfile>>([]);
-        public Task<ReviewerProfile?> GetReviewerProfileAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult<ReviewerProfile?>(null);
-        public Task<ReviewerProfile> CreateCustomReviewerProfileAsync(ReviewerProfile profile, CancellationToken cancellationToken = default) => Task.FromResult(profile);
-        public Task<ReviewerProfile> UpdateCustomReviewerProfileAsync(ReviewerProfile profile, CancellationToken cancellationToken = default) => Task.FromResult(profile);
-        public Task DeleteCustomReviewerProfileAsync(string name, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<string> RenameCustomReviewerProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default) => Task.FromResult(newName);
-        public Task<IReadOnlyList<ExecutorProfile>> ListExecutorProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ExecutorProfile>>([]);
-        public Task<ExecutorProfile?> GetExecutorProfileAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult<ExecutorProfile?>(null);
-        public Task<ExecutorProfile> CreateCustomExecutorProfileAsync(ExecutorProfile profile, CancellationToken cancellationToken = default) => Task.FromResult(profile);
-        public Task<ExecutorProfile> UpdateCustomExecutorProfileAsync(ExecutorProfile profile, CancellationToken cancellationToken = default) => Task.FromResult(profile);
-        public Task DeleteCustomExecutorProfileAsync(string name, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<string> RenameCustomExecutorProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default) => Task.FromResult(newName);
-        public Task<IReadOnlyList<AdvisorProfile>> ListAdvisorProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<AdvisorProfile>>([]);
-        public Task<AdvisorProfile?> GetAdvisorProfileAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult<AdvisorProfile?>(null);
-        public Task<AdvisorProfile> CreateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken cancellationToken = default) => Task.FromResult(profile);
-        public Task<AdvisorProfile> UpdateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken cancellationToken = default) => Task.FromResult(profile);
-        public Task DeleteCustomAdvisorProfileAsync(string name, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<string> RenameCustomAdvisorProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default) => Task.FromResult(newName);
-        public Task<IReadOnlyList<GroundingProviderProfile>> ListGroundingProviderProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<GroundingProviderProfile>>([]);
-        public Task<GroundingProviderProfile?> GetGroundingProviderProfileAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult<GroundingProviderProfile?>(null);
-        public Task<GroundingProviderProfile> CreateCustomGroundingProviderProfileAsync(GroundingProviderProfile profile, CancellationToken cancellationToken = default) => Task.FromResult(profile);
-        public Task<GroundingProviderProfile> UpdateCustomGroundingProviderProfileAsync(GroundingProviderProfile profile, CancellationToken cancellationToken = default) => Task.FromResult(profile);
-        public Task DeleteCustomGroundingProviderProfileAsync(string name, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<string> RenameCustomGroundingProviderProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default) => Task.FromResult(newName);
-        public Task<IReadOnlyList<FinalizerProfile>> ListFinalizerProfilesAsync(bool includeSystem = true, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<FinalizerProfile>>([]);
-        public Task<FinalizerProfile?> GetFinalizerProfileAsync(string name, CancellationToken ct = default) => Task.FromResult<FinalizerProfile?>(null);
-        public Task<FinalizerProfile> CreateCustomFinalizerProfileAsync(FinalizerProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
-        public Task<FinalizerProfile> UpdateCustomFinalizerProfileAsync(FinalizerProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
-        public Task DeleteCustomFinalizerProfileAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
-        public Task<string> RenameCustomFinalizerProfileAsync(string oldName, string newName, CancellationToken ct = default) => Task.FromResult(newName);
-        public Task<IReadOnlyList<CrewTemplate>> ListCrewTemplatesAsync(bool includeSystem = true, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<CrewTemplate>>([]);
-        public Task<CrewTemplate?> GetCrewTemplateAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult<CrewTemplate?>(null);
-        public Task<CrewTemplate> CreateCustomCrewTemplateAsync(CrewTemplate template, CancellationToken cancellationToken = default) => Task.FromResult(template);
-        public Task<CrewTemplate> UpdateCustomCrewTemplateAsync(CrewTemplate template, CancellationToken cancellationToken = default) => Task.FromResult(template);
-        public Task DeleteCustomCrewTemplateAsync(string name, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<string> RenameCustomCrewTemplateAsync(string oldName, string newName, CancellationToken cancellationToken = default) => Task.FromResult(newName);
     }
 }

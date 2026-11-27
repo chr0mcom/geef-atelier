@@ -1,8 +1,6 @@
-using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
@@ -69,7 +67,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     {
         var snapshot = TestCrewSnapshots.Runnable with
         {
-            Reviewers = [SystemCrew.BriefingFidelityProfile, SystemCrew.ClarityProfile with { SystemPrompt = FailingReviewerClient.Marker }],
+            Reviewers = [TestLoop.Reviewers[0], TestLoop.Reviewers[1] with { SystemPrompt = FailingReviewerClient.Marker }],
         };
         var runId = await CreateRunAsync(TestCrewSnapshots.Serialize(snapshot));
 
@@ -79,8 +77,8 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
         var warnings = await WarningsAsync(runId);
         var warning = Assert.Single(warnings, w => w.Code == RunWarningCodes.ReviewerFailed);
         Assert.Equal(RunWarningSources.Review, warning.Source);
-        Assert.Contains($"\"{SystemCrew.ClarityProfile.DisplayName}\"", warning.Message);
-        Assert.DoesNotContain(SystemCrew.ClarityProfile.Name, warning.Message);
+        Assert.Contains($"\"{TestLoop.Reviewers[1].DisplayName}\"", warning.Message);
+        Assert.DoesNotContain(TestLoop.Reviewers[1].Name, warning.Message);
         Assert.Equal(1, warning.Iteration);
     }
 
@@ -191,63 +189,6 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
         Assert.Contains("Service restarted", run.ErrorMessage);
     }
 
-    [Fact(Timeout = 30_000)]
-    public async Task SkippedAndFailingFinishingStepsBecomeWarnings()
-    {
-        var snapshot = TestCrewSnapshots.Runnable with
-        {
-            Finalizers =
-            [
-                new FinalizerProfile("skipping-step", "Skipping step", "d", FinalizerType.Transform, [], false),
-                new FinalizerProfile("throwing-step", "Throwing step", "d", FinalizerType.MetadataEnrich, [], false),
-                new FinalizerProfile("error-step", "Error step", "d", FinalizerType.FileExport, [], false),
-            ],
-        };
-        var runId = await CreateRunAsync(TestCrewSnapshots.Serialize(snapshot));
-        await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient(), FastOptions(),
-            services => services.AddSingleton<IFinalizerExecutorFactory, ScriptedFinalizerFactory>());
-        await host.StartAsync();
-
-        var run = await WaitForTerminalAsync(runId);
-        var warnings = await WaitForWarningsAsync(runId, 3);
-
-        Assert.Equal((RunOutcome?)RunOutcome.Converged, run.Outcome);
-        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerSkipped && w.Message == "The finishing step \"Skipping step\" was skipped because nothing to do.");
-        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerFailed && w.Message == "The finishing step \"Throwing step\" failed.");
-        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerFailed && w.Message == "The finishing step \"Error step\" failed.");
-        Assert.DoesNotContain(warnings, w => w.Message.Contains("exploded") || w.Message.Contains("disk full") || w.Message.Contains("sk-or-v1"));
-
-        await using var db = fixture.NewContext();
-        var statusNotes = await db.RunArtifacts.AsNoTracking().Where(a => a.RunId == runId).Select(a => a.StatusMessage).ToListAsync();
-        Assert.Contains(statusNotes, n => n != null && n.Contains("disk full"));
-        Assert.DoesNotContain(statusNotes, n => n != null && n.Contains("sk-or-v1"));
-        var stored = await db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId);
-        Assert.DoesNotContain("sk-or-v1", stored.FinalizerErrorMessage ?? string.Empty);
-        Assert.Equal("The finishing step \"Throwing step\" failed.", stored.FinalizerErrorMessage);
-        Assert.Contains(statusNotes, n => n == Geef.Atelier.Web.Services.RunOrchestratorService.FinalizerUnexpectedErrorMessage);
-        Assert.DoesNotContain(statusNotes, n => n != null && (n.Contains("exploded") || n.Contains("throwing-step")));
-    }
-
-    [Fact(Timeout = 30_000)]
-    public async Task FinishingStepsThatAreNotRunAfterNonConvergenceBecomeAWarning()
-    {
-        var snapshot = TestCrewSnapshots.Runnable with
-        {
-            ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
-            Finalizers = [new FinalizerProfile("export", "Export", "d", FinalizerType.FileExport, [], false)],
-            RunFinalizersOnMaxAttempts = false,
-        };
-        var runId = await CreateRunAsync(TestCrewSnapshots.Serialize(snapshot));
-
-        await using var host = new OrchestratorTestHost(fixture, new RejectingFakeLlmClient(), FastOptions());
-        await host.StartAsync();
-        var run = await WaitForTerminalAsync(runId);
-        var warnings = await WaitForWarningsAsync(runId, 1);
-
-        Assert.Equal((RunOutcome?)RunOutcome.DeliveredWithOpenPoints, run.Outcome);
-        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizersNotRun);
-    }
-
     private async Task<Guid> CreateRunAsync(string? crewSnapshotJson)
     {
         await using var db = fixture.NewContext();
@@ -321,33 +262,6 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     {
         await using var db = fixture.NewContext();
         return await db.RunWarnings.AsNoTracking().Where(w => w.RunId == runId).ToListAsync();
-    }
-
-    private sealed class ScriptedFinalizerFactory : IFinalizerExecutorFactory
-    {
-        public IFinalizerExecutor GetExecutor(FinalizerType type) => new Scripted(type);
-
-        private sealed class Scripted(FinalizerType type) : IFinalizerExecutor
-        {
-            public FinalizerType Type => type;
-
-            public Task<FinalizerExecutionResult> ExecuteAsync(FinalizerProfile profile, FinalizerExecutionContext context, CancellationToken cancellationToken) =>
-                type switch
-                {
-                    FinalizerType.Transform => Task.FromResult(new FinalizerExecutionResult(null, null, null, profile.Name, SkipReason: "nothing to do")),
-                    FinalizerType.FileExport => Task.FromResult(new FinalizerExecutionResult(null, new RunArtifact
-                    {
-                        Id = Guid.NewGuid(),
-                        RunId = context.RunId,
-                        FinalizerProfileName = profile.Name,
-                        ArtifactType = ArtifactType.Status,
-                        StorageUri = "error",
-                        StatusMessage = "disk full, token=sk-or-v1-0123456789abcdef0123456789abcdef",
-                        CreatedAt = DateTimeOffset.UtcNow,
-                    }, null, profile.Name)),
-                    _ => throw new InvalidOperationException("exploded with Bearer sk-or-v1-0123456789abcdef0123456789abcdef"),
-                };
-        }
     }
 
     private sealed class CountingLlmClient : ILlmClient

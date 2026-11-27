@@ -61,15 +61,11 @@ public sealed class RunStopMessageTests(PostgresFixture fixture)
     }
 
     [Fact]
-    public void MissingReasonGivesTheNeutralSentenceAndTheBestVersionNote()
+    public void MissingReasonGivesTheNeutralSentence()
     {
         ConvergenceDecision? missing = null;
 
         Assert.Equal(RunStopMessageExtensions.UnknownStopMessage, missing.ToRunStopMessage());
-        Assert.Equal(
-            $"{RunStopMessageExtensions.UnknownStopMessage} {RunStopMessageExtensions.BestVersionKeptMessage}",
-            missing.ToBestVersionKeptMessage());
-        AssertPlain(((ConvergenceDecision?)ConvergenceDecision.StopMaxAttemptsReached).ToBestVersionKeptMessage());
     }
 
     private static void AssertPlain(string message)

@@ -128,9 +128,6 @@ internal sealed class WebTestHost : IAsyncDisposable
             o.MaxConcurrentRuns          = 10;
             o.CancellationPollingInterval = TimeSpan.FromMilliseconds(200);
         });
-        builder.Services.TryAddSingleton<Geef.Atelier.Application.Crew.Grounding.IGroundingProviderFactory>(sp =>
-            new Geef.Atelier.Infrastructure.Grounding.GroundingProviderFactory(
-                sp.GetServices<Geef.Atelier.Application.Crew.Grounding.IGroundingProvider>()));
         builder.Services.AddPipelineAssemblers();
         builder.Services.AddTestLoopAssembler();
         builder.Services.AddHostedService<RunOrchestratorService>();

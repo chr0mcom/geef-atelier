@@ -4,9 +4,7 @@ using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Persistence;
-using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -220,8 +218,8 @@ public sealed class RunServiceResumeTests
         var snapshot = new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
             TemplateName: null,
-            Executor: SystemCrew.DefaultExecutorProfile,
-            Reviewers: [SystemCrew.BriefingFidelityProfile],
+            Executor: TestLoop.Writer,
+            Reviewers: [TestLoop.Reviewers[0]],
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null,
             Advisors: []);
@@ -296,7 +294,6 @@ public sealed class RunServiceResumeTests
         new RunService(
             persistence,
             repo,
-            new NoOpAdvisorConsultationRepository(),
             NullLogger<RunService>.Instance,
             new InMemoryRunWarnings(),
             orderRepository: orders);
@@ -447,12 +444,4 @@ public sealed class RunServiceResumeTests
 
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
-
-    private sealed class NoOpAdvisorConsultationRepository : IAdvisorConsultationRepository
-    {
-        public Task<AdvisorConsultation> CreateAsync(AdvisorConsultation c, CancellationToken ct) => Task.FromResult(c);
-        public Task<IReadOnlyList<AdvisorConsultation>> GetByRunIdAsync(Guid runId, CancellationToken ct) => Task.FromResult<IReadOnlyList<AdvisorConsultation>>([]);
-    }
-
-    private sealed class NoOpCrewService : StubCrewServiceBase { }
 }

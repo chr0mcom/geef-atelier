@@ -14,7 +14,6 @@ public sealed class IterationEntity
     public int? ExecutorOutputTokens { get; set; }
     public decimal? ExecutorCostEur { get; set; }
     public decimal? ReviewersTotalCostEur { get; set; }
-    public decimal? AdvisorsTotalCostEur { get; set; }
 
     public ICollection<IterationActorCostEntity> ActorCosts { get; set; } = new List<IterationActorCostEntity>();
 }

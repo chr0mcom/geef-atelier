@@ -1,23 +1,23 @@
-using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Web.Services;
 using Microsoft.EntityFrameworkCore;
+using Geef.Sdk;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Tests.Orchestrator;
 
 /// <summary>
 /// The outcome means "everything is stored" (review findings Q4, Q5, A2, T2, F3 of Etappe 0): it appears only after
-/// the text and the finishing steps are saved, never for a run whose status or text could not be written, and a
+/// the text and the results of the run kind are saved, never for a run whose status or text could not be written, and a
 /// critical stop with a text is deliberately <see cref="RunOutcome.DeliveredWithOpenPoints"/>. Failures and delays
 /// of single database writes are injected with row triggers that only match the run of the test.
 /// </summary>
@@ -33,53 +33,46 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
     };
 
     [Fact(Timeout = 30_000)]
-    public async Task ConvergedOutcomeAppearsOnlyAfterTheFinishingStepsAreStored()
+    public async Task ConvergedOutcomeAppearsOnlyAfterTheRunKindResultsAreStored()
     {
-        var finalizers = new BlockingFinalizerFactory();
-        var runId = await CreateRunAsync(Briefing(), TestCrewSnapshots.Serialize(WithFinalizer(TestCrewSnapshots.Runnable)));
+        var finish = new BlockingFinishAssembler();
+        var runId = await CreateRunAsync(Briefing(), TestCrewSnapshots.RunnableJson);
         await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient(), FastOptions(),
-            services => services.AddSingleton<IFinalizerExecutorFactory>(finalizers));
+            services => services.AddSingleton<IPipelineAssembler>(finish));
         await host.StartAsync();
 
-        await finalizers.Entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        await finish.Entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
         await Task.Delay(300);
         var whileFinishing = await LoadAsync(runId);
         Assert.Equal(RunStatus.Completed, whileFinishing.Status);
         Assert.Null(whileFinishing.Outcome);
 
-        finalizers.Release.SetResult();
+        finish.Release.SetResult();
         var run = await WaitForOutcomeAsync(runId);
 
         Assert.Equal((RunOutcome?)RunOutcome.Converged, run.Outcome);
-        Assert.Equal(BlockingFinalizerFactory.TransformedText, run.FinalText);
     }
 
     [Fact(Timeout = 30_000)]
-    public async Task BestEffortOutcomeAppearsOnlyAfterTheFinishingStepsAreStored()
+    public async Task BestEffortOutcomeAppearsOnlyAfterTheRunKindResultsAreStored()
     {
-        var finalizers = new BlockingFinalizerFactory();
-        var snapshot = WithFinalizer(TestCrewSnapshots.Runnable with
-        {
-            ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
-            RunFinalizersOnMaxAttempts = true,
-        });
-        var runId = await CreateRunAsync(Briefing(), TestCrewSnapshots.Serialize(snapshot));
+        var finish = new BlockingFinishAssembler();
+        var runId = await CreateRunAsync(Briefing(), NonConvergingSnapshotJson());
         await using var host = new OrchestratorTestHost(fixture, new RejectingFakeLlmClient(), FastOptions(),
-            services => services.AddSingleton<IFinalizerExecutorFactory>(finalizers));
+            services => services.AddSingleton<IPipelineAssembler>(finish));
         await host.StartAsync();
 
-        await finalizers.Entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        await finish.Entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
         await Task.Delay(300);
         var whileFinishing = await LoadAsync(runId);
         Assert.Equal(RunStatus.Failed, whileFinishing.Status);
         Assert.False(string.IsNullOrWhiteSpace(whileFinishing.FinalText));
         Assert.Null(whileFinishing.Outcome);
 
-        finalizers.Release.SetResult();
+        finish.Release.SetResult();
         var run = await WaitForOutcomeAsync(runId);
 
         Assert.Equal((RunOutcome?)RunOutcome.DeliveredWithOpenPoints, run.Outcome);
-        Assert.Equal(BlockingFinalizerFactory.TransformedText, run.FinalText);
     }
 
     [Fact(Timeout = 30_000)]
@@ -88,7 +81,7 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
         var briefing = Briefing();
         var runId = await CreateRunAsync(briefing, NonConvergingSnapshotJson());
         await using var trigger = await RunRowTrigger.CreateAsync(fixture, briefing,
-            """NEW."FinalizerErrorMessage" IS NOT NULL AND OLD."FinalizerErrorMessage" IS NULL""",
+            BestEffortDraftWrite,
             "PERFORM pg_sleep(1.5); RETURN NEW;");
         await using var host = new OrchestratorTestHost(fixture, new RejectingFakeLlmClient(), FastOptions());
         await host.StartAsync();
@@ -96,7 +89,8 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
         var firstWithOutcome = await WaitForOutcomeAsync(runId, pollMs: 20);
 
         Assert.Equal((RunOutcome?)RunOutcome.DeliveredWithOpenPoints, firstWithOutcome.Outcome);
-        Assert.NotNull(firstWithOutcome.FinalizerErrorMessage);
+        Assert.False(string.IsNullOrWhiteSpace(firstWithOutcome.FinalText));
+        Assert.NotNull(firstWithOutcome.WordCount);
     }
 
     [Fact(Timeout = 30_000)]
@@ -105,7 +99,7 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
         var briefing = Briefing();
         var runId = await CreateRunAsync(briefing, NonConvergingSnapshotJson());
         await using var trigger = await RunRowTrigger.CreateAsync(fixture, briefing,
-            """NEW."FinalizerErrorMessage" IS NOT NULL AND OLD."FinalizerErrorMessage" IS NULL""",
+            BestEffortDraftWrite,
             "RAISE EXCEPTION 'injected draft write failure';");
         await using var host = new OrchestratorTestHost(fixture, new RejectingFakeLlmClient(), FastOptions());
         await host.StartAsync();
@@ -156,10 +150,9 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
 
     private static string Briefing() => $"Outcome ordering test {Guid.NewGuid():N}.";
 
-    private static CrewSnapshot WithFinalizer(CrewSnapshot snapshot) => snapshot with
-    {
-        Finalizers = [new FinalizerProfile("blocking-step", "Blocking step", "d", FinalizerType.Transform, [], false)],
-    };
+    private const string BestEffortDraftWrite =
+        "OLD.\"Status\" = 'Failed' AND OLD.\"FinalText\" IS NOT NULL AND NEW.\"Outcome\" IS NULL " +
+        "AND NEW.\"TotalCostEur\" IS NOT DISTINCT FROM OLD.\"TotalCostEur\" AND NEW.\"ErrorMessage\" IS NOT DISTINCT FROM OLD.\"ErrorMessage\"";
 
     private static string NonConvergingSnapshotJson() => TestCrewSnapshots.Serialize(TestCrewSnapshots.Runnable with
     {
@@ -196,26 +189,24 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
         return await db.RunWarnings.AsNoTracking().Where(w => w.RunId == runId).ToListAsync();
     }
 
-    private sealed class BlockingFinalizerFactory : IFinalizerExecutorFactory
+    private sealed class BlockingFinishAssembler : IPipelineAssembler
     {
-        public const string TransformedText = "Text after the finishing step.";
+        private readonly TestLoopAssembler _inner = new();
 
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public IFinalizerExecutor GetExecutor(FinalizerType type) => new Blocking(this, type);
+        public int Priority => 0;
 
-        private sealed class Blocking(BlockingFinalizerFactory owner, FinalizerType type) : IFinalizerExecutor
+        public bool CanAssemble(RunEntity run, CrewSnapshot snapshot) => _inner.CanAssemble(run, snapshot);
+
+        public GeefPipelineRunner<FinalizedDocument> Assemble(PipelineAssemblyContext context) => _inner.Assemble(context);
+
+        public async Task OnRunFinishedAsync(PipelineAssemblyContext context, GeefPipelineResult<FinalizedDocument> result, CancellationToken ct)
         {
-            public FinalizerType Type => type;
-
-            public async Task<FinalizerExecutionResult> ExecuteAsync(FinalizerProfile profile, FinalizerExecutionContext context, CancellationToken cancellationToken)
-            {
-                owner.Entered.TrySetResult();
-                await owner.Release.Task.WaitAsync(cancellationToken);
-                return new FinalizerExecutionResult(TransformedText, null, null, profile.Name);
-            }
+            Entered.TrySetResult();
+            await Release.Task.WaitAsync(ct);
         }
     }
 }

@@ -1,6 +1,5 @@
 using System.Reflection;
 using Geef.Atelier.Application.Crew;
-using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Application.Security;
@@ -9,7 +8,6 @@ using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Core.Persistence.Sources;
-using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using Geef.Atelier.Infrastructure.Sources;
@@ -49,14 +47,13 @@ public sealed class ProductionWiringEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task The_orchestrator_gets_the_grounding_and_finalizer_factories_from_the_container()
+    public async Task The_orchestrator_and_the_research_client_come_from_the_container()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
 
         Assert.NotNull(host.Services.GetRequiredService<Geef.Atelier.Web.Services.RunOrchestratorService>());
-        var grounding = host.Services.GetRequiredService<IGroundingProviderFactory>();
-        Assert.True(grounding.IsRegistered("tavily"));
-        Assert.NotNull(host.Services.GetRequiredService<Geef.Atelier.Application.Crew.Finalizers.IFinalizerExecutorFactory>());
+        Assert.NotNull(host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<Geef.Atelier.Infrastructure.Research.TavilyOptions>>().Value);
+        Assert.Single(host.Services.GetServices<Geef.Atelier.Infrastructure.Pipeline.Assembly.IPipelineAssembler>());
     }
 
     [Fact]

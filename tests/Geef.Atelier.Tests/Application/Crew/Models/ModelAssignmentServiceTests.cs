@@ -1,9 +1,6 @@
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew;
-using Geef.Atelier.Core.Domain.Crew.Advisors;
-using Geef.Atelier.Core.Domain.Crew.Finalizers;
-using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -233,33 +230,7 @@ public sealed class ModelAssignmentServiceTests
             ],
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null,
-            Advisors:
-            [
-                new AdvisorProfile("expert", "X", "d", "p", "x", "y", 8000, AdvisorMode.DomainExpert, AdvisorTrigger.BeforeFirstExecution, false, ModelSlot: ModelSlot.DomainExpertAdvisor),
-                new AdvisorProfile("manual-advisor", "M", "d", "p", "claude-cli", "claude-opus-latest", 8000, AdvisorMode.Strategic, AdvisorTrigger.BeforeFirstExecution, false),
-            ],
-            GroundingProviders:
-            [
-                new GroundingProviderProfile("g", "G", "d", "tavily", new Dictionary<string, string>
-                {
-                    [GroundingProviderProfile.KeyRefinementProvider] = "deepseek",
-                    [GroundingProviderProfile.KeyRefinementModel] = "deepseek/deepseek-v4-flash",
-                    [GroundingProviderProfile.KeyModelSlot] = "GroundingRefiner",
-                }, false),
-            ],
-            Finalizers:
-            [
-                new FinalizerProfile("t-empty", "T", "d", FinalizerType.Transform, [], false),
-                new FinalizerProfile("t-manual", "T", "d", FinalizerType.Transform, new Dictionary<string, string>
-                {
-                    [TransformSettings.KeyProvider] = "codex-cli",
-                    [TransformSettings.KeyModel] = "gpt-6.1-terra",
-                }, false),
-                new FinalizerProfile("t-rewrite", "T", "d", FinalizerType.Transform, new Dictionary<string, string>
-                {
-                    [TransformSettings.KeyModelSlot] = "TransformRewrite",
-                }, false),
-            ],
+            Advisors: [],
             CrewDomain: ModelDomain.Legal);
 
         var result = await Service().ApplyAsync(snapshot);
@@ -268,13 +239,6 @@ public sealed class ModelAssignmentServiceTests
         Assert.Equal(("codex-cli", "gpt-astra-latest"), (result.Reviewers[0].Provider, result.Reviewers[0].Model));
         Assert.Equal(("xai", "grok-4.5"), (result.Reviewers[1].Provider, result.Reviewers[1].Model));
         Assert.Equal(("openrouter", "google/gemini-4-neon"), (result.Reviewers[2].Provider, result.Reviewers[2].Model));
-        Assert.Equal(("codex-cli", "gpt-astra-latest"), (result.Advisors[0].Provider, result.Advisors[0].Model));
-        Assert.Equal(("claude-cli", "claude-opus-latest"), (result.Advisors[1].Provider, result.Advisors[1].Model));
-        Assert.Equal("claude-sonnet-latest", result.GroundingProviders![0].ProviderSettings[GroundingProviderProfile.KeyRefinementModel]);
-        Assert.Equal("deepseek/deepseek-v4-flash", snapshot.GroundingProviders![0].ProviderSettings[GroundingProviderProfile.KeyRefinementModel]);
-        Assert.Equal("claude-sonnet-latest", result.Finalizers![0].Settings[TransformSettings.KeyModel]);
-        Assert.Equal("gpt-6.1-terra", result.Finalizers[1].Settings[TransformSettings.KeyModel]);
-        Assert.Equal("gpt-sol-latest", result.Finalizers[2].Settings[TransformSettings.KeyModel]);
     }
 
     [Fact]

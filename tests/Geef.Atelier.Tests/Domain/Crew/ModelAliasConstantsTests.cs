@@ -61,12 +61,9 @@ public sealed class ModelAliasConstantsTests
     [Fact]
     public void NoSystemCrewProfileIsPinnedToAFrozenClaudeGeneration()
     {
-        var pinned = new[]
-        {
-            SystemCrew.DefaultExecutorProfile.Model,
-            SystemCrew.LegalDomainExpertProfile.Model,
-            SystemCrew.AcademicRigorAdvisorProfile.Model,
-        };
+        var pinned = SystemCrew.CodeOnlyExecutorProfiles.Values.Select(p => p.Model)
+            .Concat(SystemCrew.CodeOnlyReviewerProfiles.Values.Select(p => p.Model))
+            .ToList();
 
         Assert.All(pinned, model =>
         {
