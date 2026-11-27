@@ -130,10 +130,6 @@ internal sealed class ModelCatalog(
     }
 
     /// <inheritdoc />
-    public bool IsUsingFallback(string providerName) =>
-        GetSource(providerName) == ModelCatalogSource.Fallback;
-
-    /// <inheritdoc />
     /// <remarks>
     /// Deliberately never triggers a lookup. This runs on the run-start path, once per actor, and a
     /// network round-trip there would put the shared LLM client — and its circuit breaker — in front

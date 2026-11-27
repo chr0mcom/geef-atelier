@@ -86,17 +86,10 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
     /// <summary>Fact-check answer once the queue is empty: no findings.</summary>
     public const string DefaultFactCheckJson = """{"findings":[]}""";
 
-    /// <summary>Recheck answer once the queue is empty: no results (every asked finding counts as unclear).</summary>
-    public const string DefaultRecheckJson = """{"results":[]}""";
-
     private readonly System.Collections.Concurrent.ConcurrentQueue<(string? Json, int Status, string? Code)> _factCheckAnswers = new();
-    private readonly System.Collections.Concurrent.ConcurrentQueue<string> _recheckAnswers = new();
 
     /// <summary>Queues the JSON content of the next <c>check_facts</c> answer.</summary>
     public void EnqueueFactCheckJson(string json) => _factCheckAnswers.Enqueue((json, 200, null));
-
-    /// <summary>Queues the JSON content of the next <c>recheck_facts</c> answer.</summary>
-    public void EnqueueRecheckJson(string json) => _recheckAnswers.Enqueue(json);
 
     /// <summary>Queues an error answer (cli-proxy error envelope with <paramref name="code"/>, without <c>Retry-After</c>) for the next <c>check_facts</c> call.</summary>
     public void EnqueueFactCheckError(int status, string code = "scripted") => _factCheckAnswers.Enqueue((null, status, code));
@@ -111,9 +104,6 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
 
     /// <summary>True for a <c>check_facts</c> request (structured output named <see cref="FactCheckSchema.CheckName"/>).</summary>
     public static bool IsFactCheckCall(RecordedLlmCall call) => SchemaName(call.RawBody) == FactCheckSchema.CheckName;
-
-    /// <summary>True for a <c>recheck_facts</c> request (structured output named <see cref="FactCheckSchema.RecheckName"/>).</summary>
-    public static bool IsRecheckCall(RecordedLlmCall call) => SchemaName(call.RawBody) == FactCheckSchema.RecheckName;
 
     /// <summary>Answer of the research condenser once the queue is empty: no passage.</summary>
     public const string DefaultPassagesJson = """{"passages":[]}""";
@@ -163,9 +153,6 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
                 return factCode is not null
                     ? PlainError(factStatus, factCode)
                     : Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = factJson }, "stop"));
-            case FactCheckSchema.RecheckName:
-                var recheckJson = _recheckAnswers.TryDequeue(out var recheck) ? recheck : DefaultRecheckJson;
-                return Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = recheckJson }, "stop"));
             case DossierSchema.Name:
                 var (passagesJson, passagesStatus, passagesCode) = _passagesAnswers.TryDequeue(out var passages)
                     ? passages

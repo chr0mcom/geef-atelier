@@ -30,13 +30,6 @@ public interface IModelCatalog
     ModelCatalogSource GetSource(string providerName);
 
     /// <summary>
-    /// True when the last lookup for <paramref name="providerName"/> failed and the static list is a
-    /// degraded substitute. Equivalent to <see cref="GetSource"/> returning
-    /// <see cref="ModelCatalogSource.Fallback"/>; providers without a live source report false.
-    /// </summary>
-    bool IsUsingFallback(string providerName);
-
-    /// <summary>
     /// Resolves an always-latest alias such as <c>claude-opus-latest</c> to the concrete model it
     /// currently points at, so a stored run records which model actually ran rather than a moving
     /// target. Returns <paramref name="modelId"/> unchanged when no mapping is known. Never throws.

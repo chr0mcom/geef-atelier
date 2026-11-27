@@ -180,11 +180,11 @@ public sealed class RunServiceUserIsolationTests
     }
 
     // ---------------------------------------------------------------------------
-    // ListRunWarningsAsync
+    // Warnings of the run view
     // ---------------------------------------------------------------------------
 
     [Fact]
-    public async Task ListRunWarningsAsync_OwnerAndAdminSeeTheWarningsOfTheRun()
+    public async Task GetRunViewAsync_OwnerAndAdminSeeTheWarningsOfTheRun()
     {
         var runId    = Guid.NewGuid();
         var warnings = new InMemoryRunWarnings();
@@ -193,31 +193,31 @@ public sealed class RunServiceUserIsolationTests
         await warnings.ReportAsync(Guid.NewGuid(), "grounding", "grounding.provider_skipped", "other run");
         var svc = MakeService(new SingleRunRepository(MakeRun(runId, "alice"), cancellable: false), warnings);
 
-        var forOwner = await svc.ListRunWarningsAsync(runId, "alice");
-        var forAdmin = await svc.ListRunWarningsAsync(runId, requestingUsername: null);
+        var forOwner = await svc.GetRunViewAsync(runId, "alice");
+        var forAdmin = await svc.GetRunViewAsync(runId, requestingUsername: null);
 
-        Assert.Equal(["first", "second"], forOwner.Select(w => w.Message).ToList());
-        Assert.Equal(["first", "second"], forAdmin.Select(w => w.Message).ToList());
+        Assert.Equal(["first", "second"], forOwner!.Warnings.Select(w => w.Message).ToList());
+        Assert.Equal(["first", "second"], forAdmin!.Warnings.Select(w => w.Message).ToList());
     }
 
     [Fact]
-    public async Task ListRunWarningsAsync_OtherUserGetsNothing()
+    public async Task GetRunViewAsync_OtherUserGetsNothing()
     {
         var runId    = Guid.NewGuid();
         var warnings = new InMemoryRunWarnings();
         await warnings.ReportAsync(runId, "grounding", "grounding.provider_skipped", "private");
         var svc = MakeService(new SingleRunRepository(MakeRun(runId, "alice"), cancellable: false), warnings);
 
-        Assert.Empty(await svc.ListRunWarningsAsync(runId, "bob"));
+        Assert.Null(await svc.GetRunViewAsync(runId, "bob"));
     }
 
     [Fact]
-    public async Task ListRunWarningsAsync_UnknownRunGetsNothingForAUser()
+    public async Task GetRunViewAsync_UnknownRunGetsNothingForAUser()
     {
         var warnings = new InMemoryRunWarnings();
         var svc = MakeService(new SingleRunRepository(MakeRun(Guid.NewGuid(), "alice"), cancellable: false), warnings);
 
-        Assert.Empty(await svc.ListRunWarningsAsync(Guid.NewGuid(), "alice"));
+        Assert.Null(await svc.GetRunViewAsync(Guid.NewGuid(), "alice"));
     }
 
     // ---------------------------------------------------------------------------

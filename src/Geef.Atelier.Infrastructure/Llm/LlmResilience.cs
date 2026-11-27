@@ -89,28 +89,6 @@ internal static class LlmResilience
         return false;
     }
 
-    /// <summary>
-    /// Short, non-sensitive description of a failure for user-facing findings and log lines.
-    /// Never includes API keys, provider URLs, or stack traces.
-    /// </summary>
-    public static string Describe(Exception exception)
-    {
-        for (Exception? ex = exception; ex is not null; ex = ex.InnerException)
-        {
-            switch (ex)
-            {
-                case HttpRequestException { StatusCode: { } status }:
-                    return $"provider HTTP {(int)status}";
-                case HttpRequestException:
-                    return "provider connection error";
-                case TaskCanceledException:
-                case TimeoutException:
-                    return "provider timeout";
-            }
-        }
-        return "provider error";
-    }
-
     private static TimeSpan BackoffDelay(int attempt, TimeSpan baseDelay, TimeSpan maxDelay)
     {
         if (baseDelay <= TimeSpan.Zero) return TimeSpan.Zero;

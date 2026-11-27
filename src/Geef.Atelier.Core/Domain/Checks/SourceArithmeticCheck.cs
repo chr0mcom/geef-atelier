@@ -39,9 +39,6 @@ public sealed record SourceArithmeticResult(int TotalsFound, IReadOnlyList<Sourc
 /// </summary>
 public static partial class SourceArithmeticCheck
 {
-    /// <summary>Words that mark a total in lists, sentences and tables (forms 2–4). German compounds that start with <c>gesamt</c> or end with <c>summe</c> count as well.</summary>
-    public static IReadOnlyList<string> TotalWords { get; } = ["summe", "gesamt", "insgesamt", "zusammen", "total", "sum", "altogether", "in total"];
-
     public const decimal Tolerance = 0.005m;
 
     /// <summary>Totals that do not add up listed in a result at most; more are counted in <see cref="SourceArithmeticResult.IssuesNotListed"/>.</summary>

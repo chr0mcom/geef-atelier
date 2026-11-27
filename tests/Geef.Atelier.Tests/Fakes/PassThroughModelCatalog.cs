@@ -28,8 +28,6 @@ internal sealed class PassThroughModelCatalog : IModelCatalog
 
     public ModelCatalogSource GetSource(string providerName) => ModelCatalogSource.Unknown;
 
-    public bool IsUsingFallback(string providerName) => false;
-
     public Task<string> ResolveModelAsync(string providerName, string modelId, CancellationToken ct = default)
         => Task.FromResult(modelId);
 }
@@ -63,8 +61,6 @@ internal sealed class ResolvingModelCatalog(
         => Task.FromResult(_models);
 
     public ModelCatalogSource GetSource(string providerName) => ModelCatalogSource.Live;
-
-    public bool IsUsingFallback(string providerName) => false;
 
     public Task<string> ResolveModelAsync(string providerName, string modelId, CancellationToken ct = default)
     {

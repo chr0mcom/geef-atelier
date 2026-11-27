@@ -38,11 +38,4 @@ public interface IProviderService
 
     /// <summary>Toggles the active state of a provider. No-op for system providers (always active).</summary>
     Task SetActiveAsync(string name, bool isActive, CancellationToken ct = default);
-
-    /// <summary>
-    /// Performs a live connectivity test against the provider's endpoint.
-    /// Returns a <see cref="ConnectionTestResult"/> with latency and an optional response sample.
-    /// CLI providers always return a synthetic success result.
-    /// </summary>
-    Task<ConnectionTestResult> TestConnectionAsync(string name, CancellationToken ct = default);
 }

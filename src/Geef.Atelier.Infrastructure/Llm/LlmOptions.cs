@@ -18,25 +18,11 @@ public sealed class LlmOptions
         set => ProvidersFallback = value;
     }
 
-    /// <summary>Per-actor configuration. Key matches actor name used by pipeline steps and reviewers.</summary>
-    public Dictionary<string, ActorConfig> Actors { get; set; } = new();
-
-    /// <summary>Fallback provider name when an actor's Provider field is empty.</summary>
-    public string DefaultProvider { get; set; } = "openrouter";
-
     public int DefaultMaxTokens { get; set; } = 16384;
 
     public sealed class ProviderConfig
     {
         public string Endpoint { get; set; } = string.Empty;
         public string ApiKey { get; set; } = string.Empty;
-    }
-
-    public sealed class ActorConfig
-    {
-        /// <summary>Key into <see cref="Providers"/>. Falls back to <see cref="DefaultProvider"/> when empty.</summary>
-        public string Provider { get; set; } = string.Empty;
-        public string Model { get; set; } = string.Empty;
-        public int? MaxTokens { get; set; }
     }
 }

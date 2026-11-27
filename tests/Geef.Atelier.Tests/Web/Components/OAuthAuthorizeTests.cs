@@ -24,7 +24,6 @@ public sealed class OAuthAuthorizeTests : TestContext
         public Task RevokeTokenAsync(string token, string clientId, CancellationToken ct) => throw new NotImplementedException();
         public Task RevokeAllUserTokensAsync(string userId, CancellationToken ct) => throw new NotImplementedException();
         public Task RevokeClientAsync(string userId, string clientId, CancellationToken ct) => throw new NotImplementedException();
-        public Task LogEventAsync(OAuthAuditLogEntry entry, CancellationToken ct) => throw new NotImplementedException();
         public Task<IReadOnlyList<OAuthAccessToken>> GetActiveTokensForUserAsync(string userId, CancellationToken ct) => throw new NotImplementedException();
         public Task<IReadOnlyList<ConnectedClientInfo>> GetConnectedClientsAsync(string userId, CancellationToken ct) => throw new NotImplementedException();
         public Task<IReadOnlyList<OAuthClient>> GetAllClientsAsync(CancellationToken ct) => throw new NotImplementedException();

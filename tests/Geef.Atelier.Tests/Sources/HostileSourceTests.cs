@@ -85,13 +85,13 @@ public sealed class HostileSourceTests
     {
         var forged = "[[page 1]]\n" + new string('a', 995) + " [[page 3]]\nmore text";
 
-        var wrapped = LineWrapper.Wrap(forged, 1_000, out var didWrap);
+        var wrapped = Wrap(forged, 1_000, out var didWrap);
 
         Assert.True(didWrap);
         Assert.Equal([1], PageMarkers.SplitPages(wrapped).Select(p => p.Page));
         Assert.Contains("[ [page 3]]", wrapped, StringComparison.Ordinal);
 
-        var hardCut = LineWrapper.Wrap("[[page 1]]\n" + new string('b', 1_000) + "[[page 9]]", 1_000, out _);
+        var hardCut = Wrap("[[page 1]]\n" + new string('b', 1_000) + "[[page 9]]", 1_000, out _);
         Assert.Equal([1], PageMarkers.SplitPages(hardCut).Select(p => p.Page));
     }
 
@@ -208,6 +208,13 @@ public sealed class HostileSourceTests
     private static PdfSourceExtractor Pdf(SourceOptions options) => new(Options.Create(options), NullLogger<PdfSourceExtractor>.Instance);
 
     private static DocxSourceExtractor Docx(SourceOptions options) => new(Options.Create(options), NullLogger<DocxSourceExtractor>.Instance);
+
+    private static string Wrap(string text, int maxLineChars, out bool wrapped)
+    {
+        var result = text.NormalizeForStorage(defuseMarkerLines: false, maxLineChars);
+        wrapped = result.Wrapped;
+        return result.Text;
+    }
 }
 
 internal static class DocxBytesExtensions

@@ -38,9 +38,6 @@ public interface IOAuthService
     /// <summary>Revokes all tokens a single client holds for the given user (used by the "connected clients" self-service UI).</summary>
     Task RevokeClientAsync(string userId, string clientId, CancellationToken ct);
 
-    /// <summary>Appends an entry to the permanent OAuth audit log (kept beyond token cleanup for forensics).</summary>
-    Task LogEventAsync(OAuthAuditLogEntry entry, CancellationToken ct);
-
     /// <summary>Returns the user's currently active (non-expired, non-revoked) access tokens.</summary>
     Task<IReadOnlyList<OAuthAccessToken>> GetActiveTokensForUserAsync(string userId, CancellationToken ct);
 

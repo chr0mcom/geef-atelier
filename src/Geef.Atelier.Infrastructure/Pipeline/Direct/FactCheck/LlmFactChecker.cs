@@ -48,21 +48,11 @@ internal sealed class LlmFactChecker(ILlmClientResolver resolver, DirectOptions 
     public static int ProxyTimeoutSeconds(TimeSpan timeout) =>
         (int)Math.Max(1, Math.Floor((timeout - ProxyTimeoutMargin).TotalSeconds));
 
-    /// <summary>Iteration the costs of <see cref="RecheckAsync"/> are booked on: the recheck runs in round 2.</summary>
-    public const int RecheckIteration = 2;
-
     private static readonly LlmTool CheckTool = new()
     {
         Name = FactCheckSchema.CheckName,
         Description = "Report the facts in the text that the material does not back, broken instructions and problems of the material.",
         InputSchema = FactCheckSchema.Check,
-    };
-
-    private static readonly LlmTool RecheckTool = new()
-    {
-        Name = FactCheckSchema.RecheckName,
-        Description = "Report for every earlier problem whether the revised text still states it.",
-        InputSchema = FactCheckSchema.Recheck,
     };
 
     /// <summary>
@@ -78,14 +68,6 @@ internal sealed class LlmFactChecker(ILlmClientResolver resolver, DirectOptions 
         var call = await CallAsync(CheckTool, FactCheckPrompts.System, FactCheckPrompts.User(material, draft), profile, iteration,
             FactCheckOutputParser.ParseCheckCounted, timeout, ct);
         return new FactCheckCall(call.Value?.Findings, call.RawJson, call.DurationMs, call.Model, call.ErrorCode, call.Value?.Dropped ?? 0);
-    }
-
-    /// <inheritdoc/>
-    public async Task<RecheckCall> RecheckAsync(FactMaterial material, string draft, IReadOnlyList<FactFinding> previous, ReviewerProfile profile, TimeSpan timeout, CancellationToken ct)
-    {
-        var call = await CallAsync(RecheckTool, FactCheckPrompts.RecheckSystem, FactCheckPrompts.RecheckUser(material, draft, previous), profile, RecheckIteration,
-            FactCheckOutputParser.ParseRecheck, timeout, ct);
-        return new RecheckCall(call.Value, call.RawJson, call.DurationMs, call.Model, call.ErrorCode);
     }
 
     private sealed record Outcome<T>(T? Value, string? RawJson, int DurationMs, string Model, string? ErrorCode) where T : class;

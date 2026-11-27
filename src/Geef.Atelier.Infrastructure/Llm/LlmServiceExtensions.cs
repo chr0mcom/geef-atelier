@@ -12,8 +12,7 @@ namespace Geef.Atelier.Infrastructure.Llm;
 public static class LlmServiceExtensions
 {
     /// <summary>
-    /// Registers <see cref="ILlmClientResolver"/>, <see cref="IProviderCatalog"/>,
-    /// <see cref="IModelCatalog"/>, and a shared named HttpClient "llm".
+    /// Registers <see cref="ILlmClientResolver"/>, <see cref="IModelCatalog"/>, and a shared named HttpClient "llm".
     /// Returns <see cref="IHttpClientBuilder"/> so callers can chain resilience handlers.
     /// </summary>
     public static IHttpClientBuilder AddLlmClient(
@@ -24,7 +23,6 @@ public static class LlmServiceExtensions
         services.Configure<CliProxyOptions>(configuration.GetSection("CliProxy"));
         services.Configure<ModelCatalogOptions>(configuration.GetSection(ModelCatalogOptions.SectionName));
         services.AddSingleton<ILlmClientResolver, LlmClientResolver>();
-        services.AddSingleton<IProviderCatalog, ProviderCatalog>();
         services.AddMemoryCache();
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<ICliModelSource, CliProxyModelSource>();

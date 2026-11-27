@@ -28,14 +28,6 @@ internal static class OAuthCrypto
 
     internal static string HashToken(string plainToken) => Sha256Base64Url(plainToken);
 
-    internal static bool FixedTimeEquals(string a, string b)
-    {
-        var aBytes = Encoding.UTF8.GetBytes(a);
-        var bBytes = Encoding.UTF8.GetBytes(b);
-        return aBytes.Length == bBytes.Length &&
-               CryptographicOperations.FixedTimeEquals(aBytes, bBytes);
-    }
-
     private static string Base64UrlEncode(byte[] bytes)
         => Convert.ToBase64String(bytes)
             .TrimEnd('=')

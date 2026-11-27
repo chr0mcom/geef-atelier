@@ -25,14 +25,6 @@ internal sealed class RunService(
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
-    {
-        if (requestingUsername is not null && await GetRunAsync(runId, requestingUsername, cancellationToken) is null)
-            return [];
-        return await warningRepository.ListByRunAsync(runId, cancellationToken);
-    }
-
-    /// <inheritdoc/>
     public async Task<RunEntity?> GetRunAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
     {
         var run = await repository.GetByIdAsync(runId, cancellationToken);

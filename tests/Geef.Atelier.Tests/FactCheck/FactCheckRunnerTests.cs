@@ -31,9 +31,6 @@ public sealed class FactCheckRunnerTests : IDisposable
             Drafts.Add(draft);
             return Task.FromResult(answer(Drafts.Count));
         }
-
-        public Task<RecheckCall> RecheckAsync(FactMaterial material, string draft, IReadOnlyList<FactFinding> previous, ReviewerProfile profile, TimeSpan timeout, CancellationToken ct) =>
-            throw new NotSupportedException();
     }
 
     private sealed class CountingGuard(Func<int, string?> blocker) : ICodexGuard

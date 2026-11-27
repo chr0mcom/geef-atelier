@@ -32,8 +32,6 @@ public static class OrderProgressMapper
     public const string EvaluationApproved = "EvaluationApprovedEvent";
     public const string EvaluationRejected = "EvaluationRejectedEvent";
     public const string PipelineStarted = "PipelineStartedEvent";
-    public const string PipelineCompleted = "PipelineCompletedEvent";
-    public const string PipelineFailed = "PipelineFailedEvent";
 
     /// <summary>
     /// Builds the steps of the progress display: <c>files</c> (only with sources), <c>write</c>, <c>check</c>,

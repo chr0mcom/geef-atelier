@@ -6,14 +6,6 @@ namespace Geef.Atelier.Application.Runs;
 public interface IRunService
 {
     /// <summary>
-    /// Returns the warnings recorded for a run, in the order they were recorded. Returns an empty list
-    /// when the run does not exist or <paramref name="requestingUsername"/> is set and does not own it.
-    /// Pass null to bypass the ownership check (admin mode).
-    /// </summary>
-    Task<IReadOnlyList<Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(
-        Guid runId, string? requestingUsername, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Returns the run with the given ID, or null if not found.
     /// When <paramref name="requestingUsername"/> is non-null, returns null if the run belongs to a different user.
     /// Pass null to bypass the ownership check (admin mode).

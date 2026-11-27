@@ -106,7 +106,7 @@ public sealed class ModelCatalogTests : IDisposable
         var unknown = models.Single(m => m.Id == "some/unknown-model");
         Assert.True(opus.IsRecommended);
         Assert.False(unknown.IsRecommended);
-        Assert.False(catalog.IsUsingFallback("openrouter"));
+        Assert.NotEqual(ModelCatalogSource.Fallback, catalog.GetSource("openrouter"));
         Assert.Equal(ModelCatalogSource.Live, catalog.GetSource("openrouter"));
     }
 
@@ -120,7 +120,7 @@ public sealed class ModelCatalogTests : IDisposable
 
         Assert.True(models.Count > 0);
         Assert.Equal(StaticModelFallback.ForOpenRouter.Count, models.Count);
-        Assert.True(catalog.IsUsingFallback("openrouter"));
+        Assert.Equal(ModelCatalogSource.Fallback, catalog.GetSource("openrouter"));
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public sealed class ModelCatalogTests : IDisposable
 
         await catalog.ListModelsAsync("openrouter");
 
-        Assert.True(catalog.IsUsingFallback("openrouter"));
+        Assert.Equal(ModelCatalogSource.Fallback, catalog.GetSource("openrouter"));
     }
 
     [Fact]
@@ -319,7 +319,7 @@ public sealed class ModelCatalogTests : IDisposable
         Assert.Contains(models, m => m.Id == "claude-opus-5");
         Assert.Contains(models, m => m.Id == "claude-opus-latest");
         Assert.Equal(ModelCatalogSource.Live, catalog.GetSource("claude-cli"));
-        Assert.False(catalog.IsUsingFallback("claude-cli"));
+        Assert.NotEqual(ModelCatalogSource.Fallback, catalog.GetSource("claude-cli"));
     }
 
     [Fact]
@@ -334,7 +334,7 @@ public sealed class ModelCatalogTests : IDisposable
         foreach (var configured in CliProviderSettings.FromSettings(SystemProviders.ClaudeCli.Settings).Models)
             Assert.Contains(configured, ids);
 
-        Assert.True(catalog.IsUsingFallback("claude-cli"));
+        Assert.Equal(ModelCatalogSource.Fallback, catalog.GetSource("claude-cli"));
         Assert.Equal(ModelCatalogSource.Fallback, catalog.GetSource("claude-cli"));
     }
 
@@ -412,7 +412,7 @@ public sealed class ModelCatalogTests : IDisposable
         await catalog.ListModelsAsync("claude-cli");
 
         Assert.Equal(ModelCatalogSource.Fallback, catalog.GetSource("claude-cli"));
-        Assert.True(catalog.IsUsingFallback("claude-cli"));
+        Assert.Equal(ModelCatalogSource.Fallback, catalog.GetSource("claude-cli"));
     }
 
     [Fact]
@@ -425,7 +425,7 @@ public sealed class ModelCatalogTests : IDisposable
         await catalog.ListModelsAsync("gemini-cli");
 
         Assert.Equal(ModelCatalogSource.StaticByDesign, catalog.GetSource("gemini-cli"));
-        Assert.False(catalog.IsUsingFallback("gemini-cli"));
+        Assert.NotEqual(ModelCatalogSource.Fallback, catalog.GetSource("gemini-cli"));
     }
 
     [Fact]
@@ -999,8 +999,6 @@ internal sealed class SlowProviderService(Provider provider, TimeSpan delay) : I
     public Task<Provider> UpdateCustomAsync(string name, Provider p, CancellationToken ct = default) => Task.FromResult(p);
     public Task DeleteCustomAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
     public Task SetActiveAsync(string name, bool isActive, CancellationToken ct = default) => Task.CompletedTask;
-    public Task<ConnectionTestResult> TestConnectionAsync(string name, CancellationToken ct = default)
-        => Task.FromResult(new ConnectionTestResult(true, 0, null, null));
 }
 
 internal sealed class FakeProviderService(Provider? provider) : IProviderService
@@ -1022,7 +1020,4 @@ internal sealed class FakeProviderService(Provider? provider) : IProviderService
 
     public Task SetActiveAsync(string name, bool isActive, CancellationToken ct = default)
         => Task.CompletedTask;
-
-    public Task<ConnectionTestResult> TestConnectionAsync(string name, CancellationToken ct = default)
-        => Task.FromResult(new ConnectionTestResult(true, 0, null, null));
 }

@@ -69,15 +69,11 @@ internal sealed class SingleClientResolver(ILlmClient client, bool structured = 
 {
     public ConcurrentQueue<(string Provider, string Model, int? MaxTokens)> Profiles { get; } = new();
 
-    public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) => throw new NotSupportedException();
-
     public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
     {
         Profiles.Enqueue((provider, model, maxTokens));
         return (client, model, maxTokens ?? 0);
     }
-
-    public bool SupportsAgenticTools(string providerName) => false;
 
     public bool SupportsStructuredOutputs(string providerName) => structured;
 }

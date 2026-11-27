@@ -13,9 +13,6 @@ public static class ApplicationServiceExtensions
     /// <summary>Registers all Application-layer services.</summary>
     public static IServiceCollection AddAtelierApplication(this IServiceCollection services)
     {
-        // IHttpClientFactory is needed by ProviderService.TestConnectionAsync.
-        // AddHttpClient() is idempotent and safe to call multiple times.
-        services.AddHttpClient();
         services.AddOptions();
         services.AddSingleton<IEnvReferencePolicy, EnvReferencePolicy>();
         services.AddScoped<IRunService, RunService>();

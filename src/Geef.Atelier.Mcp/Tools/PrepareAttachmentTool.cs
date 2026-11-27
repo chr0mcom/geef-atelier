@@ -13,7 +13,7 @@ namespace Geef.Atelier.Mcp.Tools;
 
 /// <summary>
 /// Tool <c>prepare_attachment</c>: prepares the upload of one file with a one-time token for <c>curl</c> and a link to the
-/// upload page. Offered only while <c>Uploads:Tickets</c> is <c>On</c> (<see cref="McpToolCatalog.OrderToolsFor"/>). The token goes
+/// upload page. Offered only while <c>Uploads:Tickets</c> is <c>On</c> (<see cref="McpToolCatalog.TicketTools"/>). The token goes
 /// only into a header of the command, never into an address; the link holds no secret and works only for the signed-in owner.
 /// </summary>
 [McpServerToolType]

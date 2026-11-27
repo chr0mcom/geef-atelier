@@ -64,8 +64,6 @@ public sealed class FactCheckEndToEndTests(PostgresFixture postgres)
 
     private static IReadOnlyList<RecordedLlmCall> FactCalls(AtelierEndToEndHost host) => host.Llm.Calls.Where(ScriptedLlmEndpoint.IsFactCheckCall).ToList();
 
-    private static IReadOnlyList<RecordedLlmCall> RecheckCalls(AtelierEndToEndHost host) => host.Llm.Calls.Where(ScriptedLlmEndpoint.IsRecheckCall).ToList();
-
     private static string UserPrompt(RecordedLlmCall call) => call.Messages.Last(m => m.Role == "user").Content ?? string.Empty;
 
     private static string MaterialOf(RecordedLlmCall call)
@@ -139,7 +137,6 @@ public sealed class FactCheckEndToEndTests(PostgresFixture postgres)
         Assert.Contains(Photos, UserPrompt(writer[1]));
         Assert.Contains("Bitte nennen Sie mir das weitere Vorgehen.", UserPrompt(checks[1]));
         Assert.DoesNotContain(Photos, UserPrompt(checks[1]).Split("<text>")[^1]);
-        Assert.Empty(RecheckCalls(host));
 
         var run = await RunOfAsync(host, orderId);
         Assert.Equal((RunOutcome?)RunOutcome.Converged, run.Outcome);
@@ -253,7 +250,6 @@ public sealed class FactCheckEndToEndTests(PostgresFixture postgres)
         Assert.Equal(2, calls.Count);
         Assert.Contains("/codex/", calls[0].Url);
         Assert.Contains("/claude/", calls[1].Url);
-        Assert.Empty(RecheckCalls(host));
         var run = await RunOfAsync(host, orderId);
         Assert.False(string.IsNullOrWhiteSpace(run.FinalText));
         var factCheck = (await ReportOfAsync(host, orderId)).FactCheck!;
@@ -454,7 +450,6 @@ public sealed class FactCheckEndToEndTests(PostgresFixture postgres)
 
         var result = await ResultOfAsync(host, orderId);
         Assert.Equal(2, FactCalls(host).Count);
-        Assert.Empty(RecheckCalls(host));
         Assert.Equal(2, result.SourceIssues!.Count);
         var issue = result.SourceIssues[0];
         Assert.True(issue.Contains("62", StringComparison.Ordinal) && issue.Contains("72", StringComparison.Ordinal) && issue.Contains("The text uses 72", StringComparison.Ordinal), issue);
@@ -477,7 +472,6 @@ public sealed class FactCheckEndToEndTests(PostgresFixture postgres)
         var orderId = await SubmitAsync(host, "Mach aus den Notizen einen Elternbrief und nenne kurz die Gesamtkosten des Materials.", [notes]);
 
         Assert.Single(host.Llm.CallsFor(LlmRole.Executor));
-        Assert.Empty(RecheckCalls(host));
         var result = await ResultOfAsync(host, orderId);
         Assert.Equal(Reply, Assert.Single(result.BlockingPassages(FactFindingKind.Unsupported)).Quote);
         Assert.Equal(OldDate, Assert.Single(result.BlockingPassages(FactFindingKind.Superseded)).Quote);
@@ -522,7 +516,6 @@ public sealed class FactCheckEndToEndTests(PostgresFixture postgres)
         var checks = FactCalls(host);
         Assert.Equal(2, checks.Count);
         Assert.Contains(Invented, UserPrompt(checks[1]));
-        Assert.Empty(RecheckCalls(host));
         var run = await RunOfAsync(host, orderId);
         Assert.Equal(2, run.DeliveredIteration);
         Assert.Equal(FactCheckState.OpenPoints, (await ReportOfAsync(host, orderId)).FactCheck!.State);

@@ -157,23 +157,12 @@ public sealed class ProviderServiceTests
         Assert.Null(result);
     }
 
-    [Fact]
-    public async Task TestConnectionAsync_CliProvider_ReturnsSyntheticSuccess()
-    {
-        var service = BuildService();
-
-        var result = await service.TestConnectionAsync("claude-cli");
-
-        Assert.True(result.Success);
-    }
-
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static ProviderService BuildService()
     {
         var repo = new FakeProviderRepository();
-        var httpFactory = new FakeHttpClientFactory();
-        return new ProviderService(repo, httpFactory);
+        return new ProviderService(repo);
     }
 
     private static Provider CreateTestProvider(string name) =>

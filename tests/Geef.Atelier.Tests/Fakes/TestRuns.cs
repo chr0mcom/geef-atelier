@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Tests.Fakes;
@@ -17,7 +17,7 @@ internal static class TestRuns
     public static async Task<Guid> CreatePendingAsync(this IServiceProvider services, string briefing, string? createdByUser = null,
         int maxIterations = 3, CancellationToken ct = default)
     {
-        var persistence = services.GetRequiredService<IRunPersistenceService>();
+        var persistence = new RunPersistenceService(services.GetRequiredService<AtelierDbContext>());
         var runId = await persistence.CreateRunAsync(briefing, createdByUser, TestLoop.TemplateName, null, ct);
         await persistence.UpdateSnapshotAsync(runId, JsonSerializer.Serialize(TestLoop.Snapshot(maxIterations), SnapshotJson), ct);
         return runId;

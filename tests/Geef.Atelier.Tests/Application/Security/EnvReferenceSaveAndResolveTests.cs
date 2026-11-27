@@ -80,7 +80,7 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
         var svc = scope.ServiceProvider.GetRequiredService<IProviderService>();
 
         var saved = await svc.CreateCustomAsync(HttpProvider(Unique("envok"), _allowed));
-        await svc.TestConnectionAsync(saved.Name);
+        await SendThroughResolverAsync(sp, saved.Name);
 
         Assert.Equal($"Bearer allowed-secret", _handler.LastAuthorization);
     }
@@ -111,24 +111,9 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
         await using (var scope = sp.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<IProviderRepository>().CreateAsync(HttpProvider(name, _forbidden), default);
 
-        await using (var scope = sp.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<IProviderService>().TestConnectionAsync(name);
-        Assert.Null(_handler.LastAuthorization);
+        await SendThroughResolverAsync(sp, name);
 
-        var resolver = new LlmClientResolver(
-            sp.GetRequiredService<IHttpClientFactory>(),
-            Options.Create(new LlmOptions()),
-            sp.GetRequiredService<IServiceScopeFactory>(),
-            NullLoggerFactory.Instance,
-            sp.GetRequiredService<IEnvReferencePolicy>());
-        var (client, model, _) = resolver.ForProfile(name, "m", null);
-        try
-        {
-            await client.CompleteAsync(new LlmRequest { Model = model, SystemPrompt = "s", UserPrompt = "u", MaxTokens = 5 }, default);
-        }
-        catch (Exception)
-        {
-        }
+        Assert.Null(_handler.LastAuthorization);
         Assert.DoesNotContain("forbidden-secret", _handler.AllAuthorizations);
     }
 
@@ -141,10 +126,28 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
         await using (var scope = sp.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<IProviderRepository>().CreateAsync(HttpProvider(name, null, _forbidden), default);
 
-        await using (var scope = sp.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<IProviderService>().TestConnectionAsync(name);
+        await SendThroughResolverAsync(sp, name);
 
         Assert.Equal("llm.test", _handler.LastUri?.Host);
+    }
+
+    /// <summary>One call to the provider <paramref name="name"/> the way a run makes it; only what was sent matters, not the answer.</summary>
+    private static async Task SendThroughResolverAsync(ServiceProvider sp, string name)
+    {
+        var resolver = new LlmClientResolver(
+            sp.GetRequiredService<IHttpClientFactory>(),
+            Options.Create(new LlmOptions()),
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            NullLoggerFactory.Instance,
+            sp.GetRequiredService<IEnvReferencePolicy>());
+        try
+        {
+            var (client, model, _) = resolver.ForProfile(name, "m", null);
+            await client.CompleteAsync(new LlmRequest { Model = model, SystemPrompt = "s", UserPrompt = "u", MaxTokens = 5 }, default);
+        }
+        catch (Exception)
+        {
+        }
     }
 
     private sealed class CapturingHandler(string body = "{\"data\":[]}") : HttpMessageHandler

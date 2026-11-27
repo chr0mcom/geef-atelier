@@ -18,40 +18,11 @@ internal static class OpenAiMessageFormat
 
     internal static string SerializeRequest(LlmRequest request)
     {
-        MessageDto[] messages;
-
-        if (request.Messages is { Count: > 0 })
-        {
-            // Multi-turn path: serialize full message history.
-            messages = request.Messages.Select(m => new MessageDto
-            {
-                Role       = m.Role,
-                Content    = m.Content,
-                ToolCalls  = m.ToolCalls is { Count: > 0 }
-                    ? m.ToolCalls.Select(tc => new OutboundToolCallDto
-                    {
-                        Id       = tc.Id,
-                        Type     = "function",
-                        Function = new FunctionCallOutDto
-                        {
-                            Name      = tc.Name,
-                            Arguments = tc.ArgumentsJson
-                        }
-                    }).ToArray()
-                    : null,
-                ToolCallId = m.ToolCallId,
-                Name       = m.Name,
-            }).ToArray();
-        }
-        else
-        {
-            // Single-turn path: legacy system + user messages.
-            messages = new[]
-            {
-                new MessageDto { Role = "system", Content = request.SystemPrompt },
-                new MessageDto { Role = "user",   Content = request.UserPrompt }
-            };
-        }
+        MessageDto[] messages =
+        [
+            new() { Role = "system", Content = request.SystemPrompt },
+            new() { Role = "user",   Content = request.UserPrompt }
+        ];
 
         ToolDto[]? tools = null;
         if (request.Tools is { Count: > 0 })
@@ -103,35 +74,15 @@ internal static class OpenAiMessageFormat
 
         var text = message.Content ?? string.Empty;
 
-        string? toolName           = null;
-        string? toolArgumentsJson  = null;
-        LlmToolCall[] allToolCalls = [];
-
-        if (message.ToolCalls is { Length: > 0 })
-        {
-            // Deserialize all tool calls for multi-turn loop consumers.
-            allToolCalls = message.ToolCalls
-                .Select(tc => new LlmToolCall
-                {
-                    Id            = tc.Id            ?? string.Empty,
-                    Name          = tc.Function?.Name ?? string.Empty,
-                    ArgumentsJson = tc.Function?.Arguments ?? string.Empty
-                })
-                .ToArray();
-
-            // Keep legacy single-call properties pointing at index 0 for backwards compatibility.
-            toolName          = allToolCalls[0].Name;
-            toolArgumentsJson = allToolCalls[0].ArgumentsJson;
-        }
+        var firstCall = message.ToolCalls is { Length: > 0 } calls ? calls[0] : null;
 
         var usage = api.Usage;
 
         return new LlmResponse
         {
             Text              = text,
-            ToolName          = toolName,
-            ToolArgumentsJson = toolArgumentsJson,
-            AllToolCalls      = allToolCalls,
+            ToolName          = firstCall is null ? null : firstCall.Function?.Name ?? string.Empty,
+            ToolArgumentsJson = firstCall is null ? null : firstCall.Function?.Arguments ?? string.Empty,
             FinishReason      = choice.FinishReason ?? string.Empty,
             TokenUsage        = new LlmTokenUsage
             {
@@ -193,23 +144,6 @@ internal static class OpenAiMessageFormat
     {
         [JsonPropertyName("role")]         public string Role { get; set; } = "";
         [JsonPropertyName("content")]      public string? Content { get; set; }
-        [JsonPropertyName("tool_calls")]   public OutboundToolCallDto[]? ToolCalls { get; set; }
-        [JsonPropertyName("tool_call_id")] public string? ToolCallId { get; set; }
-        [JsonPropertyName("name")]         public string? Name { get; set; }
-    }
-
-    /// <summary>Outbound tool_call entry inside an assistant message (request serialization).</summary>
-    private sealed class OutboundToolCallDto
-    {
-        [JsonPropertyName("id")]       public string Id { get; set; } = "";
-        [JsonPropertyName("type")]     public string Type { get; set; } = "function";
-        [JsonPropertyName("function")] public FunctionCallOutDto? Function { get; set; }
-    }
-
-    private sealed class FunctionCallOutDto
-    {
-        [JsonPropertyName("name")]      public string Name { get; set; } = "";
-        [JsonPropertyName("arguments")] public string Arguments { get; set; } = "";
     }
 
     private sealed class ToolDto
@@ -245,7 +179,6 @@ internal static class OpenAiMessageFormat
 
     private sealed class ToolCallDto
     {
-        [JsonPropertyName("id")]       public string? Id { get; init; }
         [JsonPropertyName("function")] public FunctionCallDto? Function { get; init; }
     }
 

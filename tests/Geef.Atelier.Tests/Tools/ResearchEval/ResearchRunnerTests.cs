@@ -290,11 +290,7 @@ public sealed class ResearchRunnerTests : IDisposable
     {
         public int Calls { get; private set; }
 
-        public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) => throw new NotSupportedException();
-
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens) => (this, model, 100);
-
-        public bool SupportsAgenticTools(string providerName) => false;
 
         public bool SupportsStructuredOutputs(string providerName) => true;
 

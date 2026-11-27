@@ -255,7 +255,6 @@ public sealed class LiveReloadDataAccessTests : TestContext
             return inner.GetRunViewAsync(id, requestingUsername, cancellationToken);
         }
 
-        public Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => inner.ListRunWarningsAsync(id, requestingUsername, cancellationToken);
         public Task<RunEntity?> GetRunAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => inner.GetRunAsync(id, requestingUsername, cancellationToken);
         public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, string? requestingUsername = null, CancellationToken cancellationToken = default) => inner.ListRunsAsync(limit, statusFilter, requestingUsername, cancellationToken);
         public Task<bool> CancelRunAsync(Guid id, string? requestingUsername, CancellationToken cancellationToken = default) => inner.CancelRunAsync(id, requestingUsername, cancellationToken);

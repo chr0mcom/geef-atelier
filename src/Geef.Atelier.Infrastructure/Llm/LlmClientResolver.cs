@@ -24,39 +24,11 @@ internal sealed class LlmClientResolver(
     // Lazy<T> with ExecutionAndPublication ensures the factory runs exactly once per provider.
     private readonly ConcurrentDictionary<string, Lazy<Provider?>> _providerCache = new(StringComparer.OrdinalIgnoreCase);
 
-    public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName)
-    {
-        var opts = options.Value;
-
-        if (!opts.Actors.TryGetValue(actorName, out var actorCfg))
-            throw new InvalidOperationException(
-                $"Actor '{actorName}' is not configured in Llm:Actors.");
-
-        var providerName = actorCfg.Provider is { Length: > 0 } p ? p : opts.DefaultProvider;
-        var client = ResolveClient(providerName);
-
-        if (actorCfg.Model is not { Length: > 0 } model)
-            throw new InvalidOperationException(
-                $"No model configured for actor '{actorName}' in Llm:Actors.");
-
-        return (client, model, actorCfg.MaxTokens ?? opts.DefaultMaxTokens);
-    }
-
     public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
     {
         var client = ResolveClient(provider);
         var normalised = ModelNameNormalizer.Normalize(provider, model);
         return (client, normalised, maxTokens ?? options.Value.DefaultMaxTokens);
-    }
-
-    /// <summary>Clears the provider lookup cache so the next call re-fetches from the service.</summary>
-    public void InvalidateCache() => _providerCache.Clear();
-
-    /// <inheritdoc/>
-    public bool SupportsAgenticTools(string providerName)
-    {
-        var provider = LoadProvider(providerName);
-        return provider?.SupportsAgenticTools() ?? false;
     }
 
     /// <inheritdoc/>

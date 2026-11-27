@@ -68,11 +68,4 @@ public static class AboutMeLines
         GapTopic.Language => "the language of your texts",
         _ => topic.Label().ToLowerInvariant(),
     };
-
-    /// <summary>The line about the topics the writer got from About me, for example "With this request the writer got from About me: who you are, how you sign off. You can change …".</summary>
-    public static string FromAboutMeLine(IReadOnlyList<GapTopic> topics)
-    {
-        ArgumentNullException.ThrowIfNull(topics);
-        return FromAboutMeLead + string.Join(", ", topics.Select(t => t.FromAboutMeName())) + ". " + ChangeThere;
-    }
 }

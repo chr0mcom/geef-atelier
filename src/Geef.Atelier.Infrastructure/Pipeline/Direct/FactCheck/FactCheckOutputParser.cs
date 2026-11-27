@@ -58,28 +58,6 @@ internal static class FactCheckOutputParser
         return new ParsedCheck(kept, dropped);
     }
 
-    /// <summary>
-    /// Results of a <c>recheck_facts</c> answer; unknown ids are left to the caller. An entry without id is dropped, a repeated id
-    /// keeps its first answer, an unknown status reads as <see cref="RecheckStatus.Unclear"/>, a quote over
-    /// <see cref="MaxQuoteChars"/> or a blank one becomes <c>null</c>. <c>null</c> when there is no object with a <c>results</c> list.
-    /// </summary>
-    public static IReadOnlyList<RecheckResult>? ParseRecheck(string? json)
-    {
-        if (Root(json) is not { } root || !root.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
-            return null;
-
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var read = new List<RecheckResult>();
-        foreach (var item in results.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object || Text(item, "id")?.Trim() is not { Length: > 0 } id || !seen.Add(id))
-                continue;
-            var quote = Text(item, "text_quote");
-            read.Add(new RecheckResult(id, Status(Text(item, "status")), quote is null || quote.Length > MaxQuoteChars ? null : quote));
-        }
-        return read;
-    }
-
     private static (ProposedFactFinding? Finding, bool Readable) ReadFinding(JsonElement item)
     {
         if (item.ValueKind != JsonValueKind.Object || Kind(Text(item, "kind")) is not { } kind)
@@ -128,13 +106,6 @@ internal static class FactCheckOutputParser
         "superseded" => FactFindingKind.Superseded,
         "source_conflict" => FactFindingKind.SourceConflict,
         _ => null,
-    };
-
-    private static RecheckStatus Status(string? status) => status?.Trim().ToLowerInvariant() switch
-    {
-        "fixed" => RecheckStatus.Fixed,
-        "still_there" => RecheckStatus.StillThere,
-        _ => RecheckStatus.Unclear,
     };
 
     private static string OneLine(string text, int max)

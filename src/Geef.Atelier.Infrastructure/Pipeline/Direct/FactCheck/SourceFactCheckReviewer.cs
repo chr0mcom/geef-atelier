@@ -19,8 +19,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct.FactCheck;
 ///   <item>Every wording is checked in full (<c>check_facts</c>), above <see cref="DirectOptions.FactCheckMaxMaterialChars"/>
 ///   without the content of the files. Only a wording that an earlier round of the run already checked word for word
 ///   (<see cref="FactCheckRound.HashOf"/>) takes over that round's findings without a call. A text changed for any reason (a fact
-///   finding, the length, the language, …) is therefore checked again in full; <c>recheck_facts</c> is not used, because it looks
-///   only at earlier findings and would leave new sentences unchecked. Findings of earlier answered rounds whose passage still
+///   finding, the length, the language, …) is therefore checked again in full; a look at the earlier findings alone would leave
+///   new sentences unchecked. Findings of earlier answered rounds whose passage still
 ///   stands in the text word for word keep their blocking effect, and source conflicts always stay
 ///   (<see cref="WithEarlierFindings"/>): a check that does not flag a passage again never makes it disappear.</item>
 ///   <item>A call that cannot reach its model or runs into <see cref="DirectOptions.FactCheckTimeout"/> is never repeated with the

@@ -40,13 +40,11 @@ public sealed class LlmClarifierTests
     private sealed class Resolver(ILlmClient client, bool structured = true) : ILlmClientResolver
     {
         public List<(string Provider, string Model, int? MaxTokens)> Profiles { get; } = [];
-        public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) => throw new NotSupportedException();
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
         {
             Profiles.Add((provider, model, maxTokens));
             return (client, model, maxTokens ?? 0);
         }
-        public bool SupportsAgenticTools(string providerName) => false;
         public bool SupportsStructuredOutputs(string providerName) => structured;
     }
 

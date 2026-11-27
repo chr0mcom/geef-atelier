@@ -84,7 +84,6 @@ public static class OrderCheckLines
     public const string FactsOpenPointsFormat = FactsComparedLead + FactsOpenFormat;
     public const string FactsOpenPointOne = FactsComparedLead + FactsOpenOne;
     public const string FactsCheckedNoFiles = FactsComparedLeadNoFiles + FactsNothingFound;
-    public const string FactsOpenPointsNoFilesFormat = FactsComparedLeadNoFiles + FactsOpenFormat;
     public const string FactsOpenPointOneNoFiles = FactsComparedLeadNoFiles + FactsOpenOne;
 
     public const string FactsWithoutFilesLead =

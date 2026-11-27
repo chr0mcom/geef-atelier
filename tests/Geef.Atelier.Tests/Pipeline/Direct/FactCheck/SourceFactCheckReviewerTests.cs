@@ -285,7 +285,6 @@ public sealed class SourceFactCheckReviewerTests
 
         Assert.Equal(2, checker.Calls.Count);
         Assert.Equal((longer, 2), (checker.Calls[1].Draft, checker.Calls[1].Iteration));
-        Assert.Empty(checker.Rechecks);
         Assert.Equal("Der Eintritt kostet 5 Euro pro Person.", Assert.Single(result.Findings).Metadata![FactFindingMetadata.Quote]);
         Assert.Equal((FactRoundStatus.Checked, 1, FactCheckRound.HashOf(longer)), (ledger.For(2)!.Status, ledger.For(2)!.Calls, ledger.For(2)!.TextHash));
     }
@@ -300,7 +299,6 @@ public sealed class SourceFactCheckReviewerTests
         var result = await reviewer.ReviewAsync(Context(FactCheckMode.On, iteration: 2), default);
 
         Assert.Single(checker.Calls);
-        Assert.Empty(checker.Rechecks);
         Assert.Equal(ReviewDecision.Rejected, result.Decision);
         Assert.Equal(Unbacked, Assert.Single(result.Findings).Metadata![FactFindingMetadata.Quote]);
         Assert.Equal(0, ledger.For(2)!.Calls);
@@ -319,7 +317,6 @@ public sealed class SourceFactCheckReviewerTests
 
         Assert.Equal(2, checker.Calls.Count);
         Assert.Equal(corrected, checker.Calls[1].Draft);
-        Assert.Empty(checker.Rechecks);
         Assert.Equal(ReviewDecision.Approved, result.Decision);
         Assert.Equal(FactFindingMetadata.SourceConflictCode, Assert.Single(result.Findings).Metadata![FactFindingMetadata.Code]);
         Assert.Equal(1, ledger.For(2)!.Calls);
@@ -626,25 +623,15 @@ public sealed class SourceFactCheckReviewerTests
 
     private sealed record CheckRequest(FactMaterial Material, string Draft, ReviewerProfile Profile, TimeSpan Timeout, int Iteration);
 
-    private sealed record RecheckRequest(FactMaterial Material, string Draft, IReadOnlyList<FactFinding> Previous, ReviewerProfile Profile, TimeSpan Timeout);
-
     private sealed class ScriptedFactChecker : IFactChecker
     {
         public Queue<FactCheckCall> Checks { get; } = new();
-        public Queue<RecheckCall> RecheckAnswers { get; } = new();
         public List<CheckRequest> Calls { get; } = [];
-        public List<RecheckRequest> Rechecks { get; } = [];
 
         public Task<FactCheckCall> CheckAsync(FactMaterial material, string draft, ReviewerProfile profile, TimeSpan timeout, int iteration, CancellationToken ct)
         {
             Calls.Add(new CheckRequest(material, draft, profile, timeout, iteration));
             return Task.FromResult(Checks.TryDequeue(out var answer) ? answer with { Model = profile.Model } : new FactCheckCall([], "{}", 10, profile.Model, null));
-        }
-
-        public Task<RecheckCall> RecheckAsync(FactMaterial material, string draft, IReadOnlyList<FactFinding> previous, ReviewerProfile profile, TimeSpan timeout, CancellationToken ct)
-        {
-            Rechecks.Add(new RecheckRequest(material, draft, previous, profile, timeout));
-            return Task.FromResult(RecheckAnswers.TryDequeue(out var answer) ? answer with { Model = profile.Model } : new RecheckCall([], "{}", 10, profile.Model, null));
         }
     }
 

@@ -9,7 +9,6 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct.FactCheck;
 internal static class FactCheckSchema
 {
     public const string CheckName = "check_facts";
-    public const string RecheckName = "recheck_facts";
 
     public const string CheckJson = """
         {
@@ -37,34 +36,8 @@ internal static class FactCheckSchema
         }
         """;
 
-    public const string RecheckJson = """
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["results"],
-          "properties": {
-            "results": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["id", "status", "text_quote"],
-                "properties": {
-                  "id": { "type": "string" },
-                  "status": { "type": "string", "enum": ["fixed", "still_there"] },
-                  "text_quote": { "type": ["string", "null"] }
-                }
-              }
-            }
-          }
-        }
-        """;
-
     /// <summary>Schema of the <c>check_facts</c> answer.</summary>
     public static JsonElement Check { get; } = Parse(CheckJson);
-
-    /// <summary>Schema of the <c>recheck_facts</c> answer.</summary>
-    public static JsonElement Recheck { get; } = Parse(RecheckJson);
 
     private static JsonElement Parse(string json)
     {

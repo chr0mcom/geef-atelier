@@ -8,20 +8,6 @@ internal sealed class UploadTicketRepository(AtelierDbContext db) : IUploadTicke
 {
     private static readonly TimeSpan Day = TimeSpan.FromHours(24);
 
-    public async Task AddAsync(UploadTicketEntity ticket, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(ticket);
-        db.UploadTickets.Add(ticket);
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        finally
-        {
-            db.ChangeTracker.Clear();
-        }
-    }
-
     public async Task<bool> AddWithinLimitsAsync(UploadTicketEntity ticket, int maxOpen, int maxPerDay, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(ticket);

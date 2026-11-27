@@ -79,8 +79,6 @@ internal sealed class FakeUploadTickets : IUploadTicketService, IUploadTicketRep
             .Select(id => Entity(id, _tickets[id]))
             .ToList());
 
-    public Task AddAsync(UploadTicketEntity ticket, CancellationToken ct = default) => throw new NotSupportedException();
-
     public Task<bool> AddWithinLimitsAsync(UploadTicketEntity ticket, int maxOpen, int maxPerDay, CancellationToken ct = default) => throw new NotSupportedException();
 
     public Task<(int Open, int Last24h)> CountForOwnerAsync(string owner, DateTimeOffset now, CancellationToken ct = default) => throw new NotSupportedException();

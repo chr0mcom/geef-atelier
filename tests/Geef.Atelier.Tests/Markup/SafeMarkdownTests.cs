@@ -1,4 +1,3 @@
-using Geef.Atelier.Infrastructure.Orders.Export;
 using Geef.Atelier.Infrastructure.Markup;
 using Geef.Atelier.Web.Services;
 using Markdig;
@@ -27,9 +26,9 @@ public sealed class SafeMarkdownTests
 
     [Theory]
     [MemberData(nameof(Attacks))]
-    public void Nothing_in_a_text_acts_on_its_own_in_the_page_or_in_the_html_export(string markdown)
+    public void Nothing_in_a_text_acts_on_its_own_in_either_rendering(string markdown)
     {
-        foreach (var html in new[] { markdown.ToSafeHtml(Pipeline), MarkdownToHtmlConverter.Convert(markdown), MarkdownRenderer.ToHtml(markdown) })
+        foreach (var html in new[] { markdown.ToSafeHtml(Pipeline), MarkdownRenderer.ToHtml(markdown) })
         {
             var body = html.Contains("<body>") ? html[html.IndexOf("<body>", StringComparison.Ordinal)..] : html;
             Assert.DoesNotMatch("<[a-zA-Z][^>]*\\s(on[a-z]+|style|ping|autofocus)\\s*=", body);
@@ -47,7 +46,7 @@ public sealed class SafeMarkdownTests
     {
         const string markdown = "Sehr geehrte Frau {Name}\n\n## Angebot {Entwurf}\n\nBetrag: **{Betrag}**";
 
-        foreach (var output in new[] { markdown.ToSafeHtml(Pipeline), MarkdownToHtmlConverter.Convert(markdown), PlaintextStripper.Strip(markdown) })
+        foreach (var output in new[] { markdown.ToSafeHtml(Pipeline), MarkdownRenderer.ToHtml(markdown) })
         {
             Assert.Contains("{Name}", output);
             Assert.Contains("{Entwurf}", output);

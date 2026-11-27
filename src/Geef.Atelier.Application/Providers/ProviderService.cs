@@ -1,20 +1,17 @@
 namespace Geef.Atelier.Application.Providers;
 
-using System.Diagnostics;
 using Geef.Atelier.Core.Domain.Providers;
 using Geef.Atelier.Application.Security;
 using Geef.Atelier.Core.Persistence.Providers;
 
 internal sealed class ProviderService(
     IProviderRepository repository,
-    IHttpClientFactory httpClientFactory,
     IEnvReferencePolicy? envReferencePolicy = null) : IProviderService
 {
     private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
 
     private const string SystemReadOnlyMessage = "System provider is read-only.";
     private const string SystemCannotBeDeletedMessage = "System providers cannot be deleted.";
-    private const string LlmClientName = "llm";
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<Provider>> ListAsync(bool includeInactive = false, CancellationToken ct = default)
@@ -105,89 +102,6 @@ internal sealed class ProviderService(
         await repository.SetActiveAsync(name, isActive, ct);
     }
 
-    /// <inheritdoc/>
-    public async Task<ConnectionTestResult> TestConnectionAsync(string name, CancellationToken ct = default)
-    {
-        var provider = await GetByNameAsync(name, ct)
-            ?? throw new InvalidOperationException($"Provider '{name}' not found.");
-
-        if (provider.Type == ProviderType.Cli)
-        {
-            return new ConnectionTestResult(
-                Success: true,
-                LatencyMs: 0,
-                ErrorMessage: null,
-                ResponseSample: "CLI provider — connection test not applicable");
-        }
-
-        var settings = HttpProviderSettings.FromSettings(provider.Settings);
-
-        // Resolve endpoint, honouring optional environment-variable override.
-        var endpoint = _envPolicy.Read(settings.EndpointEnvOverride, $"provider '{name}' endpoint override") ?? settings.Endpoint;
-
-        if (string.IsNullOrWhiteSpace(endpoint))
-        {
-            return new ConnectionTestResult(
-                Success: false,
-                LatencyMs: 0,
-                ErrorMessage: "Provider endpoint is not configured.",
-                ResponseSample: null);
-        }
-
-        // Prefer /models; fall back to /chat/completions for providers without a models list.
-        var testPath = settings.ModelsEndpoint is { Length: > 0 } mp ? mp : "/chat/completions";
-        var testUrl = endpoint.TrimEnd('/') + testPath;
-
-        try
-        {
-            var http = httpClientFactory.CreateClient(LlmClientName);
-
-            using var request = new HttpRequestMessage(HttpMethod.Get, testUrl);
-
-            if (settings.ApiKeyEnv is { Length: > 0 } keyEnv)
-            {
-                var apiKey = _envPolicy.Read(keyEnv, $"provider '{name}' API key") ?? string.Empty;
-                if (apiKey.Length > 0)
-                {
-                    var headerValue = settings.AuthHeaderFormat.Replace("{key}", apiKey);
-                    request.Headers.TryAddWithoutValidation(settings.AuthHeaderName, headerValue);
-                }
-            }
-
-            foreach (var (header, value) in settings.DefaultHeaders)
-                request.Headers.TryAddWithoutValidation(header, value);
-
-            var sw = Stopwatch.StartNew();
-            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-            sw.Stop();
-
-            var sample = await TryReadSampleAsync(response, ct);
-
-            if (response.IsSuccessStatusCode)
-            {
-                return new ConnectionTestResult(
-                    Success: true,
-                    LatencyMs: sw.ElapsedMilliseconds,
-                    ErrorMessage: null,
-                    ResponseSample: sample);
-            }
-
-            return new ConnectionTestResult(
-                Success: false,
-                LatencyMs: sw.ElapsedMilliseconds,
-                ErrorMessage: $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}",
-                ResponseSample: sample);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return new ConnectionTestResult(
-                Success: false,
-                LatencyMs: 0,
-                ErrorMessage: ex.Message,
-                ResponseSample: null);
-        }
-    }
-
     private void EnsureEnvReferencesAllowed(Provider provider)
     {
         if (provider.Type != ProviderType.Http)
@@ -195,18 +109,5 @@ internal sealed class ProviderService(
         var settings = HttpProviderSettings.FromSettings(provider.Settings);
         _envPolicy.EnsureAllowed(settings.ApiKeyEnv, "API key variable");
         _envPolicy.EnsureAllowed(settings.EndpointEnvOverride, "Endpoint override variable");
-    }
-
-    private static async Task<string?> TryReadSampleAsync(HttpResponseMessage response, CancellationToken ct)
-    {
-        try
-        {
-            var content = await response.Content.ReadAsStringAsync(ct);
-            return content.Length > 500 ? content[..500] : content;
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

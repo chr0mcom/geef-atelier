@@ -270,7 +270,7 @@ model and its one fallback leave the facts unchecked, and "What was checked" say
   see); unsafe passages of the material are replaced the same way. "Covered word for word" needs whole words.
 - **Every wording is checked in full.** A text changed for any reason (fact finding, length, language …) gets a full
   `check_facts` again, with the same fallback rules; only a wording an earlier round already checked word for word takes over
-  that round's findings without a call. `recheck_facts` is no longer called (prompt and schema stay unchanged in the code).
+  that round's findings without a call.
   A model that ran into its time limit is not called again in the same run. The report knows which wording was checked
   (`FactCheckRound.TextHash`); a delivered text no check saw is `VersionNotChecked` ("The facts of this version of the text
   were not checked …"), and earlier findings are shown only when their passage still stands in it.

@@ -163,10 +163,6 @@ public sealed class SecretRedactionExtensionsTests
         Assert.Equal(text, text.RedactSecrets());
 
     [Fact]
-    public void WarningDetailIsRedactedToo() =>
-        Assert.DoesNotContain("sk-or-v1", "failed with sk-or-v1-0123456789abcdef0123456789abcdef".ToWarningDetail());
-
-    [Fact]
     public void LogTextKeepsTypeAndStackButNotTheSecret()
     {
         Exception captured;

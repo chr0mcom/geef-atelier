@@ -12,10 +12,4 @@ public sealed class InMemoryOAuthAuditLogRepository : IOAuthAuditLogRepository
         Entries.Add(entry);
         return Task.CompletedTask;
     }
-
-    public Task<IReadOnlyList<OAuthAuditLogEntry>> GetRecentByUserIdAsync(string userId, int limit, CancellationToken ct)
-    {
-        var entries = Entries.Where(e => e.UserId == userId).TakeLast(limit).ToList();
-        return Task.FromResult<IReadOnlyList<OAuthAuditLogEntry>>(entries);
-    }
 }

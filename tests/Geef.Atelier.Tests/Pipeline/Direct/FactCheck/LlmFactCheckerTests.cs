@@ -26,13 +26,11 @@ public sealed class LlmFactCheckerTests
     private sealed class Resolver(ILlmClient client, bool structured = true) : ILlmClientResolver
     {
         public List<(string Provider, string Model, int? MaxTokens)> Profiles { get; } = [];
-        public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) => throw new NotSupportedException();
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
         {
             Profiles.Add((provider, model, maxTokens));
             return (client, model, maxTokens ?? 0);
         }
-        public bool SupportsAgenticTools(string providerName) => false;
         public bool SupportsStructuredOutputs(string providerName) => structured;
     }
 
@@ -87,9 +85,6 @@ public sealed class LlmFactCheckerTests
     private static FactMaterial Material() => FactCheckPromptsTests.Material(FactCheckScope.Full,
         new FactSource("S1", "notizen.txt", "ERSTE-DATEI-ANFANG Bastelmaterial 22 Euro\nSumme 62 Euro ERSTE-DATEI-ENDE"),
         new FactSource("S2", "protokoll.md", "ZWEITE-DATEI-ANFANG\n" + new string('p', 30_000) + "\nZWEITE-DATEI-ENDE"));
-
-    private static readonly FactFinding Previous = new("f1", FactFindingKind.Unsupported, "Fotos liegen diesem Schreiben bei.", "Not backed.",
-        null, null, null, null, null, true, QuoteMatchKind.Exact);
 
     [Fact]
     public async Task The_check_asks_the_profile_model_with_the_schema_and_without_proxy_failover()
@@ -241,7 +236,6 @@ public sealed class LlmFactCheckerTests
         var setup = Answering(FactCheckOutputParserTests.Empty);
 
         await setup.Checker.CheckAsync(Material(), FactCheckPromptsTests.Draft, Profile, TimeSpan.FromSeconds(seconds), 1, CancellationToken.None);
-        await setup.Checker.RecheckAsync(Material(), FactCheckPromptsTests.Draft, [Previous], Profile, TimeSpan.FromSeconds(seconds), CancellationToken.None);
 
         Assert.All(setup.Handler.Requests, r => Assert.Equal([header], r.Request.Headers.GetValues(OpenAiCompatibleClient.TimeoutHeader)));
     }
@@ -325,13 +319,12 @@ public sealed class LlmFactCheckerTests
     }
 
     [Fact]
-    public async Task Costs_of_check_and_recheck_are_booked_on_rounds_one_and_two()
+    public async Task Costs_of_two_checks_are_booked_on_their_rounds()
     {
-        var answers = new Queue<string>([FactCheckOutputParserTests.Empty, """{"results":[{"id":"f1","status":"fixed","text_quote":null}]}"""]);
-        var setup = Create((_, _) => Task.FromResult(Completion(answers.Dequeue())));
+        var setup = Answering(FactCheckOutputParserTests.Empty);
 
         await setup.Checker.CheckAsync(Material(), FactCheckPromptsTests.Draft, Profile, Limit, 1, CancellationToken.None);
-        await setup.Checker.RecheckAsync(Material(), FactCheckPromptsTests.Draft, [Previous], Profile, Limit, CancellationToken.None);
+        await setup.Checker.CheckAsync(Material(), FactCheckPromptsTests.Draft, Profile, Limit, 2, CancellationToken.None);
 
         var costs = setup.Costs.Flush().OrderBy(c => c.IterationNumber).ToList();
         Assert.Equal([1, 2], costs.Select(c => c.IterationNumber));
@@ -343,37 +336,6 @@ public sealed class LlmFactCheckerTests
             Assert.Equal(Profile.Provider, c.ProviderName);
             Assert.Equal((1200, 80), (c.InputTokens, c.OutputTokens));
         });
-    }
-
-    [Fact]
-    public async Task The_recheck_asks_with_its_own_schema_and_prompt()
-    {
-        const string answer = """{"results":[{"id":"f1","status":"still_there","text_quote":"Fotos liegen diesem Schreiben bei."}]}""";
-        var setup = Answering(answer);
-
-        var call = await setup.Checker.RecheckAsync(Material(), FactCheckPromptsTests.Draft, [Previous], Profile, Limit, CancellationToken.None);
-
-        Assert.Null(call.ErrorCode);
-        Assert.Equal([new RecheckResult("f1", RecheckStatus.StillThere, "Fotos liegen diesem Schreiben bei.")], call.Results);
-        Assert.Equal(answer, call.RawJson);
-        var (request, body) = Assert.Single(setup.Handler.Requests);
-        Assert.Equal([OpenAiCompatibleClient.FailoverSameModel], request.Headers.GetValues(OpenAiCompatibleClient.FailoverHeader));
-        using var json = JsonDocument.Parse(body);
-        Assert.Equal(FactCheckSchema.RecheckName, json.RootElement.GetProperty("response_format").GetProperty("json_schema").GetProperty("name").GetString());
-        var messages = json.RootElement.GetProperty("messages").EnumerateArray().ToList();
-        Assert.Equal(FactCheckPrompts.RecheckSystem, messages[0].GetProperty("content").GetString());
-        Assert.Equal(FactCheckPrompts.RecheckUser(Material(), FactCheckPromptsTests.Draft, [Previous]), messages[1].GetProperty("content").GetString());
-    }
-
-    [Fact]
-    public async Task A_failed_recheck_comes_back_as_its_code_without_exception()
-    {
-        var setup = Create((_, _) => Task.FromResult(Error(HttpStatusCode.ServiceUnavailable, LlmApiError.BackendUnavailableCode)));
-
-        var call = await setup.Checker.RecheckAsync(Material(), FactCheckPromptsTests.Draft, [Previous], Profile, Limit, CancellationToken.None);
-
-        Assert.Null(call.Results);
-        Assert.Equal(LlmApiError.BackendUnavailableCode, call.ErrorCode);
     }
 
     [Theory]

@@ -6,7 +6,6 @@ namespace Geef.Atelier.Tests.Fakes;
 /// <summary>
 /// In-memory fake for <see cref="IProviderService"/>.
 /// System providers are always merged in from <see cref="SystemProviders"/>.
-/// <see cref="TestConnectionAsync"/> returns a synthetic success result without network I/O.
 /// </summary>
 internal sealed class FakeProviderService : IProviderService
 {
@@ -78,12 +77,4 @@ internal sealed class FakeProviderService : IProviderService
             return; // System providers are always considered active — silently skip.
         await _repo.SetActiveAsync(name, isActive, ct);
     }
-
-    /// <inheritdoc/>
-    public Task<ConnectionTestResult> TestConnectionAsync(string name, CancellationToken ct = default)
-        => Task.FromResult(new ConnectionTestResult(
-            Success: true,
-            LatencyMs: 42,
-            ErrorMessage: null,
-            ResponseSample: null));
 }

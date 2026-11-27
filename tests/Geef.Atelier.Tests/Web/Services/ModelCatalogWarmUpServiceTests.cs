@@ -108,8 +108,6 @@ public sealed class ModelCatalogWarmUpServiceTests
 
         public ModelCatalogSource GetSource(string providerName) => ModelCatalogSource.Live;
 
-        public bool IsUsingFallback(string providerName) => false;
-
         public Task<string> ResolveModelAsync(string providerName, string modelId, CancellationToken ct = default)
             => Task.FromResult(modelId);
     }
@@ -126,8 +124,6 @@ public sealed class ModelCatalogWarmUpServiceTests
         public Task<Provider> UpdateCustomAsync(string name, Provider p, CancellationToken ct = default) => Task.FromResult(p);
         public Task DeleteCustomAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
         public Task SetActiveAsync(string name, bool isActive, CancellationToken ct = default) => Task.CompletedTask;
-        public Task<ConnectionTestResult> TestConnectionAsync(string name, CancellationToken ct = default)
-            => Task.FromResult(new ConnectionTestResult(true, 0, null, null));
     }
 
     private sealed class ThrowingProviderService : IProviderService
@@ -140,8 +136,6 @@ public sealed class ModelCatalogWarmUpServiceTests
         public Task<Provider> UpdateCustomAsync(string name, Provider p, CancellationToken ct = default) => Task.FromResult(p);
         public Task DeleteCustomAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
         public Task SetActiveAsync(string name, bool isActive, CancellationToken ct = default) => Task.CompletedTask;
-        public Task<ConnectionTestResult> TestConnectionAsync(string name, CancellationToken ct = default)
-            => Task.FromResult(new ConnectionTestResult(true, 0, null, null));
     }
 }
 

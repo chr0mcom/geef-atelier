@@ -363,7 +363,6 @@ public sealed class ModelAssignmentInvariantTests
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string providerName, CancellationToken ct = default) => ListModelsAsync(providerName, ct);
         public Task<IReadOnlyList<ModelInfo>> WarmUpAsync(string providerName, CancellationToken ct = default) => ListModelsAsync(providerName, ct);
         public ModelCatalogSource GetSource(string providerName) => ModelCatalogSource.Live;
-        public bool IsUsingFallback(string providerName) => false;
         public Task<string> ResolveModelAsync(string providerName, string modelId, CancellationToken ct = default) => Task.FromResult(modelId);
     }
 }

@@ -39,7 +39,7 @@ public sealed class SourceExtractorTests
         Assert.True(two.IndexOf("Left column second", StringComparison.Ordinal) < two.IndexOf("Right column first", StringComparison.Ordinal),
             "the left column is read before the right column");
 
-        var wrapped = LineWrapper.Wrap(result.Text!, 1_000, out _);
+        var wrapped = Wrap(result.Text!, 1_000, out _);
         Assert.All(wrapped.Split('\n'), line => Assert.True(line.Length <= 1_000));
     }
 
@@ -208,17 +208,17 @@ public sealed class SourceExtractorTests
     }
 
     [Fact]
-    public void LineWrapperBreaksLongLinesAtSpaces()
+    public void LongLinesAreBrokenAtSpaces()
     {
         var longLine = string.Join(' ', Enumerable.Repeat("word", 600));
-        var wrapped = LineWrapper.Wrap("short\n" + longLine, 1_000, out var didWrap);
+        var wrapped = Wrap("short\n" + longLine, 1_000, out var didWrap);
         Assert.True(didWrap);
         Assert.All(wrapped.Split('\n'), l => Assert.True(l.Length <= 1_000));
         Assert.Equal(longLine.Replace(" ", string.Empty, StringComparison.Ordinal), string.Concat(wrapped.Split('\n').Skip(1)).Replace(" ", string.Empty, StringComparison.Ordinal));
 
         var noSpaces = new string('x', 2_500);
-        Assert.Equal([1_000, 1_000, 500], LineWrapper.Wrap(noSpaces, 1_000, out _).Split('\n').Select(l => l.Length));
-        Assert.Equal("a\nb", LineWrapper.Wrap("a\r\nb", 1_000, out var untouched));
+        Assert.Equal([1_000, 1_000, 500], Wrap(noSpaces, 1_000, out _).Split('\n').Select(l => l.Length));
+        Assert.Equal("a\nb", Wrap("a\r\nb", 1_000, out var untouched));
         Assert.False(untouched);
     }
 
@@ -234,4 +234,11 @@ public sealed class SourceExtractorTests
 
     private static DocxSourceExtractor Docx() =>
         new(Options.Create(new SourceOptions()), NullLogger<DocxSourceExtractor>.Instance);
+
+    private static string Wrap(string text, int maxLineChars, out bool wrapped)
+    {
+        var result = text.NormalizeForStorage(defuseMarkerLines: false, maxLineChars);
+        wrapped = result.Wrapped;
+        return result.Text;
+    }
 }

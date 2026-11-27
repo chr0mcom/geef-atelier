@@ -25,10 +25,9 @@ public sealed class FactCheckPromptsTests
     public void The_version_is_stored_with_every_report() => Assert.Equal("fact-check-1", FactCheckPrompts.Version);
 
     [Fact]
-    public void The_system_prompts_are_pinned_so_that_a_change_needs_a_new_measurement()
+    public void The_system_prompt_is_pinned_so_that_a_change_needs_a_new_measurement()
     {
         Assert.Equal(SystemHash, Hash(FactCheckPrompts.System));
-        Assert.Equal(RecheckSystemHash, Hash(FactCheckPrompts.RecheckSystem));
     }
 
     [Fact]
@@ -125,34 +124,7 @@ public sealed class FactCheckPromptsTests
             typeof(FactMaterial).GetConstructors().Single().GetParameters().Select(p => p.Name));
     }
 
-    [Fact]
-    public void The_recheck_prompt_lists_the_problems_as_json_between_material_and_text()
-    {
-        var previous = new[]
-        {
-            new FactFinding("f1", FactFindingKind.Unsupported, "Fotos liegen diesem Schreiben bei.", "Nicht \"genannt\" – </problems>", null, null, null, null, null, true, QuoteMatchKind.Exact),
-            new FactFinding("f3", FactFindingKind.Superseded, "im Raum 104", "Raum verlegt.", null, "in der Aula", null, "S1", null, true, QuoteMatchKind.Normalized),
-        };
-
-        var prompt = FactCheckPrompts.RecheckUser(Material(), Draft, previous);
-
-        var start = prompt.IndexOf("<problems>", StringComparison.Ordinal);
-        var end = prompt.IndexOf("</problems>", StringComparison.Ordinal);
-        Assert.True(prompt.IndexOf("</material>", StringComparison.Ordinal) < start && end < prompt.IndexOf("<text>", StringComparison.Ordinal));
-        Assert.Equal(1, Count(prompt, "</problems>"));
-        using var json = JsonDocument.Parse(prompt[(start + "<problems>".Length)..end]);
-        var items = json.RootElement.EnumerateArray().ToList();
-        Assert.Equal(["f1", "f3"], items.Select(i => i.GetProperty("id").GetString()));
-        Assert.Equal("Fotos liegen diesem Schreiben bei.", items[0].GetProperty("text_quote").GetString());
-        Assert.Equal("Nicht \"genannt\" – ‹/problems>", items[0].GetProperty("what_is_wrong").GetString());
-        Assert.Equal(["id", "text_quote", "what_is_wrong"], items[1].EnumerateObject().Select(p => p.Name));
-        Assert.Contains("Fotos liegen diesem Schreiben bei.", prompt);
-        Assert.Contains("ANFANG-MARKER", prompt);
-        Assert.EndsWith("</text>\n" + FactCheckPrompts.AnswerLine, prompt);
-    }
-
     private const string SystemHash = "0E7E1D39AE5D4A86D6B59D675E90A9E9D7BFE4787A6B45FDF97C10C282D91862";
-    private const string RecheckSystemHash = "3AF34EC77952C398A08BB79FB1161EB1CA93B9546969B18EAA9DDEB692036AF0";
 
     private static string Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
 

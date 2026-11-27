@@ -237,9 +237,6 @@ internal sealed class OAuthService(
             CreatedAt: DateTimeOffset.UtcNow), ct);
     }
 
-    public async Task LogEventAsync(OAuthAuditLogEntry entry, CancellationToken ct)
-        => await auditLogRepo.AddAsync(entry, ct);
-
     public Task<IReadOnlyList<OAuthAccessToken>> GetActiveTokensForUserAsync(string userId, CancellationToken ct)
         => accessTokenRepo.GetActiveTokensByUserIdAsync(userId, ct);
 

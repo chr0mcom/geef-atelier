@@ -18,13 +18,8 @@ internal sealed class GatewayResolver(HttpClient http, string gateway, string? a
         _ => throw new UsageException($"provider {provider} is not served by the gateway; only {ModelMatrix.ClaudeCli} and {ModelMatrix.CodexCli} are measured"),
     };
 
-    public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) =>
-        throw new NotSupportedException("The measurement uses profiles only.");
-
     public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens) =>
         (new OpenAiCompatibleClient(http, Route(gateway, provider), apiKey), ModelNameNormalizer.Normalize(provider, model), maxTokens ?? new LlmOptions().DefaultMaxTokens);
-
-    public bool SupportsAgenticTools(string providerName) => false;
 
     public bool SupportsStructuredOutputs(string providerName) => true;
 }

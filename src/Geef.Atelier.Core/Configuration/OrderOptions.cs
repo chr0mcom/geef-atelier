@@ -28,9 +28,6 @@ public sealed class OrderOptions
     /// <summary>How often a long poll checks the database.</summary>
     public TimeSpan WaitPollInterval { get; set; } = TimeSpan.FromSeconds(1);
 
-    /// <summary>Default wait of a status long poll, in seconds.</summary>
-    public int DefaultWaitSeconds { get; set; } = 25;
-
     /// <summary>Longest wait of a status long poll, in seconds.</summary>
     public int MaxWaitSeconds { get; set; } = 50;
 

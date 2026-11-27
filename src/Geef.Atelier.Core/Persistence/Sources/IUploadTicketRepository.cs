@@ -8,9 +8,6 @@ namespace Geef.Atelier.Core.Persistence.Sources;
 /// </summary>
 public interface IUploadTicketRepository
 {
-    /// <summary>Inserts a ticket.</summary>
-    Task AddAsync(UploadTicketEntity ticket, CancellationToken ct = default);
-
     /// <summary>
     /// Inserts <paramref name="ticket"/> unless its owner already has <paramref name="maxOpen"/> open or receiving tickets whose
     /// page has not expired, or prepared <paramref name="maxPerDay"/> tickets in the 24 hours before its creation. Counting and

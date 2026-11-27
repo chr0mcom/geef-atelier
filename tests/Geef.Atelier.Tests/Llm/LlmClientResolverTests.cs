@@ -12,22 +12,14 @@ namespace Geef.Atelier.Tests.Llm;
 public sealed class LlmClientResolverTests
 {
     private static IOptions<LlmOptions> MakeOptions(
-        string defaultProvider = "openrouter",
-        Dictionary<string, LlmOptions.ProviderConfig>? providers = null,
-        Dictionary<string, LlmOptions.ActorConfig>? actors = null) =>
+        Dictionary<string, LlmOptions.ProviderConfig>? providers = null) =>
         Options.Create(new LlmOptions
         {
-            DefaultProvider = defaultProvider,
             ProvidersFallback = providers ?? new()
             {
                 ["openrouter"] = new() { Endpoint = "https://openrouter.ai/api/v1", ApiKey = "key1" },
                 ["claude-cli"] = new() { Endpoint = "http://cli-proxy:8090/v1/claude", ApiKey = "" },
                 ["codex-cli"]  = new() { Endpoint = "http://cli-proxy:8090/v1/codex",  ApiKey = "" }
-            },
-            Actors = actors ?? new()
-            {
-                ["Executor"]              = new() { Provider = "openrouter",  Model = "claude-opus-4.8", MaxTokens = 8192 },
-                ["BriefingTreueReviewer"] = new() { Provider = "claude-cli",  Model = "claude-sonnet-4-5" },
             }
         });
 
@@ -51,70 +43,22 @@ public sealed class LlmClientResolverTests
     }
 
     [Fact]
-    public void ForActor_ReturnsConfiguredClientAndModel()
+    public void ForProfile_ThrowsWhenProviderNotConfigured()
     {
-        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
-
-        var (client, model, maxTokens) = resolver.ForActor("Executor");
-
-        Assert.NotNull(client);
-        Assert.Equal("claude-opus-4.8", model);
-        Assert.Equal(8192, maxTokens);
-    }
-
-    [Fact]
-    public void ForActor_FallsBackToDefaultMaxTokens_WhenNotSet()
-    {
-        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
-
-        var (_, _, maxTokens) = resolver.ForActor("BriefingTreueReviewer");
-
-        Assert.Equal(16384, maxTokens); // DefaultMaxTokens
-    }
-
-    [Fact]
-    public void ForActor_UsesDifferentProvidersPerActor()
-    {
-        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
-
-        var (clientA, _, _) = resolver.ForActor("Executor");
-        var (clientB, _, _) = resolver.ForActor("BriefingTreueReviewer");
-
-        Assert.NotNull(clientA);
-        Assert.NotNull(clientB);
-    }
-
-    [Fact]
-    public void ForActor_ThrowsOnUnknownActor()
-    {
-        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
-
-        Assert.Throws<InvalidOperationException>(() => resolver.ForActor("NonExistentActor"));
-    }
-
-    [Fact]
-    public void ForActor_ThrowsWhenProviderNotConfigured()
-    {
-        var opts = MakeOptions(
-            providers: new() { ["openrouter"] = new() { Endpoint = "https://openrouter.ai/api/v1", ApiKey = "" } },
-            actors: new() { ["Executor"] = new() { Provider = "missing-provider", Model = "some-model" } });
+        var opts = MakeOptions(new() { ["openrouter"] = new() { Endpoint = "https://openrouter.ai/api/v1", ApiKey = "" } });
         var resolver = new LlmClientResolver(MakeFactory(), opts, MakeScopeFactory());
 
-        Assert.Throws<InvalidOperationException>(() => resolver.ForActor("Executor"));
+        Assert.Throws<InvalidOperationException>(() => resolver.ForProfile("missing-provider", "some-model", null));
     }
 
     [Fact]
-    public void ForActor_UsesDefaultProviderWhenActorProviderEmpty()
+    public void ForProfile_FallsBackToDefaultMaxTokens_WhenNotSet()
     {
-        var opts = MakeOptions(actors: new()
-        {
-            ["Executor"] = new() { Provider = "", Model = "some-model" }
-        });
-        var resolver = new LlmClientResolver(MakeFactory(), opts, MakeScopeFactory());
+        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
 
-        var (client, model, _) = resolver.ForActor("Executor");
-        Assert.NotNull(client);
-        Assert.Equal("some-model", model);
+        var (_, _, maxTokens) = resolver.ForProfile("claude-cli", "claude-sonnet-latest", null);
+
+        Assert.Equal(16384, maxTokens);
     }
 
     [Fact]

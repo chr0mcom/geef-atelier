@@ -26,10 +26,6 @@ public static class McpToolCatalog
     /// <summary>The tools of the upload ticket, offered beside the order tools while <c>Uploads:Tickets</c> is <c>On</c>.</summary>
     public static IReadOnlyList<Type> TicketTools { get; } = [typeof(PrepareAttachmentTool)];
 
-    /// <summary>The order tools; with <paramref name="tickets"/> (<c>Uploads:Tickets=On</c>) also <see cref="TicketTools"/>.</summary>
-    public static IReadOnlyList<Type> OrderToolsFor(bool tickets) =>
-        tickets ? [.. OrderTools, .. TicketTools] : OrderTools;
-
     /// <summary>The stubs of the removed older tools, offered for one version beside the order tools (D-091).</summary>
     public static IReadOnlyList<Type> RetiredTools { get; } = [typeof(Tools.RetiredTools)];
 

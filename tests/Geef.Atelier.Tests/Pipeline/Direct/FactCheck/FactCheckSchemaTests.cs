@@ -7,24 +7,18 @@ public sealed class FactCheckSchemaTests
 {
     private static readonly string[] LimitKeywords = ["maxLength", "minLength", "maxItems", "minItems", "maximum", "minimum", "exclusiveMaximum", "exclusiveMinimum", "pattern", "maxProperties"];
 
-    public static TheoryData<string> Schemas => new() { FactCheckSchema.CheckName, FactCheckSchema.RecheckName };
-
-    private static JsonElement Schema(string name) => name == FactCheckSchema.CheckName ? FactCheckSchema.Check : FactCheckSchema.Recheck;
-
-    [Theory]
-    [MemberData(nameof(Schemas))]
-    public void No_schema_limits_lengths_or_counts(string name)
+    [Fact]
+    public void The_schema_limits_neither_lengths_nor_counts()
     {
-        var found = Keywords(Schema(name)).Where(LimitKeywords.Contains).ToList();
+        var found = Keywords(FactCheckSchema.Check).Where(LimitKeywords.Contains).ToList();
 
         Assert.Empty(found);
     }
 
-    [Theory]
-    [MemberData(nameof(Schemas))]
-    public void Every_object_is_closed_and_requires_all_its_properties(string name)
+    [Fact]
+    public void Every_object_is_closed_and_requires_all_its_properties()
     {
-        var objects = Objects(Schema(name)).ToList();
+        var objects = Objects(FactCheckSchema.Check).ToList();
 
         Assert.NotEmpty(objects);
         foreach (var element in objects)
@@ -49,17 +43,7 @@ public sealed class FactCheckSchemaTests
     }
 
     [Fact]
-    public void The_recheck_schema_answers_fixed_or_still_there()
-    {
-        var item = FactCheckSchema.Recheck.GetProperty("properties").GetProperty("results").GetProperty("items").GetProperty("properties");
-
-        Assert.Equal(["fixed", "still_there"], item.GetProperty("status").GetProperty("enum").EnumerateArray().Select(e => e.GetString()));
-        Assert.Equal(["string", "null"], item.GetProperty("text_quote").GetProperty("type").EnumerateArray().Select(e => e.GetString()));
-    }
-
-    [Fact]
-    public void Names_match_the_contract() =>
-        Assert.Equal(("check_facts", "recheck_facts"), (FactCheckSchema.CheckName, FactCheckSchema.RecheckName));
+    public void Names_match_the_contract() => Assert.Equal("check_facts", FactCheckSchema.CheckName);
 
     private static IEnumerable<string> Keywords(JsonElement element) => element.ValueKind switch
     {

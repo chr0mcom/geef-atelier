@@ -22,13 +22,8 @@ internal sealed class FixedModelAssignment(ModelCandidate candidate) : IModelAss
 /// <summary>Sends every call to one OpenAI-compatible endpoint (the gateway route of the CLI), with structured outputs.</summary>
 internal sealed class ProxyResolver(ILlmClient client) : ILlmClientResolver
 {
-    public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) =>
-        throw new NotSupportedException("The intake measurement uses profiles only.");
-
     public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens) =>
         (client, model, maxTokens ?? new IntakeOptions().MaxTokens);
-
-    public bool SupportsAgenticTools(string providerName) => false;
 
     public bool SupportsStructuredOutputs(string providerName) => true;
 }

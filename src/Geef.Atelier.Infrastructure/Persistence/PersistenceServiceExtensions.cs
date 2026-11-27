@@ -28,7 +28,6 @@ public static class PersistenceServiceExtensions
     {
         services.AddScoped<IAtelierUserRepository, AtelierUserRepository>();
         services.AddScoped<IAccountStore, AccountStore>();
-        services.AddScoped<IRunPersistenceService, RunPersistenceService>();
         services.AddScoped<IRunRepository, RunRepository>();
         services.AddScoped<IProviderRepository, ProviderRepository>();
         services.AddScoped<IOAuthClientRepository, OAuthClientRepository>();

@@ -92,7 +92,6 @@ public sealed class CrewSnapshotModelResolverTests
         public Task<IReadOnlyList<ModelInfo>> WarmUpAsync(string p, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
         public ModelCatalogSource GetSource(string p) => ModelCatalogSource.Live;
-        public bool IsUsingFallback(string p) => false;
         public Task<string> ResolveModelAsync(string p, string modelId, CancellationToken ct = default)
             => Task.FromResult(map.TryGetValue(modelId, out var resolved) ? resolved : modelId);
     }
@@ -109,7 +108,6 @@ public sealed class CrewSnapshotModelResolverTests
         public Task<IReadOnlyList<ModelInfo>> WarmUpAsync(string p, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
         public ModelCatalogSource GetSource(string p) => ModelCatalogSource.Unknown;
-        public bool IsUsingFallback(string p) => false;
         public Task<string> ResolveModelAsync(string p, string modelId, CancellationToken ct = default)
             => throw new InvalidOperationException("gateway unreachable");
     }

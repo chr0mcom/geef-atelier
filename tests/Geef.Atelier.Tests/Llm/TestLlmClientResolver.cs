@@ -3,20 +3,15 @@ using Geef.Atelier.Infrastructure.Llm;
 namespace Geef.Atelier.Tests.Llm;
 
 /// <summary>
-/// Always returns the same client, model, and maxTokens regardless of actor name.
+/// Always returns the same client regardless of provider.
 /// Used in E2E tests to inject a fake LLM client without configuring a full multi-provider setup.
 /// </summary>
 internal sealed class TestLlmClientResolver(
     ILlmClient client,
-    string model = "test-model",
     int maxTokens = 4096) : ILlmClientResolver
 {
-    public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) =>
-        (client, model, maxTokens);
-
     public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string profileModel, int? profileMaxTokens) =>
         (client, profileModel, profileMaxTokens ?? maxTokens);
 
-    public bool SupportsAgenticTools(string providerName) => true;
-        public bool SupportsStructuredOutputs(string providerName) => true;
+    public bool SupportsStructuredOutputs(string providerName) => true;
 }

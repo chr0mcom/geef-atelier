@@ -277,8 +277,7 @@ Modells samt seinem einen Ersatz lassen die Tatsachen ungeprüft, und „What wa
   Materialstellen werden ebenso ersetzt. „Wörtlich gedeckt“ verlangt ganze Wörter.
 - **Jede Fassung wird voll geprüft.** Ein aus beliebigem Grund geänderter Text (Faktenbefund, Länge, Sprache …) bekommt
   erneut ein volles `check_facts` mit denselben Ersatzregeln; nur eine Fassung, die eine frühere Runde schon wortgleich
-  geprüft hat, übernimmt deren Befunde ohne Aufruf. `recheck_facts` wird nicht mehr aufgerufen (Prompt und Schema bleiben im
-  Code unverändert). Ein Modell, das in seine Zeitgrenze lief, wird im selben Lauf nicht erneut gerufen. Der Bericht kennt die
+  geprüft hat, übernimmt deren Befunde ohne Aufruf. Ein Modell, das in seine Zeitgrenze lief, wird im selben Lauf nicht erneut gerufen. Der Bericht kennt die
   geprüfte Fassung (`FactCheckRound.TextHash`); ein ausgelieferter Text, den keine Prüfung sah, ist `VersionNotChecked` („The
   facts of this version of the text were not checked …“), und frühere Befunde erscheinen nur, wenn ihre Stelle noch darin steht.
 - **Kein Befund geht zwischen Runden verloren** (`FactCarryOver`): Nach jeder vollen Prüfung bleiben die Befunde aller früher

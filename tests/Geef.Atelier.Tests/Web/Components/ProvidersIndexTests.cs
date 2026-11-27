@@ -150,8 +150,5 @@ public sealed class ProvidersIndexTests : TestContext
 
         public Task SetActiveAsync(string name, bool isActive, CancellationToken ct = default)
             => Task.CompletedTask;
-
-        public Task<ConnectionTestResult> TestConnectionAsync(string name, CancellationToken ct = default)
-            => Task.FromResult(new ConnectionTestResult(true, 42, null, null));
     }
 }

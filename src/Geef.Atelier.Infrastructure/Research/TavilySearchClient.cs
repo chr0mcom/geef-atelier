@@ -127,9 +127,6 @@ internal sealed class TavilySearchClient(
         return Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length).TrimStart('\uFEFF');
     }
 
-    /// <summary>True for an address the research keeps (<see cref="ResearchAddress.Acceptable"/>).</summary>
-    internal static bool IsWebAddress(string? url) => ResearchAddress.Acceptable(url) is not null;
-
     private static SearchResponse? Parse(string json)
     {
         if (string.IsNullOrWhiteSpace(json))

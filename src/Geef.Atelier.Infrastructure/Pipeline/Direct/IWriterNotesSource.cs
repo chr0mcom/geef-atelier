@@ -15,7 +15,7 @@ internal interface IWriterNotesSource
 }
 
 /// <summary>Reads the notes from the block at the end of the answer (<see cref="WriterNotesFormat.Split"/>, with the request of the briefing as what the request treats).</summary>
-internal sealed class TrailerNotesSource : IWriterNotesSource, IDraftOutputSplitter
+internal sealed class TrailerNotesSource : IWriterNotesSource
 {
     /// <summary>Shared instance.</summary>
     public static TrailerNotesSource Instance { get; } = new();
@@ -26,16 +26,6 @@ internal sealed class TrailerNotesSource : IWriterNotesSource, IDraftOutputSplit
     /// <inheritdoc/>
     public Task<WriterNotesSplit> SplitAsync(string raw, string brief, CancellationToken ct) =>
         Task.FromResult(WriterNotesFormat.Split(raw, BriefingSections.RequestPart(brief ?? string.Empty)));
-
-    /// <summary>The text without the block; the trailer is everything the split removed, <c>null</c> when there was no block.</summary>
-    public DraftOutput Split(string raw)
-    {
-        var split = WriterNotesFormat.Split(raw);
-        if (split.Status == WriterNotesStatus.Absent)
-            return new DraftOutput(split.Text, null);
-        var trailer = (raw ?? string.Empty).StartsWith(split.Text, StringComparison.Ordinal) ? raw![split.Text.Length..].Trim() : null;
-        return new DraftOutput(split.Text, string.IsNullOrEmpty(trailer) ? null : trailer);
-    }
 }
 
 /// <summary>No notes: the whole answer is the text, status <see cref="WriterNotesStatus.Off"/>.</summary>

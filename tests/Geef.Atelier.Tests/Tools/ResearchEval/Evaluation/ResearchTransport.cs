@@ -150,9 +150,6 @@ public sealed class GuardedLlmClient(ILlmClient inner, ResearchTransport transpo
 /// <summary>Resolves only the Claude subscription CLI and wraps its client in a <see cref="GuardedLlmClient"/>; Codex is never measured in VR.</summary>
 public sealed class GuardedResolver(ILlmClientResolver inner, ResearchTransport transport) : ILlmClientResolver
 {
-    public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) =>
-        throw new NotSupportedException("The measurement uses profiles only.");
-
     public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
     {
         if (provider != ModelMatrix.ClaudeCli)
@@ -160,8 +157,6 @@ public sealed class GuardedResolver(ILlmClientResolver inner, ResearchTransport 
         var (client, resolved, tokens) = inner.ForProfile(provider, model, maxTokens);
         return (new GuardedLlmClient(client, transport), resolved, tokens);
     }
-
-    public bool SupportsAgenticTools(string providerName) => false;
 
     public bool SupportsStructuredOutputs(string providerName) => true;
 }

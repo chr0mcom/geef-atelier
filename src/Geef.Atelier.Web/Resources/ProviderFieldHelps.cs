@@ -16,8 +16,6 @@ public static class ProviderFieldHelps
         "Atelier leaves an inactive provider out when it lists providers and their models.";
 
     // CLI-specific
-    public const string CliKind =
-        "CLI type. For built-in CLIs (Claude, Codex, Gemini) most fields are pre-filled and read-only. For 'Generic' all fields are editable.";
 
     public const string CliMaxConcurrent =
         "Maximum number of concurrent CLI calls for this provider. Prevents rate limiting on subscription-based CLIs.";
