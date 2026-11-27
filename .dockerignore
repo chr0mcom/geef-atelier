@@ -18,5 +18,16 @@ reports
 docker-compose*.yml*
 .env*
 .smoke.env
+# Local configuration and secret files, at any depth (the entries above without ** only match the root)
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/appsettings.local.json
+**/appsettings.*.Local.json
+**/appsettings.*.local.json
+**/secrets.json
+**/.env
+**/.env.*
+**/*.env
+**/docker-compose.override.yml
 **/*.bak
 **/*.bak-*
