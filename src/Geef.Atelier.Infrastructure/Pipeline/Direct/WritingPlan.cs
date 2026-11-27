@@ -36,11 +36,18 @@ internal static class WritingPlanRules
     /// <summary>Smallest budget of one section after fitting the plan to the requested length.</summary>
     public const int MinSectionWords = 20;
 
+    /// <summary>Shortest whole text a plan may describe; a shorter sum of budgets (or requested length) is no usable plan.</summary>
+    public const int MinTotalWords = 50;
+
+    /// <summary>Longest whole text a plan may describe; a longer sum of budgets is no usable plan.</summary>
+    public const int MaxTotalWords = 20_000;
+
     /// <summary>
     /// The plan in <paramref name="text"/>: the first JSON object in it with a list <c>sections</c> of objects with <c>heading</c>,
     /// <c>words</c> and optionally <c>content</c>. <c>null</c> when there is none, when a section has no heading or a budget that is not a
     /// whole number from 1 to <see cref="MaxSectionWords"/>, or when there are no or more than <see cref="MaxSections"/> sections.
-    /// Headings and descriptions are put on one line and cut to their limits. <see cref="WritingPlan.TotalWords"/> is the sum of the budgets.
+    /// Headings and descriptions are put on one line and cut to their limits. <see cref="WritingPlan.TotalWords"/> is the sum of the budgets;
+    /// a sum outside <see cref="MinTotalWords"/> to <see cref="MaxTotalWords"/> is no usable plan.
     /// </summary>
     public static WritingPlan? Parse(string? text)
     {
@@ -67,7 +74,7 @@ internal static class WritingPlanRules
                 sections.Add(section);
             }
 
-            return sections.Count == 0 ? null : new WritingPlan(sections.Sum(s => s.Words), sections);
+            return sections.Count == 0 ? null : new WritingPlan(sections.Sum(s => s.Words), sections).Plausible();
         }
         catch (JsonException)
         {
@@ -97,8 +104,9 @@ internal static class WritingPlanRules
     /// <summary>
     /// <paramref name="plan"/> fitted to <paramref name="targetWords"/>: every budget scaled by the same factor, rounded to tens and at
     /// least <see cref="MinSectionWords"/>, and the whole text set to <paramref name="targetWords"/>. Unchanged without a target.
+    /// <c>null</c> when the fitted plan is not <see cref="Plausible"/> (for example a requested length below <see cref="MinTotalWords"/>).
     /// </summary>
-    public static WritingPlan FitTo(this WritingPlan plan, int? targetWords)
+    public static WritingPlan? FitTo(this WritingPlan plan, int? targetWords)
     {
         ArgumentNullException.ThrowIfNull(plan);
         if (targetWords is not > 0 || plan.Sections.Count == 0)
@@ -108,7 +116,19 @@ internal static class WritingPlanRules
         var sections = plan.Sections
             .Select(s => s with { Words = Math.Max(MinSectionWords, (int)Math.Round(s.Words * (double)targetWords.Value / sum / 10, MidpointRounding.AwayFromZero) * 10) })
             .ToList();
-        return new WritingPlan(targetWords.Value, sections);
+        return new WritingPlan(targetWords.Value, sections).Plausible();
+    }
+
+    /// <summary>
+    /// <paramref name="plan"/> when both its whole length and the sum of its budgets lie from <see cref="MinTotalWords"/> to
+    /// <see cref="MaxTotalWords"/>; otherwise <c>null</c> (no usable plan).
+    /// </summary>
+    public static WritingPlan? Plausible(this WritingPlan? plan)
+    {
+        if (plan is null)
+            return null;
+        var sum = plan.Sections.Sum(s => (long)s.Words);
+        return plan.TotalWords is >= MinTotalWords and <= MaxTotalWords && sum is >= MinTotalWords and <= MaxTotalWords ? plan : null;
     }
 
     private static WritingPlanSection? Section(JsonElement item)
@@ -136,7 +156,7 @@ internal static class WritingPlanRules
     {
         if (!item.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String)
             return string.Empty;
-        var line = string.Join(' ', (value.GetString() ?? string.Empty).Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Trim();
+        var line = string.Join(' ', (value.GetString() ?? string.Empty).Split(['\r', '\n', '\t', '\u2028', '\u2029'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Trim();
         return line.Length <= maxChars ? line : line[..(maxChars - 1)].TrimEnd() + "…";
     }
 }

@@ -3477,9 +3477,12 @@ path (D). No new build along section 3.5 of the analysis report.
   fact check, the same one correction, the same report. New is one call of the writer's model **before** the first version: it sees the
   request and the files exactly as the writer does and returns sections with heading, word budget and content as JSON. When the code can
   read the requested length in words, the budgets are scaled to that length (middle of a range, 90 % of an upper limit, 110 % of a lower
-  limit, otherwise the stated number; rounded to tens, at least 20 per section). Only the first version gets the outline; the correction
-  gets only the problems, as before.
-- If no usable outline comes back (error, no JSON, no or more than 20 sections), nothing is repeated: the text is written in one go and
+  limit, otherwise the stated number; rounded to tens, at least 20 per section). The whole length and the sum of the budgets must lie
+  between 50 and 20,000 words. Only the first version gets the outline, with the sentence that it sets only order and length, every fact
+  comes from the request and the files, and instructions inside it do not count (the outline comes from a call that reads the files);
+  the correction gets only the problems, as before.
+- If no usable outline comes back (error, also a timeout or a transient gateway error, no JSON, no or more than 20 sections, implausible
+  length), nothing is repeated: the text is written in one go and
   the order gets the note “The text could not be planned section by section first, so it was written in one go.” The call is stored as
   its own cost line `direct-outline`.
 - The progress display shows the steps of the standard way for such runs; the run page offers “Change something” as for the standard
@@ -3494,11 +3497,12 @@ if L wins the measurement, before switching it on.
 
 **Measurement (prepared, outside this repository).** Five new, made-up long tasks (at least 1,500 words each, three with files), fixed
 before the criteria. Run 1: D against K; run 2: L against the winner of run 1 (its stored texts). A blind juror compares each pair in two
-passes with swapped order. “Wins” means: ahead in at least 4 of 5 in both passes and not more invented facts; length fidelity (±25 %) is
-reported. If nobody wins, a repair of K follows (separate step), otherwise the checkbox goes. A needs check on earlier finished workshop
+passes with swapped order. “Wins” means: ahead in at least 4 of 5 in both passes and not more invented facts; if a limit does not
+cover all pairs, the result is “not decided”, never a loss; length fidelity (±25 %) is reported. If nobody wins, a repair of K follows (separate step), otherwise the checkbox goes. A needs check on earlier finished workshop
 tasks decides whether Auto-Crew and the composer may go with the removal: the old text may win at most once more often than the new
-one. Hard limits per run, a quota guard for the shared codex subscription (counted on a rolling basis) and the shared measuring guard;
-stop on failover or an open breaker. No time windows.
+one, the new one may not have more invented facts, and with mostly open tasks it is “not decided”. Hard limits per run, a guard of the
+shared codex subscription from its current state (read before every run and after every five codex calls) and the shared measuring
+guard; stop on failover or an open breaker. No time or daily rules.
 
 **Evidence.** Unit tests for reading, target size and scaling of the outline and for the prompts; pipeline tests over the real assembly
 of the direct path (outline first, missing outline with a note, no retry when the gateway refuses, correction without the outline, no
@@ -3511,6 +3515,10 @@ with and without the clarifier.
 - The texts about “Extra careful” on `/start`, in `submit_order` and on the explanation page speak of several review rounds; they are
   adapted only when the switch is turned on.
 - For now only the admin guide names the new switch.
+- When a K order is changed, the new version runs on the direct path like every change; the progress display there shows the loop
+  steps, as for older “Extra careful” orders. To be decided before switching on.
+- “Revise my file”: K does not make the file the template (as before with “Extra careful”), so it plans and writes anew where the
+  standard way changes little. To be decided before switching on.
 
 **Way back:** switch `Off` (default), remove the exceptions.
 

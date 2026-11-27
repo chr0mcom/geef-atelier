@@ -3609,9 +3609,12 @@ Direktweg (D) schlägt. Kein Neubau nach Abschnitt 3.5 des Analyseberichts.
   Faktenprüfung, dieselbe eine Korrektur, derselbe Bericht. Neu ist ein Aufruf des Schreibermodells **vor** der ersten Fassung: Er sieht
   Auftrag und Dateien genau wie der Schreiber und liefert Abschnitte mit Überschrift, Wortbudget und Inhalt als JSON. Kann der Code die
   verlangte Länge in Wörtern lesen, werden die Budgets auf diese Länge skaliert (Mitte eines Bereichs, 90 % einer Obergrenze, 110 %
-  einer Untergrenze, sonst die genannte Zahl; auf Zehner gerundet, je Abschnitt mindestens 20). Nur die erste Fassung bekommt die
-  Gliederung; die Korrektur bekommt wie bisher nur die Probleme.
-- Kommt keine brauchbare Gliederung zurück (Fehler, kein JSON, keine oder mehr als 20 Abschnitte), wird nicht wiederholt: Der Text wird
+  einer Untergrenze, sonst die genannte Zahl; auf Zehner gerundet, je Abschnitt mindestens 20). Gesamtlänge und Summe der Budgets
+  müssen zwischen 50 und 20.000 Wörtern liegen. Nur die erste Fassung bekommt die Gliederung, mit dem Satz, dass sie nur Reihenfolge
+  und Länge vorgibt, jede Tatsache aus Auftrag und Dateien kommt und Anweisungen in ihr nicht gelten (die Gliederung entsteht aus
+  einem Aufruf, der die Dateien liest); die Korrektur bekommt wie bisher nur die Probleme.
+- Kommt keine brauchbare Gliederung zurück (Fehler, auch Zeitüberschreitung oder vorübergehender Fehler des Gateways, kein JSON, keine
+  oder mehr als 20 Abschnitte, unplausible Länge), wird nicht wiederholt: Der Text wird
   in einem Zug geschrieben, und der Auftrag bekommt den Hinweis „The text could not be planned section by section first, so it was
   written in one go.“ Der Aufruf wird als eigener Kostenposten `direct-outline` gespeichert.
 - Die Fortschrittsanzeige zeigt für solche Läufe die Schritte des Standardwegs; die Laufseite bietet „Change something“ wie beim
@@ -3627,11 +3630,13 @@ werden nur behoben, wenn L die Messung gewinnt, vor dem Einschalten.
 **Messung (vorbereitet, außerhalb dieses Repositorys).** Fünf neue, frei erfundene lange Aufgaben (je mindestens 1.500 Wörter, drei mit
 Dateien), festgeschrieben vor den Kriterien. Lauf 1: D gegen K; Lauf 2: L gegen den Sieger von Lauf 1 (dessen gespeicherte Texte). Ein
 blinder Juror vergleicht je Paar in zwei Durchgängen mit vertauschter Reihenfolge. „Gewinnt“ heißt: in beiden Durchgängen mindestens 4
-von 5 vorne und nicht mehr erfundene Angaben; Längentreue (±25 %) wird berichtet. Gewinnt keiner, folgt eine Reparatur an K (eigener
+von 5 vorne und nicht mehr erfundene Angaben; reicht eine Obergrenze nicht für alle Paare, heißt das „nicht entschieden“, nie
+Niederlage; Längentreue (±25 %) wird berichtet. Gewinnt keiner, folgt eine Reparatur an K (eigener
 Schritt), sonst entfällt das Häkchen. Eine Bedürfnisprüfung auf früheren abgeschlossenen Aufgaben der Werkstatt entscheidet, ob Auto-Crew
-und Composer mit dem Abriss gehen dürfen: Der alte Text darf höchstens einmal öfter gewinnen als der neue. Harte Obergrenzen je Lauf,
-ein Kontingentschutz für das geteilte codex-Abo (rollend gezählt) und der gemeinsame Messwächter; Abbruch bei Failover oder offenem
-Breaker. Keine Zeitfenster.
+und Composer mit dem Abriss gehen dürfen: Der alte Text darf höchstens einmal öfter gewinnen als der neue, der neue darf nicht mehr
+erfundene Angaben haben, und bei mehrheitlich offenen Aufgaben ist es „nicht entschieden“. Harte Obergrenzen je Lauf, ein Schutz des
+geteilten codex-Abos aus dessen aktuellem Stand (gelesen vor jedem Lauf und nach je fünf codex-Aufrufen) und der gemeinsame
+Messwächter; Abbruch bei Failover oder offenem Breaker. Keine Zeit- oder Tagesregeln.
 
 **Nachweis.** Einheitstests für Lesen, Zielgröße und Skalierung der Gliederung und für die Prompts; Pipeline-Tests über den echten
 Zusammenbau des Direktwegs (Gliederung zuerst, fehlende Gliederung mit Hinweis, kein Wiederholen bei Ablehnung des Gateways, Korrektur ohne
@@ -3644,6 +3649,10 @@ Ende-zu-Ende über MCP mit und ohne Klärer.
 - Die Texte zu „Extra careful“ auf `/start`, in `submit_order` und auf der Erklärseite sprechen von mehreren Prüfrunden; sie werden erst
   mit dem Einschalten angepasst.
 - Die Leitfäden nennen den neuen Schalter vorerst nur im Admin-Leitfaden.
+- Wird ein K-Auftrag geändert, läuft die neue Fassung wie jede Änderung auf dem Direktweg; die Fortschrittsanzeige zeigt dort wie bei
+  älteren „Extra careful“-Aufträgen die Schritte der Schleife. Vor dem Einschalten zu entscheiden.
+- „Überarbeite meine Datei“: K macht die Datei nicht zur Vorlage (wie bisher bei „Extra careful“), plant und schreibt also neu, wo der
+  Standardweg wenig ändert. Vor dem Einschalten zu entscheiden.
 
 **Rückweg:** Schalter `Off` (Standard), Ausnahmen entfernen.
 

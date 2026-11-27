@@ -11,7 +11,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 /// The planning call of "Extra careful" with an outline (D-087): one call of the writer's model, before the first writing pass, that splits
 /// the text into sections with word budgets (<see cref="WritingPlan"/>). It sees the request and the files exactly as the writer does
 /// (document mode: the plan goes into an empty <c>draft.md</c>, the files are the background document, no failover). Its cost is recorded as
-/// actor <see cref="ActorName"/>. A call that fails or gives no readable plan is not repeated: the text is then written without an outline
+/// actor <see cref="ActorName"/>. A call that fails (also on a timeout or a transient error of the gateway) or gives no readable plan is
+/// not repeated: the text is then written without an outline
 /// and the run gets the warning <see cref="NoPlanWarning"/>, so that nobody believes a plan was followed.
 /// </summary>
 internal sealed class WritingPlanner(
@@ -53,7 +54,7 @@ internal sealed class WritingPlanner(
         WritingPlan? plan = null;
         try
         {
-            var response = await LlmResilience.ExecuteAsync(ct => CompleteAsync(client, request, ct), cancellationToken);
+            var response = await LlmResilience.ExecuteAsync(ct => CompleteAsync(client, request, ct), cancellationToken, maxAttempts: 1);
             Record(request.Model, response);
             plan = WritingPlanRules.Parse(response.Text)?.FitTo(targetWords);
             if (plan is null)

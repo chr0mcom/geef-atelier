@@ -96,6 +96,21 @@ public sealed class CarefulOutlinePipelineTests
     }
 
     [Fact]
+    public async Task A_planning_call_with_a_transient_gateway_error_is_not_repeated_either()
+    {
+        var harness = Outline();
+        var (run, _) = harness.CreateRun(Request);
+        harness.Script.EnqueueExecutorError(500, "server_error");
+        harness.Script.EnqueueExecutorText(Words(100));
+
+        var outcome = await harness.RunAsync(run);
+
+        Assert.Equal(Words(100), outcome.Result.Output!.Markdown);
+        Assert.Equal(2, harness.WriterCalls.Count);
+        Assert.Equal(DirectWarningCodes.NoWritingPlan, Assert.Single(harness.Warnings.All).Code);
+    }
+
+    [Fact]
     public async Task The_correction_pass_gets_only_the_problems_and_the_plan_is_made_once()
     {
         var harness = Outline();
