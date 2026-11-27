@@ -42,7 +42,7 @@ public sealed class LandingWordsTests : TestContext
         foreach (var word in TechnicalWords)
             Assert.DoesNotMatch(new Regex($@"\b{word}s?\b", RegexOptions.IgnoreCase), text);
         Assert.DoesNotContain("powers every run", text, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Every text written the standard way comes with what was checked", text, StringComparison.Ordinal);
+        Assert.Contains("Every text comes with what was checked", text, StringComparison.Ordinal);
         Assert.Contains("This is the standard way every text is written.", text, StringComparison.Ordinal);
     }
 

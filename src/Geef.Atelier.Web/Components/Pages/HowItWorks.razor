@@ -218,7 +218,7 @@
         </dl>
         @if (!_f.ChangeText || !_f.WebResearch)
         {
-            <p class="hiw-note">Features that are not switched on yet are built and are being tested before they are switched on for everyone. When they are, this page shows them here without any further change.</p>
+            <p class="hiw-note">An administrator can switch these features on. This page then shows them here without any further change.</p>
         }
     </section>
 
@@ -235,7 +235,7 @@
 
     <section class="hiw-section" id="checks" aria-labelledby="hiw-checks-title" data-testid="hiw-checks">
         <h2 id="hiw-checks-title" class="hiw-h2">What the checks mean</h2>
-        <p>Below every text written the standard way there is a box “@OrderCheckLines.Heading”. It lists only the checks that really ran.</p>
+        <p>Below every text there is a box “@OrderCheckLines.Heading”. It lists only the checks that really ran.</p>
         <dl class="hiw-defs">
             <dt>Checked automatically</dt>
             <dd>Checked without AI. A few basics are always checked: the text is not empty and starts with the text itself, not with a remark to the reader. Length, language, gaps, lists or headings, and words to use or to avoid are checked only when your request asked for them.</dd>
@@ -327,7 +327,7 @@
                     <tbody>
                         <tr><td>Questions before it starts</td><td><code>Orders:IntakeMode</code></td><td>@OrderSettings.Value.IntakeMode</td></tr>
                         <tr><td>Changing a finished text</td><td><code>Orders:Revise</code>, per person <code>Orders:ReviseOverrides</code></td><td>@_everyone.ChangeText.OnOff()</td></tr>
-                        <tr><td>Looking things up on the web (standard way)</td><td><code>Research:Mode</code>, per person <code>Research:ModeOverrides</code></td><td>@_everyone.WebResearch.OnOff()</td></tr>
+                        <tr><td>Looking things up on the web</td><td><code>Research:Mode</code>, per person <code>Research:ModeOverrides</code></td><td>@_everyone.WebResearch.OnOff()</td></tr>
                         <tr><td>Fact check</td><td><code>Direct:FactCheckMode</code>, per person <code>Direct:FactCheckModeOverrides</code></td><td>@DirectSettings.Value.FactCheckMode</td></tr>
                         <tr><td>Files from an AI assistant</td><td><code>Uploads:Tickets</code></td><td>@_everyone.UploadThroughAssistant.OnOff()</td></tr>
                         <tr><td>Offer to save missing details under About me</td><td><code>Orders:TellOnce</code></td><td>@_everyone.TellOnce</td></tr>
@@ -335,7 +335,7 @@
                     </tbody>
                 </table>
             </div>
-            <p data-testid="hiw-admins-workshop">The workshop menu holds a technical list of all writing jobs and, for administrators, the AI providers. @(UiSettings.Value.WorkshopForAdminsOnly ? "It is shown only to administrators." : "It is shown to everyone.") The older way of working with teams you set up yourself no longer exists; older requests stay readable.</p>
+            <p data-testid="hiw-admins-workshop">The workshop menu holds a technical list of all writing jobs and, for administrators, the AI providers. @(UiSettings.Value.WorkshopForAdminsOnly ? "It is shown only to administrators." : "It is shown to everyone.") The older way of working with teams you set up yourself no longer exists.</p>
         }
         <p><a href="/docs/14-admin-guide">Guide for administrators</a></p>
     </section>
@@ -378,7 +378,7 @@
 
     string FlowDescription => _f.WebResearch
         ? "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. A web search service gets only a few short search words taken from your request, never your answers or your files; names or other details you wrote can end up in them."
-        : "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. Nothing goes to a web search when you use this standard way.";
+        : "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. Nothing goes to a web search.";
 
     string FactCheckSentence => _f.FactCheck switch
     {

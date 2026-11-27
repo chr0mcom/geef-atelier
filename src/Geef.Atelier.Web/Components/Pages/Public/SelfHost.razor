@@ -33,7 +33,7 @@
                 <h2 class="sh-h2">What stays on your server, and what does not</h2>
                 <ul class="lp-plain-list">
                     <li data-testid="self-host-stays">On your server: accounts, requests, texts and their versions, the files people add and what was read from them.</li>
-                    <li data-testid="self-host-leaves">To write and check a text, Atelier sends the request, the answers, the About me details and the files to the AI services you connect. You choose which ones, and their terms apply.</li>
+                    <li data-testid="self-host-leaves">To write and check a text, Atelier sends the request, the answers, the About me details and the files to the AI services you connect. Their terms apply.</li>
                     <li data-testid="self-host-search">Web searches need a key for a search service that you add to your settings; without one, nothing goes to a web search. With a key, the standard way may send a few short search words taken from a request to the search service. @OrderResearchLines.SearchPrivacy You can switch this off.</li>
                 </ul>
             </div>
@@ -45,7 +45,7 @@
                 </div>
                 <div class="sh-item">
                     <h3>Your AI services</h3>
-                    <p>You connect them yourself: with an OpenRouter key, or through the included gateway, which uses AI command-line tools signed in with your own accounts. Administrators can add more.</p>
+                    <p>Texts are written and checked through the included gateway. It uses the command-line tools Claude Code and Codex, signed in with your own accounts. The standard setup uses both, so sign in to both.</p>
                 </div>
                 <div class="sh-item">
                     <h3>People and settings</h3>
@@ -69,10 +69,14 @@
                 <h2 class="sh-h2">Quick start</h2>
                 <pre><code>git clone https://github.com/chr0mcom/geef-atelier
 cd geef-atelier
-cp .env.example .env        # fill in passwords and keys
-docker compose up -d --build</code></pre>
+cp .env.example .env          # fill in passwords, keys and your domain
+docker network create proxy   # once, the network your reverse proxy uses
+docker compose up -d --build
+docker compose exec -e HOME=/auth/claude cli-proxy claude auth login
+docker compose exec cli-proxy codex login --device-auth</code></pre>
                 <p class="sh-note">
-                    The README in the repository explains every step: passwords, the first administrator, the AI services, backups and restore.
+                    You need Docker and a running Traefik as reverse proxy. The README in the repository explains every step: what
+                    Traefik must provide, passwords, the first administrator, signing in the AI tools, backups and restore.
                     Health check at <code>https://&lt;your-domain&gt;/health</code>.
                 </p>
             </div>
