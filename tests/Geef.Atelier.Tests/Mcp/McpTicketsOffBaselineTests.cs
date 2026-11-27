@@ -17,18 +17,22 @@ namespace Geef.Atelier.Tests.Mcp;
 /// see it (<see cref="McpJsonUtilities.DefaultOptions"/>), and taken again once when changing a text lost the quick change <c>longer</c>
 /// (<c>revise_order</c>, <c>get_order_result</c> with <c>lengthNotice</c>, step 6 of the instructions), and once more for the questions the
 /// person did not answer in step 5 of the instructions (D-081), and once more for <c>profile</c>, which since D-083 can save four About me
-/// fields, with the sentence about it in the instructions. With saving switched off the tool list and the instructions still give the hashes before D-083.
+/// fields, with the sentence about it in the instructions. With saving switched off the tool list and the instructions still give the hashes before D-083,
+/// apart from D-086: the instructions were shortened below the 4,096 characters Claude Code keeps, and the details of changing a text moved into the
+/// descriptions of <c>revise_order</c> and <c>get_order_result</c>, so all eight hashes were taken again once; nothing else in the tool list changed.
+/// The four tool list hashes were taken again once more for the SDK 2.4.0 (D-086): SDK 1.3.0 marked every async tool with
+/// <c>execution: {"taskSupport":"optional"}</c> although the server offers no tasks; 2.4.0 leaves the field out, and nothing else changed.
 /// </summary>
 public sealed class McpTicketsOffBaselineTests
 {
-    private const string ToolsWithLegacyHash = "7f6b42c13ffc2e9b136a8a96e81fe77e90e68176214b775bf70be99e170b3ab1";
-    private const string ToolsWithoutLegacyHash = "3ab86f77d9601fc3eff624da80683902eef18f6c75d7195e2059d09987170a42";
-    private const string InstructionsWithLegacyHash = "55ae0dda5dc96ad7b099eaa5cd01b6804e00e4b1cbea7985fe9155eb96ea36c2";
-    private const string InstructionsWithoutLegacyHash = "03fe8a67778d2a20323d1db96d64d4920cf096407c6e1a43a4e55ad50346b8fb";
-    private const string ToolsWithLegacyBeforeAboutMeHash = "db658fcddf55eeab54412dcb5d988294421dc793359281a45492e3dec9f1c840";
-    private const string ToolsWithoutLegacyBeforeAboutMeHash = "165e018513d9f4c28ab23e7b103c71cda389761a326e13804832554f754ed42a";
-    private const string InstructionsWithLegacyBeforeAboutMeHash = "39052d88f5f976882751a4fcde33a70c4bc889cd9f4ea3b0b92ebdf60f256672";
-    private const string InstructionsWithoutLegacyBeforeAboutMeHash = "e56324836621e79badcad70ab3888faaf4477a2d0343d3400008a514b552e2a3";
+    private const string ToolsWithLegacyHash = "6df3d78d078549a34a9b38d1c21f6f49b2d0e5a13814eb5e52a4118863f1119e";
+    private const string ToolsWithoutLegacyHash = "863752b45a5537c880951e559c8b2591e22b1725c3753e5f111a047101ea7e44";
+    private const string InstructionsWithLegacyHash = "0008d51c7b9a6d3663e355f88eb9a485ec4565a787d3b1476277452eb585d81a";
+    private const string InstructionsWithoutLegacyHash = "f9c6023635e5f6d73305154507755c8c36d483ba989488706b9c0920d52d04d1";
+    private const string ToolsWithLegacyBeforeAboutMeHash = "d41a8cc7025ba85b39f8311a45de938b6184148b9be2110d1d9ceb29d8ce25ad";
+    private const string ToolsWithoutLegacyBeforeAboutMeHash = "d9065d358e2afd84b19f96f5062e7273863737798e6cfd109fbca3d41556cbbd";
+    private const string InstructionsWithLegacyBeforeAboutMeHash = "8185e3bdcfa40031c0d4f0c5eca8cd08864a7ab11eb3cf2d0288203152eff680";
+    private const string InstructionsWithoutLegacyBeforeAboutMeHash = "75aab43d645c8fadd9927f53851a12f8a53df7c86ef70114d03af033ccd7e09a";
 
     [Theory]
     [InlineData("true", ToolsWithLegacyHash)]
@@ -78,7 +82,7 @@ public sealed class McpTicketsOffBaselineTests
 /// <summary>The MCP server options as the host builds them, with every service of the tools registered as a stub.</summary>
 internal static class McpTestServer
 {
-    public static ServiceProvider Provider(string legacy, string? tickets, TellOnceMode? tellOnce = null)
+    public static ServiceProvider Provider(string legacy, string? tickets, TellOnceMode? tellOnce = null, Action<IServiceCollection>? configure = null)
     {
         var settings = new Dictionary<string, string?> { ["Mcp:LegacyTools"] = legacy };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
@@ -92,6 +96,7 @@ internal static class McpTestServer
         foreach (var type in typeof(McpAssemblyMarker).Assembly.ToolMethods().SelectMany(m => m.GetParameters()).Select(p => p.ParameterType)
                      .Where(t => t.IsInterface && !t.IsClientValue() && !t.IsSdkValue() && !t.IsGenericType).Distinct())
             services.AddScoped(type, _ => throw new NotSupportedException());
+        configure?.Invoke(services);
         services.AddAtelierMcp();
         return services.BuildServiceProvider();
     }

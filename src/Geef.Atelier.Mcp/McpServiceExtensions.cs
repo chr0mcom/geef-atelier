@@ -6,6 +6,7 @@ using Geef.Atelier.Mcp.Tools;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using ModelContextProtocol.AspNetCore;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -19,7 +20,8 @@ public static class McpServiceExtensions
     /// While tickets are off, <c>submit_order</c> does not offer <c>uploadIds</c>, so the tool list and the instructions are the same
     /// as before upload tickets; while they are on, its description and that of <c>attachments</c> name <c>prepare_attachment</c>. The longest wait named in the instructions and in <c>get_order_status</c> is
     /// <c>Orders:MaxWaitSeconds</c>, the same value that limits the wait. Trace lines of the SDK, which hold whole messages with upload
-    /// tokens and file content, are never written (<see cref="McpMessageLogGuard"/>).
+    /// tokens and file content, are never written (<see cref="McpMessageLogGuard"/>). The transport is stateless on purpose
+    /// (<see cref="HttpServerSessionMode.Stateless"/>): every request stands alone, for clients of the 2026-07-28 revision as for older ones.
     /// </summary>
     public static IServiceCollection AddAtelierMcp(this IServiceCollection services)
     {
@@ -29,7 +31,7 @@ public static class McpServiceExtensions
 
         services
             .AddMcpServer()
-            .WithHttpTransport(o => o.Stateless = true);
+            .WithHttpTransport(o => o.SessionMode = HttpServerSessionMode.Stateless);
         services.AddOptions<McpServerOptions>()
             .Configure<IOptions<OrderOptions>, IOptions<McpOptions>, IOptions<UploadOptions>, IEnumerable<TicketMcpTool>, IEnumerable<LegacyMcpTool>>(
                 (o, orders, mcp, uploads, ticketTools, legacy) =>

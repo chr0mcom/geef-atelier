@@ -103,7 +103,8 @@ public sealed class McpTicketsProtocolTests
 
         Assert.Equal(SubmitOrderTool.ToolDescription, submit.Description);
         Assert.StartsWith("Optional files as a JSON array", submit.InputSchema.GetProperty("properties").GetProperty("attachments").GetProperty("description").GetString(), StringComparison.Ordinal);
-        Assert.StartsWith("Atelier writes finished texts for people (letters, emails, articles, summaries, reports) from their request and their files.\n1. Start with submit_order. Pass the person's request word for word",
+        Assert.StartsWith("Atelier writes finished texts for people (letters, emails, articles, summaries, reports) from their request and their files.\n" +
+            McpServerInstructions.AlwaysRules + "1. Start with submit_order. Pass the person's request word for word",
             session.Client.ServerInstructions, StringComparison.Ordinal);
     }
 

@@ -44,7 +44,7 @@ public static class SubmitOrderTool
         "Optional, only for very small text files (a few kilobytes); upload every other file with prepare_attachment and pass uploadIds instead. " +
         "A JSON array: [{\"filename\":\"notes.txt\",\"contentType\":\"text/plain\",\"contentBase64\":\"...\"}]. contentBase64 must be the complete original file. " +
         "Supported content types: application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, text/markdown, text/plain. " +
-        "Placeholders, summaries or shortened content are rejected.";
+        "Placeholders, summaries or shortened content are rejected, and so is Base64 encoded twice or content that does not match the contentType.";
 
     public const string UploadIdsDescription = "Upload IDs from prepare_attachment whose file was uploaded. Not file content, not file names.";
 

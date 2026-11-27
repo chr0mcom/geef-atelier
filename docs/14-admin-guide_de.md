@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](14-admin-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-27 (`Orders:TellOnce = On`, Zusatz zu D-083; `Research:Mode = On`, Zusatz zu D-074; davor `Orders:TellOnce`, D-083; davor nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
+*Letzte Aktualisierung: 2026-11-27 (`Orders:TellOnce = On`, Zusatz zu D-083; `Research:Mode = On`, Zusatz zu D-074; Schalter der älteren Prüfschleife, D-085; davor 2026-11-26 `Orders:TellOnce`, D-083; davor nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
 
 Dieser Leitfaden ist für die Administration: Menschen, die Konten anlegen, entscheiden, welche Funktionen an sind, und sich um die
 ältere Werkstatt kümmern. Installation und Betrieb beschreiben der [Leitfaden für Entwicklung und Betrieb](15-developer-guide_de.md)
@@ -40,6 +40,9 @@ muss beim Einschalten nicht geändert werden.
 | Ältere Werkzeuge für KI-Assistenten | `Mcp:LegacyTools` | `true` | `true` (D-075) | – |
 | Lernschleife des älteren Wegs | `Learning:Enabled` | `false` | `false` (D-067) | – |
 | Angebot, fehlende Angaben unter About me zu speichern („Tell Atelier once“) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `On` (Zusatz zu D-083, Abnahme bestanden) | – |
+| Ältere Prüfschleife: beste statt jüngster Fassung | `Convergence:BestDraft` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
+| Ältere Prüfschleife: Schreiber bekommt nur blockierende Befunde | `Convergence:WriterBlockingOnly` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
+| Ältere Prüfschleife: Stopp nach zwei Runden ohne Fortschritt | `Convergence:StopWithoutProgress` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
 
 Was die Werte bedeuten:
 
@@ -71,6 +74,17 @@ Was die Werte bedeuten:
   denen er entstand. `WithoutPromise` (Code-Standard) nutzt „Save it under About me for your next texts“. `Off` zeigt nichts davon, und `profile` wird nur lesend mit seiner früheren Beschreibung angeboten. Die
   Administration sieht es nie an fremden Aufträgen, und gespeichert wird nur in die eigenen About-me-Angaben (D-083). Rückweg:
   `Orders__TellOnce=WithoutPromise` (Angebot ohne Zusage) oder `Orders__TellOnce=Off`.
+- **Ältere Prüfschleife** („Extra careful“, Werkstatt-Vorlagen und fortgesetzte Läufe; nie Standardweg oder Team-Entwurf): Runden
+  werden nur über die Prüfer verglichen, die in keiner der verglichenen Runden technisch ausfielen. Eine Runde ist besser, wenn sie
+  weniger „critical“-Befunde hat, bei gleich vielen weniger blockierende („major“ oder „critical“). `BestDraft` liefert nach einer
+  Schleife ohne Freigabe die beste Runde (bei Gleichstand die mit weniger Ausfällen, dann die jüngste) und speichert sie als
+  gelieferte Runde; gewählt wird nur ein nicht leerer Text mit mindestens 70 % der Länge des längsten Rundentexts, sonst bleibt es
+  bei der bisherigen Wahl. Eine freigegebene Schleife liefert wie bisher ihre letzte Runde.
+  `WriterBlockingOnly` gibt dem Schreiber nur die blockierenden Befunde der letzten Runde, keine Ausfallmeldungen.
+  `StopWithoutProgress` beendet die Schleife, wenn zwei Runden nacheinander keine Runde besser als alle früheren brachten (gleicher
+  Vergleich; ohne einen Prüfer, der in allen Runden antwortete, kein Stopp); der Lauf
+  nennt dann den Grund „Two more rounds did not reduce the open points, so the work was stopped.“ Freigabe, Höchstzahl der Runden
+  und Zeitgrenze gehen vor. Alle drei sind aus, bis die Messung des neuen „Extra careful“ über sie entschieden hat (D-085).
 
 **Einen Schalter setzen.** Die Einstellungen werden beim Start gelesen. Setz sie als Umgebungsvariablen des Webdienstes, mit `__`
 statt `:` (zum Beispiel `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` reicht Variablen einzeln

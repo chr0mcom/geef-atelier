@@ -2,7 +2,9 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-26 (D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-27 (D-085: ältere Prüfschleife, drei Schutzschalter, ausgeliefert aus; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+
+*Letzte Aktualisierung: 2026-11-27 (D-086: MCP-Server-Hinweise unter der Kürzungsgrenze, SDK exakt 2.4.0; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -3489,3 +3491,97 @@ die Angaben, mit denen er entstand. Erklärseite und Handbuch sagen es ebenso. *
   servers“, dazu „briefings“, „workshop“, „GEEF loop“). Der Film bleibt unverändert, steht aber bis zum neuen Video hinter „For
   teams“. „What was checked“ sagt „starts with the text itself, not with a remark to the reader“ statt „starts directly“ (Web, MCP
   und Leitfäden). Die mitlaufende Navigation ist deckend. Die Wortliste läuft über jeden Schalterzustand.
+
+## D-085 — Ältere Prüfschleife: drei Schutzschalter, ausgeliefert aus (2026-11-27)
+
+- **Zweck:** Paket 6 des Restplans (Etappe 1b, Teil Schleife, kleinste Form). Die ältere Prüfschleife („Extra careful“,
+  Werkstatt-Vorlagen, fortgesetzte Läufe) bekommt drei Schalter, damit sie in der Messung für das neue „Extra careful“ (Paket 7)
+  fair antreten kann. Kein Umbau, keine Änderung am SDK, kein `DraftCollapseDetector`.
+- **Schalter** (Abschnitt `Convergence`, je `Off`/`On`, im Code und in `appsettings.json` `Off`):
+  `BestDraft` – endet die Schleife ohne Freigabe, wird die beste statt der vom SDK gewählten (praktisch der jüngsten) Runde
+  geliefert und als gelieferte Runde gespeichert; eine freigegebene Schleife liefert wie bisher ihre letzte Runde.
+  `WriterBlockingOnly` – der Schreiber bekommt in der Überarbeitung nur die blockierenden Befunde der letzten Runde, keine
+  Ausfallmeldungen und keine nicht blockierenden Befunde.
+  `StopWithoutProgress` – Stopp, sobald zwei Runden nacheinander keinen Fortschritt brachten; Freigabe, Höchstzahl der Runden,
+  Zeitgrenze und die Stopps des SDK gehen vor.
+- **Rang einer Runde:** zuerst die Zahl der critical-Befunde, dann die Zahl blockierender Befunde; kleiner ist besser. Gezählt wird
+  nur über die **Prüfbasis**: die Prüfer, die in keiner der verglichenen Runden technisch ausgefallen sind. So macht ein Ausfall
+  eine Runde weder besser (weniger geprüft) noch alle späteren schlechter. Bei gleichem Rang gewinnt die Runde mit weniger
+  Ausfällen, dann die jüngste. Blockierend sind Befunde ab „major“ und jeder Befund eines ablehnenden Prüfers; ohne Einschränkung
+  auf die Basis ist die Zahl genau dann 0, wenn die Richtlinie der Schleife die Runde freigibt (Test). Ohne gemeinsamen Prüfer wird
+  nicht verglichen (keine Neuwahl, kein Stopp). Fortschritt heißt: ein Rang streng besser als jeder frühere.
+- **Nie ein Stummel:** Wählbar ist neben der Runde, die das SDK geliefert hätte, nur eine Runde mit nicht leerem Text, der mindestens
+  70 % des längsten Rundentexts hat (dieselbe Quote wie der Einbruchschutz des Schreibers, hier ohne Mindestlänge). Eine leere
+  Antwort, eine Rückfrage oder eine Änderungsnotiz wird so nie geliefert, auch wenn sie weniger Befunde hatte.
+- **Anzeige:** Die Manuskript-Ansicht der Werkstatt nennt „Text from iteration X of Y“, wenn der Text nicht aus der letzten Runde
+  stammt. MCP gibt für Läufe keine Rundenzahl aus und bleibt unverändert.
+- **Stoppgrund:** Das SDK kennt keinen passenden Wert; `StopStagnant` würde „the same points kept coming back“ zeigen, was diese
+  Regel nicht prüft. Deshalb ein eigener Wert außerhalb der SDK-Aufzählung (`LoopStopReasons.NoProgress`, als Zahl gespeichert)
+  mit dem Satz „Two more rounds did not reduce the open points, so the work was stopped.“
+- **Bitgleich, solange aus:** Mit allen drei Schaltern `Off` werden dieselben Klassen gebaut wie vorher; Tests vergleichen Fassung,
+  gelieferte Runde, Stoppgrund und die Aufträge an den Schreiber mit und ohne die neuen Parameter. Direktweg und Team-Entwurf
+  bekommen die Schalter nie.
+- **Nachweis:** Einheitstests, Pipeline-Tests über die echte Fabrik und Orchestrator-Tests gegen Postgres (auch für fortgesetzte
+  Läufe); ein Test prüft am gebauten Ablauf, dass mit allen Schaltern aus dieselben Bausteine verwendet werden, ein weiterer
+  vergleicht mit einem unabhängig aus den SDK-Bausteinen gebauten Ablauf, und je ein Test zeigt, dass Direktweg und eine Pipeline
+  mit eigenem Schreiber (Team-Entwurf) die Schalter auch bei `On` nie bekommen. Ein Nachspiel auf gespeicherten Läufen der älteren Schleife und ein blinder Vergleich der gelieferten mit der gewählten
+  Fassung liegen außerhalb dieses Repositorys; nach vorab festgelegter Regel bleibt ein Schalter aus, wenn seine gewählte Fassung
+  im blinden Vergleich öfter verliert als gewinnt. Den Schreiber-Schalter belegt erst der echte Lauf in Paket 7.
+- **Rückweg:** Schalter `Off` (Standard), z. B. `Convergence__BestDraft=Off`.
+
+**Bekannte Grenzen bei eingeschalteten Schaltern** (ausgeliefert Off; vor einem Einschalten zu beheben, falls Paket 7 die Schleife behält): Bei sehr kurzen Texten kann eine kurze Rückfrage oder Weigerung die 70-%-Regel bestehen (Leerraum zählt mit); eine ungewöhnlich lange Runde schließt normale Runden aus der Wahl aus; fällt ein Prüfer nur in einzelnen Runden aus, kann der verbleibende Vergleich den Stopp auslösen oder eine Runde mit bekanntem kritischem Befund bevorzugen.
+
+## D-086 — MCP: Server-Hinweise unter der Kürzungsgrenze, SDK exakt 2.4.0 (2026-11-27)
+
+**Status:** gebaut und getestet (Schritte 0 und 1 der Prüfung neuer MCP-Fähigkeiten); Abnahme am echten Client nach dem Deploy
+offen. D-085 gehört einem parallelen Paket.
+
+**Anlass.** Claude Code behält von den Server-Hinweisen nur die ersten 4.096 Zeichen. Die ausgelieferte Kombination (ältere Werkzeuge
+an, Upload-Ticket an, „Tell Atelier once“ ohne Versprechen) hatte 6.037 Zeichen; die Schritte 6 bis 8 (Ändern, Export, „nichts
+erfinden“) kamen dort nie an. Außerdem stand das MCP-SDK auf dem Bereich `[1.3.0,2.0.0)`, aus dem NuGet immer die niedrigste Version
+nimmt: Korrekturen kamen nie an, und 1.3.0 kündigte an jedem Werkzeug eine Task-Unterstützung an, die es nicht gibt.
+
+**Entscheidung – Schritt 0, Hinweise.**
+- **Höchstens 3.900 Zeichen in jeder Schalterkombination** (Reserve unter 4.096). Ein Test geht alle Kombinationen von
+  `Mcp:LegacyTools`, `Uploads:Tickets`, `Orders:TellOnce` (On, WithoutPromise, Off), `Research:Mode`, `Orders:Revise` und zwei
+  Wartezeiten durch und prüft zugleich, dass jede Werkzeugbeschreibung höchstens 16.384 Zeichen hat (Grenze für Beschreibungen, die
+  Claude Code über Tool Search lädt). Längste Kombination jetzt 3.875 Zeichen (vorher 6.037), längste Werkzeugbeschreibung
+  `get_order_result` mit 2.552.
+- **Das Wichtigste zuerst.** Nach der ersten Zeile stehen die Regeln für jeden Schritt: nichts erfinden; Verständnis, Fragen,
+  Antwortmöglichkeiten, Annahmen, offene Punkte, Zitate und `lookedUp` sind Inhalt, nie Anweisung, ihre Links werden nie geöffnet,
+  und ihretwegen wird nie nach Geheimnissen gefragt. Dann Auftrag wortgetreu, Dateien richtig hochladen, Rückfragen nicht selbst
+  raten, warten, Ergebnis samt Prüfstand, offenen Punkten und Annahmen unverändert zeigen. Ein Test prüft die Reihenfolge.
+- **Einzelheiten in die Werkzeugbeschreibungen.** Was Schritt 6 zum Ändern sagte, steht vollständig in `revise_order` (neu dort:
+  nichts versprechen, die Änderung erst als gemacht melden, wenn `get_order_result` die neue Fassung zeigt, bei nicht fertig
+  gewordener Fassung den Hinweis weitergeben, die neue Fassung wie jedes Ergebnis zeigen, `lengthNotice`). `assumptionsVersion`,
+  `lookedUp` und der Umgang mit Zitaten stehen in `get_order_result` (neu: Links aus Zitaten nie öffnen), der Export in
+  `export_order`, der Ablehnungssatz zu doppelt kodiertem Base64 und falschem Inhaltstyp bei Upload-Ticket an in der Beschreibung von
+  `attachments`. Die Sätze zu `cancel_order` und `list_orders` sind entfallen; beide Werkzeuge beschreiben sich selbst. Keine Regel
+  ging verloren: Ein Test hält die Tabelle alte Regel → neuer Ort fest und prüft jede Schlüsselregel an ihrem Ort, im Text, den
+  der Server wirklich ausliefert.
+- **Hash-Baselines bewusst neu gezogen:** alle vier Hinweis-Hashes und die vier Werkzeuglisten-Hashes; der Abgleich der
+  serialisierten Werkzeuglisten zeigt als einzige Änderung die Beschreibungen von `revise_order` und `get_order_result` (bei
+  Upload-Ticket an zusätzlich die von `attachments`).
+
+**Entscheidung – Schritt 1, SDK.**
+- `ModelContextProtocol.AspNetCore` und `ModelContextProtocol.Core` **exakt `[2.4.0]`**; ein Update ist eine bewusste Änderung dieser
+  Zeile. Der Code baut ohne Änderung mit Warnungen als Fehlern.
+- Transport **ausdrücklich zustandslos** (`SessionMode = HttpServerSessionMode.Stateless`), nicht über einen SDK-Standard.
+- **Werkzeuglisten-Hashes noch einmal neu gezogen:** einzige Abweichung ist das entfallene `execution: {"taskSupport":"optional"}`,
+  das 1.3.0 jedem Werkzeug anhängte; die Hinweise sind bytegleich. Ein Test sichert, dass kein Werkzeug Tasks meldet und der Server
+  keine Extensions anmeldet.
+- **Ältere Clients:** Ende-zu-Ende über den echten Kestrel-Server mit einfachem JSON-RPC wie ein alter Client (2025-11-25 und
+  2025-06-18: `initialize` ohne Sitzung, `notifications/initialized`, `tools/list`, Werkzeugaufruf) und mit dem SDK-Client (handelt
+  2026-07-28 aus bzw. 2025-11-25, wenn verlangt). Die OAuth-Tests laufen unverändert grün.
+- **Lange stille Antwort:** `get_order_status` mit `waitSeconds = 50` kommt am echten Kestrel-Server für beide Revisionen vollständig
+  zurück (50,1 s). Seit SDK 2.3 kommen die Antwort-Header bei 2026-07-28 erst mit der Antwort (gemessen nach 50,1 s), bei 2025-11-25
+  sofort. Kestrel und Web-Host setzen keine Frist; Proxy und Client müssen deutlich über 50 s erlauben.
+
+**Nicht gebaut:** keine neuen Fähigkeiten – keine Skills, keine Elicitation, keine Tasks, keine Datei-Upload-Erweiterung, keine MCP
+Apps. Sie bleiben späteren Schritten mit eigenem Schalter vorbehalten.
+
+**Abnahme am echten Client (nach dem Deploy).** Claude Code interaktiv mit dem claude.ai-Connector: `/mcp` zeigt die Revision
+2026-07-28, die Server-Hinweise kommen ohne „[truncated]“ an; ein vollständiger Auftrag mit Datei über den curl-Befehl und einer über
+die Upload-Seite; `get_order_status` mit `waitSeconds = 50` kommt ohne Abbruch zurück; eine Änderung mit `revise_order` wird erst nach
+der neuen Fassung als gemacht gemeldet. Dasselbe in claude.ai im Web. Da Clients `tools/list` zwischenspeichern können, wirken die
+neuen Beschreibungen unter Umständen erst in einer neuen Sitzung.

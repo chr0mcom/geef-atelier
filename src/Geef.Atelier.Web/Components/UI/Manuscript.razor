@@ -6,7 +6,7 @@
         <div>
             <div class="t-eyebrow eyebrow">Final manuscript</div>
             <h2>@Title</h2>
-            <div class="sub">After @IterationCount iteration@(IterationCount != 1 ? "s" : "") · @WordCount words · serif body, Newsreader</div>
+            <div class="sub">@RoundLine · @WordCount words · serif body, Newsreader</div>
         </div>
         <div class="actions">
             <button class="btn small" @onclick="CopyText">
@@ -22,7 +22,7 @@
     <div class="manuscript">
         <div class="colophon">
             <span>Geef.Atelier — Manuscript @RunId</span>
-            <span>Iteration @IterationCount · @(RunStatus == RunStatus.Completed ? "Approved" : RunStatus.ToString())</span>
+            <span>Iteration @ShownIteration · @(RunStatus == RunStatus.Completed ? "Approved" : RunStatus.ToString())</span>
         </div>
         <MarkdownView Markdown="@FinalText" Class="body-text" />
         <div class="signature">
@@ -41,6 +41,11 @@
     RunStatus RunStatus => Run.Status;
     string RunId       => Run.Id.ToString("N")[..8].ToUpperInvariant();
     string FinalText   => Run.FinalText ?? string.Empty;
+    bool   FromEarlierRound => Run.DeliveredIteration is { } delivered && delivered != IterationCount;
+    int    ShownIteration   => FromEarlierRound ? Run.DeliveredIteration!.Value : IterationCount;
+    string RoundLine => FromEarlierRound
+        ? $"Text from iteration {Run.DeliveredIteration} of {IterationCount}"
+        : $"After {IterationCount} iteration{(IterationCount != 1 ? "s" : "")}";
     int    WordCount   => FinalText.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
 
     string Title

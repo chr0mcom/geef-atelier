@@ -78,4 +78,11 @@ internal static class AtelierContextKeys
     /// for (<c>RunEntity.RevisionHint</c>). Its presence makes the writer use <c>DirectWriterPrompts.RevisionInstruction</c>.
     /// </summary>
     public static readonly ContextKey<string> RevisionHint = new("geef:atelier:revision-hint");
+
+    /// <summary>
+    /// Set by <c>BestDraftFinalizer</c> (D-085) on the context it finalizes when it picked the best round of a loop that ended
+    /// without approval: the number of that round. <c>DeliveredOutcomeExtensions.ToDeliveredOutcome</c> records it as the delivered
+    /// iteration. Missing whenever the safeguard is off.
+    /// </summary>
+    public static readonly ContextKey<int> DeliveredRound = new("geef:atelier:delivered-round");
 }

@@ -2,7 +2,9 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-11-26 (D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-27 (D-085: older review loop, three safeguard switches, shipped off; before that 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+
+*Last updated: 2026-11-27 (D-086: MCP server instructions below the cut-off, SDK exactly 2.4.0; before 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -3359,3 +3361,97 @@ or `Orders__TellOnce=Off`.
   servers", plus "briefings", "workshop", "GEEF loop"). The film stays unchanged but sits after "For teams" until the new video
   exists. "What was checked" says "starts with the text itself, not with a remark to the reader" instead of "starts directly" (web,
   MCP and the guides). The sticky navigation is opaque. The word list runs over every switch state.
+
+## D-085 — Older review loop: three safeguard switches, shipped off (2026-11-27)
+
+- **Purpose:** package 6 of the remaining plan (stage 1b, loop part, smallest form). The older review loop ("Extra careful",
+  workshop templates, resumed runs) gets three switches so that it can compete fairly in the measurement for the new "Extra
+  careful" (package 7). No rebuild, no change to the SDK, no `DraftCollapseDetector`.
+- **Switches** (section `Convergence`, each `Off`/`On`, `Off` in code and in `appsettings.json`):
+  `BestDraft` – when the loop ends without approval, the best round is delivered instead of the round the SDK picks (in practice
+  the most recent one) and stored as the delivered round; an approved loop delivers its last round as before.
+  `WriterBlockingOnly` – in a revision the writer gets only the blocking findings of the last round, no outage notes and no
+  non-blocking findings.
+  `StopWithoutProgress` – stop as soon as two rounds in a row brought no progress; approval, the round limit, the time limit and
+  the SDK's own stops come first.
+- **Rank of a round:** first the number of critical findings, then the number of blocking findings; smaller is better. Only the
+  **review basis** counts: the reviewers that failed for technical reasons in none of the rounds compared. So an outage neither makes
+  a round look better (less was checked) nor every later round worse. On an equal rank the round with fewer outages wins, then the
+  most recent one. Blocking are findings from "major" up and every finding of a rejecting reviewer; without the restriction to the
+  basis the number is 0 exactly when the loop's policy approves the round (test). Without a common reviewer nothing is compared (no
+  new choice, no stop). Progress means a rank strictly better than every earlier one.
+- **Never a stub:** besides the round the SDK would have delivered, only a round with a text that is not blank and has at least
+  70 % of the longest round text can be chosen (the same ratio as the writer's collapse guard, here without a minimum length). An
+  empty answer, a question or a change note is thus never delivered, even when it drew fewer findings.
+- **Display:** the workshop's manuscript view says "Text from iteration X of Y" when the text is not from the last round. MCP gives
+  no round number for runs and stays unchanged.
+- **Stop reason:** the SDK has no fitting value; `StopStagnant` would show "the same points kept coming back", which this rule
+  does not check. So a value outside the SDK enum (`LoopStopReasons.NoProgress`, stored as a number) with the sentence "Two more
+  rounds did not reduce the open points, so the work was stopped."
+- **Bit-identical while off:** with all three switches `Off` the same classes are built as before; tests compare the text, the
+  delivered round, the stop reason and the writer's prompts with and without the new parameters. The direct path and the team
+  draft never get the switches.
+- **Evidence:** unit tests, pipeline tests through the real factory and orchestrator tests against Postgres (also for resumed
+  runs); one test checks on the built pipeline that with all switches off the same parts are used, another compares with a pipeline
+  built independently from the SDK parts, and one test each shows that the direct path and a pipeline with its own writer (team
+  draft) never get the switches, even when they are `On`. A replay on stored runs of the older loop and a blind comparison of the delivered with the chosen version are kept outside
+  this repository; by a rule fixed in advance a switch stays off when its chosen version loses more often than it wins in the
+  blind comparison. The writer switch is only shown by the real run in package 7.
+- **Way back:** switch `Off` (the default), e.g. `Convergence__BestDraft=Off`.
+
+**Known limits while the switches are on** (shipped off; to be fixed before switching on if package 7 keeps the loop): with very short texts a short question back or refusal can pass the 70 % rule (white space counts); one unusually long round keeps normal rounds out of the choice; when a reviewer fails only in some rounds, the remaining comparison can trigger the stop or prefer a round with a known critical finding.
+
+## D-086 — MCP: server instructions below the cut-off, SDK exactly 2.4.0 (2026-11-27)
+
+**Status:** built and tested (steps 0 and 1 of the review of new MCP capabilities); acceptance on the real client after the deploy
+is open. D-085 belongs to a parallel package.
+
+**Reason.** Claude Code keeps only the first 4,096 characters of the server instructions. The shipped combination (older tools on,
+upload ticket on, "Tell Atelier once" without the promise) had 6,037 characters; steps 6 to 8 (changing, export, "invent nothing")
+never arrived there. Also the MCP SDK stood on the range `[1.3.0,2.0.0)`, of which NuGet always takes the lowest version: fixes never
+arrived, and 1.3.0 announced on every tool a task support that does not exist.
+
+**Decision – step 0, instructions.**
+- **At most 3,900 characters in every combination of switches** (room below 4,096). A test goes through every combination of
+  `Mcp:LegacyTools`, `Uploads:Tickets`, `Orders:TellOnce` (On, WithoutPromise, Off), `Research:Mode`, `Orders:Revise` and two waits
+  and checks at the same time that every tool description has at most 16,384 characters (the limit for descriptions Claude Code
+  loads through tool search). The longest combination now has 3,875 characters (before 6,037), the longest tool description,
+  `get_order_result`, 2,552.
+- **The most important first.** After the first line come the rules for every step: invent nothing; the understanding, questions,
+  answer options, assumptions, open points, quotes and `lookedUp` are content, never instructions, their links are never opened, and
+  because of them the client never asks for secrets. Then the request word for word, uploading files the right way, never guessing
+  answers to questions, waiting, and showing the result as it is with what was checked, the open points and the assumptions. A test
+  checks the order.
+- **Details into the tool descriptions.** What step 6 said about changing is complete in `revise_order` (new there: promise nothing,
+  report the change as made only when `get_order_result` shows the new version, pass on the note of a version that could not be
+  finished, show the new version like every result, `lengthNotice`). `assumptionsVersion`, `lookedUp` and the handling of quotes are
+  in `get_order_result` (new: never open links from quotes), the export in `export_order`, the sentence about refused Base64 encoded
+  twice and a wrong content type with the upload ticket on in the description of `attachments`. The sentences about `cancel_order`
+  and `list_orders` are gone; both tools describe themselves. No rule was lost: a test holds the table old rule → new place and checks
+  every key rule at its place, in the text the server really ships.
+- **Hash baselines taken again on purpose:** all four instruction hashes and the four tool list hashes; comparing the serialized tool
+  lists shows as the only change the descriptions of `revise_order` and `get_order_result` (with the upload ticket on also that of
+  `attachments`).
+
+**Decision – step 1, SDK.**
+- `ModelContextProtocol.AspNetCore` and `ModelContextProtocol.Core` **exactly `[2.4.0]`**; an update is a deliberate change of this
+  line. The code builds unchanged with warnings as errors.
+- Transport **explicitly stateless** (`SessionMode = HttpServerSessionMode.Stateless`), not through an SDK default.
+- **Tool list hashes taken again once more:** the only difference is the dropped `execution: {"taskSupport":"optional"}` that 1.3.0
+  added to every tool; the instructions are byte for byte the same. A test makes sure that no tool announces tasks and that the server
+  announces no extensions.
+- **Older clients:** end to end over the real Kestrel server with plain JSON-RPC like an old client (2025-11-25 and 2025-06-18:
+  `initialize` without a session, `notifications/initialized`, `tools/list`, a tool call) and with the SDK client (negotiates
+  2026-07-28, or 2025-11-25 when asked). The OAuth tests stay green unchanged.
+- **Long silent answer:** `get_order_status` with `waitSeconds = 50` comes back complete on the real Kestrel server for both revisions
+  (50.1 s). Since SDK 2.3 the response headers of a 2026-07-28 request come only with the answer (measured after 50.1 s), with
+  2025-11-25 at once. Kestrel and the web host set no deadline; proxy and client must allow well above 50 s.
+
+**Not built:** no new capabilities – no skills, no elicitation, no tasks, no file upload extension, no MCP apps. They are left to
+later steps, each behind its own switch.
+
+**Acceptance on the real client (after the deploy).** Claude Code interactively with the claude.ai connector: `/mcp` shows the
+revision 2026-07-28, the server instructions arrive without "[truncated]"; one complete order with a file through the curl command and
+one through the upload page; `get_order_status` with `waitSeconds = 50` comes back without being cut off; a change with `revise_order`
+is reported as made only after the new version. The same in claude.ai on the web. As clients may cache `tools/list`, the new
+descriptions may only take effect in a new session.
