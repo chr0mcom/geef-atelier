@@ -61,13 +61,10 @@ public static class ManagedBindingExtensions
 
     /// <summary>
     /// Finalizer profile whose Transform binding obeys the CLI-route rule; a managed Transform (slot marker) keeps a
-    /// candidate binding or gets the slot's primary. An explicit LearningExtract binding is CLI-normalized as well.
-    /// Other finalizers have no model and are returned unchanged.
+    /// candidate binding or gets the slot's primary. Other finalizers have no model and are returned unchanged.
     /// </summary>
     public static FinalizerProfile ForSave(this FinalizerProfile profile)
     {
-        if (profile.FinalizerType == FinalizerType.LearningExtract)
-            return profile.LearningExtractForSave();
         if (profile.FinalizerType != FinalizerType.Transform)
             return profile;
 
@@ -90,25 +87,6 @@ public static class ManagedBindingExtensions
         if (b.Slot is null)
             updated.Remove(TransformSettings.KeyModelSlot);
         return profile with { Settings = updated };
-    }
-
-    private static FinalizerProfile LearningExtractForSave(this FinalizerProfile profile)
-    {
-        var settings = profile.Settings;
-        var provider = settings.GetValueOrDefault(LearningExtractSettings.KeyProvider);
-        var model = settings.GetValueOrDefault(LearningExtractSettings.KeyModel);
-        if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(model))
-            return profile;
-
-        var b = CliRoute.Normalize(provider, model);
-        return profile with
-        {
-            Settings = new Dictionary<string, string>(settings)
-            {
-                [LearningExtractSettings.KeyProvider] = b.Provider,
-                [LearningExtractSettings.KeyModel] = b.Model,
-            },
-        };
     }
 
     private static void EnsureAllowed(ModelSlot? slot, ModelActorKind kind)

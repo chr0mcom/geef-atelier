@@ -13,6 +13,7 @@ namespace Geef.Atelier.Tests.Infrastructure.Pipeline;
 public sealed class StandardOrderWebSearchTests(PostgresFixture postgres)
 {
     private static readonly GroundingProviderProfile RestApi = Profile("own-api", "rest-api");
+    private static readonly GroundingProviderProfile LearningRetriever = Profile("learning-retriever-default", "learning-retrieval") with { IsSystem = true };
     private static readonly GroundingProviderProfile RetiredNews = Profile("tavily-news", "news-search") with { IsSystem = true };
     private static readonly GroundingProviderProfile RetiredAcademic = Profile("academic-default", "academic-search") with { IsSystem = true };
     private static readonly GroundingProviderProfile UrlFetch = Profile("own-pages", GroundingProviderTypes.UrlFetch);
@@ -31,7 +32,7 @@ public sealed class StandardOrderWebSearchTests(PostgresFixture postgres)
         LocalTypeThroughTool,
         SystemAttachmentsWithOldToolName,
         SystemCrew.KnowledgeBaseDefaultProfile,
-        SystemCrew.LearningRetrieverDefaultProfile,
+        LearningRetriever,
     ];
 
     [Fact]
@@ -40,14 +41,14 @@ public sealed class StandardOrderWebSearchTests(PostgresFixture postgres)
         var local = Snapshot(SystemCrew.KlassikTemplateName, Mixed).WithoutOutsideSearch();
 
         Assert.Equal(
-            [SystemCrew.OrderSourcesProfile.Name, SystemAttachmentsWithOldToolName.Name, SystemCrew.KnowledgeBaseDefaultProfile.Name, SystemCrew.LearningRetrieverDefaultProfile.Name],
+            [SystemCrew.OrderSourcesProfile.Name, SystemAttachmentsWithOldToolName.Name, SystemCrew.KnowledgeBaseDefaultProfile.Name, LearningRetriever.Name],
             local.GroundingProviders!.Select(p => p.Name));
     }
 
     [Fact]
     public void WithoutOutsideSearch_returns_the_same_snapshot_when_nothing_searches_outside()
     {
-        var snapshot = Snapshot(SystemCrew.KlassikTemplateName, [SystemCrew.OrderSourcesProfile, SystemCrew.LearningRetrieverDefaultProfile]);
+        var snapshot = Snapshot(SystemCrew.KlassikTemplateName, [SystemCrew.OrderSourcesProfile, LearningRetriever]);
 
         Assert.Same(snapshot, snapshot.WithoutOutsideSearch());
     }

@@ -63,15 +63,6 @@ public sealed class ProductionWiringEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task The_learning_switch_is_registered_once_and_off_by_default()
-    {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
-
-        Assert.Single(host.Services.GetServices<Microsoft.Extensions.Options.IConfigureOptions<Geef.Atelier.Core.Configuration.LearningOptions>>());
-        Assert.False(host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Geef.Atelier.Core.Configuration.LearningOptions>>().CurrentValue.Enabled);
-    }
-
-    [Fact]
     public async Task The_order_and_source_services_are_registered_and_wired()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);

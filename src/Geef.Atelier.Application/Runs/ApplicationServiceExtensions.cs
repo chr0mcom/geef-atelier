@@ -1,5 +1,4 @@
 using Geef.Atelier.Application.Crew;
-using Geef.Atelier.Application.Crew.Learning;
 using Geef.Atelier.Application.Crew.Models;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Providers;
@@ -23,7 +22,6 @@ public static class ApplicationServiceExtensions
         services.AddSingleton<IModelAssignmentService, ModelAssignmentService>();
         services.AddScoped<ICrewService, CrewService>();
         services.AddScoped<IProviderService, ProviderService>();
-        services.AddScoped<ILearningService, LearningService>();
         services.AddAtelierOrders();
         return services;
     }

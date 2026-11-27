@@ -13,7 +13,6 @@ using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.SiteSettings;
 using Geef.Atelier.Infrastructure.Dashboard;
 using Geef.Atelier.Infrastructure.Persistence.Crew;
-using Geef.Atelier.Infrastructure.Persistence.Crew.Learning;
 using Geef.Atelier.Infrastructure.Persistence.Dashboard;
 using Geef.Atelier.Infrastructure.Persistence.OAuth;
 using Geef.Atelier.Infrastructure.Persistence.Intake;
@@ -54,7 +53,6 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IOAuthRefreshTokenRepository, OAuthRefreshTokenRepository>();
         services.AddScoped<IOAuthAuditLogRepository, OAuthAuditLogRepository>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
-        services.AddScoped<ILearningRepository, LearningRepository>();
         services.AddScoped<ISiteSettingsRepository, SiteSettingsRepository>();
         services.AddScoped<ISiteSettingsService, SiteSettingsService>();
         services.AddScoped<IToolDefinitionRepository, ToolDefinitionRepository>();

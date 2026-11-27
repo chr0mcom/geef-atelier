@@ -273,14 +273,6 @@ public sealed class HowItWorksPageTests : TestContext
     }
 
     [Fact]
-    public void While_learning_is_on_the_page_does_not_say_that_it_does_not_learn()
-    {
-        Services.Configure<LearningOptions>(o => o.Enabled = true);
-        this.AddTestAuthorization();
-        Assert.Empty(Render().FindAll("[data-testid='hiw-limit-learning']"));
-    }
-
-    [Fact]
     public void Without_research_no_web_search_is_promised_and_extra_careful_says_it_does_not_search()
     {
         Services.Configure<OrderOptions>(o => o.IntakeMode = IntakeMode.On);
@@ -412,7 +404,6 @@ public sealed class HowItWorksPageTests : TestContext
         Services.Configure<DirectOptions>(shipped.GetSection(DirectOptions.SectionName));
         Services.Configure<UploadOptions>(shipped.GetSection(UploadOptions.SectionName));
         Services.Configure<UiOptions>(shipped.GetSection(UiOptions.SectionName));
-        Services.Configure<LearningOptions>(shipped.GetSection(LearningOptions.SectionName));
         Services.Configure<SourceOptions>(shipped.GetSection(SourceOptions.SectionName));
     }
 

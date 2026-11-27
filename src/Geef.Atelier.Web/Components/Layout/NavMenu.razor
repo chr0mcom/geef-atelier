@@ -42,11 +42,6 @@
                     <NavLink class="nav-link" href="/crew/knowledge" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                         Knowledge
                     </NavLink>
-                    <AuthorizeView Roles="admin">
-                        <NavLink class="nav-link" href="/crew/learnings" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                            Learnings
-                        </NavLink>
-                    </AuthorizeView>
                     <div class="nav-dropdown-sep">Profiles</div>
                     <NavLink class="nav-link" href="/crew/profiles/reviewers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                         Reviewers

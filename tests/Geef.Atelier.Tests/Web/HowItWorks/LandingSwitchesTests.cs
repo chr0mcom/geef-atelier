@@ -229,7 +229,6 @@ public sealed class LandingSwitchesTests : TestContext
         services.Configure<DirectOptions>(shipped.GetSection(DirectOptions.SectionName));
         services.Configure<UploadOptions>(shipped.GetSection(UploadOptions.SectionName));
         services.Configure<UiOptions>(shipped.GetSection(UiOptions.SectionName));
-        services.Configure<LearningOptions>(shipped.GetSection(LearningOptions.SectionName));
         services.Configure<SourceOptions>(shipped.GetSection(SourceOptions.SectionName));
     }
 }

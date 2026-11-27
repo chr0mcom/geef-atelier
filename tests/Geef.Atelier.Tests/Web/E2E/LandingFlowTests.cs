@@ -178,7 +178,6 @@ public sealed class LandingFlowTests(PlaywrightFixture pw, PostgresFixture pg)
         services.Configure<DirectOptions>(shipped.GetSection(DirectOptions.SectionName));
         services.Configure<UploadOptions>(shipped.GetSection(UploadOptions.SectionName));
         services.Configure<UiOptions>(shipped.GetSection(UiOptions.SectionName));
-        services.Configure<LearningOptions>(shipped.GetSection(LearningOptions.SectionName));
     }
 
     private async Task<IBrowserContext> ContextAsync(WebTestHost host, string palette, int width, int height, ReducedMotion motion)

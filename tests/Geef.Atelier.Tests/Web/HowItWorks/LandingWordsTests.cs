@@ -73,7 +73,6 @@ public sealed class LandingWordsTests : TestContext
             case "all-off":
                 Services.Configure<OrderOptions>(o => { o.IntakeMode = IntakeMode.Off; o.Revise = ReviseMode.Off; });
                 Services.Configure<DirectOptions>(o => o.FactCheckMode = FactCheckMode.Off);
-                Services.Configure<LearningOptions>(o => o.Enabled = true);
                 break;
             case "research-off":
                 Services.Configure<ResearchOptions>(o => o.Mode = ResearchMode.Off);

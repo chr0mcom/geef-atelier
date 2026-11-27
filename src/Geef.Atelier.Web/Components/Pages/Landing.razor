@@ -11,7 +11,6 @@
 @inject IOptions<UploadOptions> UploadSettings
 @inject IOptions<UiOptions> UiSettings
 @inject IOptions<McpOptions> McpSettings
-@inject IOptions<LearningOptions> LearningSettings
 @inject IOptions<SourceOptions> SourceSettings
 
 <PageTitle>@Title</PageTitle>
@@ -51,7 +50,7 @@
     int RetentionDays => (int)SourceSettings.Value.OriginalRetention.TotalDays;
 
     HowItWorksSettings Settings => new(OrderSettings.Value, IntakeSettings.Value, ResearchSettings.Value, DirectSettings.Value, UploadSettings.Value,
-        UiSettings.Value, McpSettings.Value, LearningSettings.Value, SourceSettings.Value);
+        UiSettings.Value, McpSettings.Value, SourceSettings.Value);
 
     protected override async Task OnParametersSetAsync()
     {

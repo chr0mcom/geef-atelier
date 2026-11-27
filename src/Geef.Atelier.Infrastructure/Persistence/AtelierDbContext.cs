@@ -13,7 +13,6 @@ using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
-using Geef.Atelier.Infrastructure.Persistence.Crew.Learning;
 using Geef.Atelier.Infrastructure.Persistence.Entities;
 using Geef.Atelier.Infrastructure.Persistence.Providers;
 using Geef.Atelier.Infrastructure.Persistence.SiteSettings;
@@ -59,7 +58,6 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<KnowledgeDocumentEntity> KnowledgeDocuments => Set<KnowledgeDocumentEntity>();
     internal DbSet<KnowledgeDocumentChunkEntity> KnowledgeDocumentChunks => Set<KnowledgeDocumentChunkEntity>();
 
-    internal DbSet<LearningEntryEntity> LearningEntries => Set<LearningEntryEntity>();
 
     public DbSet<CrewTemplateEmbedding> CrewTemplateEmbeddings => Set<CrewTemplateEmbedding>();
 

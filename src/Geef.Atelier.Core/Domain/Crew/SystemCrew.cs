@@ -319,8 +319,8 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
-        FinalizerProfileNames: new[] { "learning-extractor" },
+        GroundingProviderNames: new[] { "tavily-refined", "run-attachments" },
+        FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true,
         Domain: ModelDomain.General);
 
@@ -336,8 +336,8 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 12, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "legal-domain-expert" },
-        GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
-        FinalizerProfileNames: new[] { "learning-extractor" },
+        GroundingProviderNames: new[] { "tavily-refined", "run-attachments" },
+        FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true,
         ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
         {
@@ -356,8 +356,8 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 8, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "academic-rigor-advisor" },
-        GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
-        FinalizerProfileNames: new[] { "learning-extractor" },
+        GroundingProviderNames: new[] { "tavily-refined", "run-attachments" },
+        FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true,
         ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
         {
@@ -376,8 +376,8 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
-        FinalizerProfileNames: new[] { "learning-extractor" },
+        GroundingProviderNames: new[] { "tavily-refined", "run-attachments" },
+        FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true,
         ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
         {
@@ -439,23 +439,6 @@ public static class SystemCrew
         Description: "Uses documents uploaded with the briefing as a grounding source. Activated automatically when attachments are present.",
         ProviderType: "vector-store",
         ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "run-local" },
-        IsSystem: true);
-
-    /// <summary>
-    /// System grounding-provider profile for the Continuous-Learning-Loop (D-054).
-    /// Retrieves approved learnings from previous runs using cosine similarity with domain-aware boost.
-    /// </summary>
-    public static readonly GroundingProviderProfile LearningRetrieverDefaultProfile = new(
-        Name: "learning-retriever-default",
-        DisplayName: "Learning Retriever (domain-aware)",
-        Description: "Retrieves approved learnings from the learning store using cosine similarity with a domain-boost. Place after curated knowledge providers.",
-        ProviderType: GroundingProviderTypes.LearningRetrieval,
-        ProviderSettings: new Dictionary<string, string>
-        {
-            ["sameDomainBoost"]    = "1.0",
-            ["crossDomainPenalty"] = "0.5",
-            ["maxLearnings"]       = "4",
-        },
         IsSystem: true);
 
     /// <summary>All system reviewer profiles, indexed by name.</summary>
@@ -562,7 +545,6 @@ public static class SystemCrew
             [TavilyRefinedProfile.Name]              = TavilyRefinedProfile,
             [KnowledgeBaseDefaultProfile.Name]       = KnowledgeBaseDefaultProfile,
             [RunAttachmentsProfile.Name]             = RunAttachmentsProfile,
-            [LearningRetrieverDefaultProfile.Name]   = LearningRetrieverDefaultProfile,
             // Auto-Crew grounding providers
             [CrewCatalogDefaultProfile.Name]         = CrewCatalogDefaultProfile,
             [CrewDesignRulesProfile.Name]            = CrewDesignRulesProfile,
@@ -779,22 +761,6 @@ public static class SystemCrew
         },
         IsSystem: true);
 
-    public static readonly FinalizerProfile LearningExtractorProfile = new(
-        Name: "learning-extractor",
-        DisplayName: "Learning Extractor",
-        Description: "Extracts structured learnings from a completed run and fires a gated learning-evaluation run.",
-        FinalizerType: FinalizerType.LearningExtract,
-        Settings: [],
-        IsSystem: true);
-
-    public static readonly FinalizerProfile LearningPublisherProfile = new(
-        Name: "learning-publisher",
-        DisplayName: "Learning Publisher",
-        Description: "Publishes approved learning candidates to the learning store, or marks rejected ones.",
-        FinalizerType: FinalizerType.LearningPublish,
-        Settings: [],
-        IsSystem: true);
-
     /// <summary>All system finalizer profiles, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, FinalizerProfile> FinalizerProfiles =
         new Dictionary<string, FinalizerProfile>
@@ -817,9 +783,6 @@ public static class SystemCrew
             [ExecutiveSummaryProfile.Name]    = ExecutiveSummaryProfile,
             [KeyTakeawaysProfile.Name]        = KeyTakeawaysProfile,
             [GlossaryProfile.Name]            = GlossaryProfile,
-            // Learning Loop
-            [LearningExtractorProfile.Name]   = LearningExtractorProfile,
-            [LearningPublisherProfile.Name]   = LearningPublisherProfile,
             // Auto-Crew
             [CrewMaterializerProfile.Name]    = CrewMaterializerProfile,
         };

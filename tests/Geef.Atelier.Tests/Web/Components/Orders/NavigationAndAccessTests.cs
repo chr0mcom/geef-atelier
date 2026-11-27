@@ -60,25 +60,6 @@ public sealed class NavigationAndAccessTests : TestContext
         Assert.DoesNotContain("/crew/learnings", cut.FindAll("a.nav-link").Select(a => a.GetAttribute("href")));
     }
 
-    [Fact]
-    public void LearningsAreListedForAdministrators()
-    {
-        this.AddTestAuthorization().SetAuthorized("root").SetRoles("admin");
-        var cut = RenderComponent<NavMenu>();
-
-        cut.Find("[data-testid='nav-workshop']").Click();
-
-        Assert.Contains("/crew/learnings", cut.FindAll("a.nav-link").Select(a => a.GetAttribute("href")));
-    }
-
-    [Fact]
-    public void TheLearningsPageRequiresTheAdminPolicy()
-    {
-        var attribute = Assert.Single(typeof(LearningsIndex).GetCustomAttributes<AuthorizeAttribute>(inherit: true));
-
-        Assert.Equal("AdminPolicy", attribute.Policy);
-    }
-
     [Theory]
     [InlineData(typeof(Start), "/start")]
     [InlineData(typeof(OrderDetail), "/orders/{orderId:guid}")]

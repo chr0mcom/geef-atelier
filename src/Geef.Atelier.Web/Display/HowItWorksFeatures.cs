@@ -27,7 +27,6 @@ public sealed record HowItWorksSettings(
     UploadOptions Uploads,
     UiOptions Ui,
     McpOptions Mcp,
-    LearningOptions Learning,
     SourceOptions Sources);
 
 /// <summary>
@@ -46,7 +45,6 @@ public sealed record HowItWorksSettings(
 /// <param name="FactCheck">How the fact check may be described.</param>
 /// <param name="SumsInFiles">Whether totals in the files are recalculated without an AI model.</param>
 /// <param name="UploadThroughAssistant">Whether an AI assistant can upload files with an upload ticket.</param>
-/// <param name="LearnsFromEarlierTexts">Whether the learning loop runs.</param>
 /// <param name="MaxFiles">Most files per order.</param>
 /// <param name="MaxFileBytes">Largest file.</param>
 /// <param name="FullTextChars">Up to this many characters the writer gets the files completely.</param>
@@ -62,7 +60,6 @@ public sealed record HowItWorksFeatures(
     FactCheckOffer FactCheck,
     bool SumsInFiles,
     bool UploadThroughAssistant,
-    bool LearnsFromEarlierTexts,
     int MaxFiles,
     long MaxFileBytes,
     int FullTextChars,
@@ -91,7 +88,6 @@ public static class HowItWorksFeatureExtensions
             FactCheck: settings.Direct.FactCheckModeFor(user).ToOffer(),
             SumsInFiles: settings.Direct.SourceArithmetic,
             UploadThroughAssistant: settings.Uploads.Tickets == UploadTicketsMode.On,
-            LearnsFromEarlierTexts: settings.Learning.Enabled,
             MaxFiles: settings.Sources.MaxFilesPerOrder,
             MaxFileBytes: settings.Sources.MaxFileBytes,
             FullTextChars: settings.Sources.FullTextMaxChars,

@@ -18,17 +18,6 @@ public sealed class ManagedBindingExtensionsTests
     }
 
     [Fact]
-    public void LearningExtractBindingFollowsTheCliRoute()
-    {
-        var profile = new FinalizerProfile("l", "L", "d", FinalizerType.LearningExtract,
-            new Dictionary<string, string> { ["provider"] = "openrouter", ["model"] = "openai/gpt-5.6-sol", ["minIterations"] = "2" }, false);
-
-        var saved = profile.ForSave();
-
-        Assert.Equal(("codex-cli", "gpt-sol-latest", "2"), (saved.Settings["provider"], saved.Settings["model"], saved.Settings["minIterations"]));
-    }
-
-    [Fact]
     public void GroundingMarkerMustBeTheRefinerSlot()
     {
         var profile = new GroundingProviderProfile("g", "G", "d", "tavily",

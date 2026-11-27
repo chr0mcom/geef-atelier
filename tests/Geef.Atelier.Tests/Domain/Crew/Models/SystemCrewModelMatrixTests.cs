@@ -92,11 +92,4 @@ public sealed class SystemCrewModelMatrixTests
         Assert.DoesNotContain("Recommended defaults", rules);
     }
 
-    [Fact]
-    public void LearningExtractionDefaultsToTheCondenseSlot()
-    {
-        var settings = LearningExtractSettings.From([]);
-
-        Assert.Equal(ModelMatrix.Primary(ModelSlot.TransformCondense), new ModelCandidate(settings.Provider, settings.Model));
-    }
 }

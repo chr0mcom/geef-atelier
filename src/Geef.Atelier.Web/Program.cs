@@ -83,7 +83,6 @@ builder.Services.AddCrewComposition();
 
 builder.Services.AddGroundingProviders(builder.Configuration);
 builder.Services.AddResearch(builder.Configuration);
-builder.Services.AddLearningSwitch(builder.Configuration);
 
 // Tool execution infrastructure (IToolExecutor + IToolSchemaProvider)
 builder.Services.AddToolExecutor();

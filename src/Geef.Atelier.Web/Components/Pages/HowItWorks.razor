@@ -12,7 +12,6 @@
 @inject IOptions<UploadOptions> UploadSettings
 @inject IOptions<UiOptions> UiSettings
 @inject IOptions<McpOptions> McpSettings
-@inject IOptions<LearningOptions> LearningSettings
 @inject IOptions<SourceOptions> SourceSettings
 @inject NavigationManager Nav
 
@@ -196,10 +195,7 @@
                         <li>The fact check can miss things. It often points at harmless sentences too, such as a closing line or a signature.</li>
                     }
                     <li>It is not a chat. Once it starts, you wait for the result. You cannot add files to a request later.</li>
-                    @if (!_f.LearnsFromEarlierTexts)
-                    {
-                        <li data-testid="hiw-limit-learning">It does not learn from your earlier texts. Only your About me details carry over.</li>
-                    }
+                    <li data-testid="hiw-limit-learning">It does not learn from your earlier texts. Only your About me details carry over.</li>
                     <li>Scanned pages (photos of paper) cannot be read.</li>
                     <li data-testid="hiw-limit-careful">“Extra careful” takes longer and uses an older way of working with several review rounds. It does not look things up on the web. Its result does not show “What was checked”. For most texts, leave it off.</li>
                 </ul>
@@ -373,7 +369,7 @@
     bool _isAdmin;
 
     HowItWorksSettings Settings => new(OrderSettings.Value, IntakeSettings.Value, ResearchSettings.Value, DirectSettings.Value, UploadSettings.Value,
-        UiSettings.Value, McpSettings.Value, LearningSettings.Value, SourceSettings.Value);
+        UiSettings.Value, McpSettings.Value, SourceSettings.Value);
 
     string McpAddress => Nav.BaseUri.TrimEnd('/') + "/mcp";
 

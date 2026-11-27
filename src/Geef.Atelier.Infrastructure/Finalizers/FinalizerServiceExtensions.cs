@@ -16,8 +16,6 @@ public static class FinalizerServiceExtensions
         services.AddSingleton<IFinalizerExecutor, FileExportFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutor, MetadataEnrichFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutor, TransformFinalizerExecutor>();
-        services.AddSingleton<IFinalizerExecutor, LearningExtractFinalizerExecutor>();
-        services.AddSingleton<IFinalizerExecutor, LearningPublishFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutor, CrewMaterializeFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutorFactory, FinalizerExecutorFactory>();
 

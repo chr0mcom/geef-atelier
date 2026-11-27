@@ -26,7 +26,6 @@ public sealed class HowItWorksFeaturesTests
         Assert.False(features.WebResearch);
         Assert.Equal(FactCheckOffer.ReportsOnly, features.FactCheck);
         Assert.False(features.UploadThroughAssistant);
-        Assert.False(features.LearnsFromEarlierTexts);
     }
 
     [Fact]
@@ -162,7 +161,7 @@ public sealed class HowItWorksFeaturesTests
 
     internal static HowItWorksSettings Settings(
         OrderOptions? orders = null, IntakeOptions? intake = null, ResearchOptions? research = null, DirectOptions? direct = null,
-        UploadOptions? uploads = null, UiOptions? ui = null, McpOptions? mcp = null, LearningOptions? learning = null, SourceOptions? sources = null) =>
+        UploadOptions? uploads = null, UiOptions? ui = null, McpOptions? mcp = null, SourceOptions? sources = null) =>
         new(orders ?? new OrderOptions(), intake ?? new IntakeOptions(), research ?? new ResearchOptions(), direct ?? new DirectOptions(),
-            uploads ?? new UploadOptions(), ui ?? new UiOptions(), mcp ?? new McpOptions(), learning ?? new LearningOptions(), sources ?? new SourceOptions());
+            uploads ?? new UploadOptions(), ui ?? new UiOptions(), mcp ?? new McpOptions(), sources ?? new SourceOptions());
 }
