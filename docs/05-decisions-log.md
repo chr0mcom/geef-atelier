@@ -2368,6 +2368,33 @@ the clarifier reliably names research topics.
 backed; the clarifier once offered guessed dates as options although its prompt forbids it; quotes show formatting characters of
 the source page.
 
+### Addendum to D-074 — measurement gate R3′ passed, research switched on for everyone (2026-11-27)
+
+**Measurement R3′ (remaining plan, package 2):** new, invented orders without files, written without knowledge of the gate; first
+the arm with research, then the arm without for the same orders, both without the fact check. Criteria, threshold T (the noise
+of the juror, computed from the stored R3 data) and evaluation were fixed before the first call; "covered" was decided by code
+for facts with digits and by a second blind reader with control cases for the rest, never by hand. **Result: passed, all three
+criteria.** Texts with research won clearly more often (a), left fewer gaps open that could have been looked up (c) and held
+not more but fewer unbacked facts per text (b′) – also without the tolerance T.
+
+**Consequence:** `Research:Mode = On` in `appsettings.json` (the code default stays `Off`), own commit; daily limits unchanged
+(`Research:DailyOrderCap`, `Research:DailyOrderCapPerUser`). When a limit is reached, the text is written without looking things
+up and the result says so; the order does not fail.
+
+**Checked in the code before switching on (for every account):** no search with attached files; none for "Extra careful"
+(D-079; now also blocked in the research service itself, not only by the choice of pipeline); only the short research topics of
+the clarifier go to the search service (at most five, each at most 120 characters, at most four searches), never answers, About
+me details, file contents or, on a failure, the request text; research runs only when the questions step ran (without a
+clarified record there are no topics); a change ("Change something") does not search again, it uses the stored research of the
+first version. **Gap found and fixed:** the topics were checked only against the About me details at the start of the run.
+Someone who changed or deleted a detail between the questions and the start, after the clarifier had put one of its words into a
+topic, would have sent that word. Now the reading already checks against the details the clarifier saw; topics held back there
+still count as held back. The sentence "the profile of the briefing counts" above therefore applies only in addition.
+
+**Way back:** `Research__Mode=Off` (environment variable, restart of `web`, no new image). Exceptions per account stay possible
+with `Research__ModeOverrides__<account>`. Without a search key nothing goes to a search service; self-hosters who set no key
+switch `Research:Mode` off, otherwise every result with research topics reports that looking things up did not work.
+
 ## D-075 — Stage 5, part A: findings from real runs (2026-11-25)
 
 **Status:** of four planned changes **one** ships: (c). (a), (b) and (d) were built, measured and reviewed and are removed

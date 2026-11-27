@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](14-admin-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26 (`Orders:TellOnce`, D-083; davor nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
+*Letzte Aktualisierung: 2026-11-27 (`Research:Mode = On`, Zusatz zu D-074; davor `Orders:TellOnce`, D-083; davor nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
 
 Dieser Leitfaden ist für die Administration: Menschen, die Konten anlegen, entscheiden, welche Funktionen an sind, und sich um die
 ältere Werkstatt kümmern. Installation und Betrieb beschreiben der [Leitfaden für Entwicklung und Betrieb](15-developer-guide_de.md)
@@ -33,7 +33,7 @@ muss beim Einschalten nicht geändert werden.
 |---|---|---|---|---|
 | Fragen vor dem Start | `Orders:IntakeMode` (`Off`, `Shadow`, `On`) | `Shadow` | `On` (D-072) | – |
 | Fertigen Text ändern | `Orders:Revise` (`Off`, `On`) | `Off` | `On` (D-078) | `Orders:ReviseOverrides:<user>` |
-| Im Web nachschlagen (Standardweg) | `Research:Mode` (`Off`, `On`) | `Off` | `Off` (D-074) | `Research:ModeOverrides:<user>` |
+| Im Web nachschlagen (Standardweg) | `Research:Mode` (`Off`, `On`) | `Off` | `On` (Zusatz zu D-074) | `Research:ModeOverrides:<user>` |
 | Faktenprüfung | `Direct:FactCheckMode` (`Off`, `Shadow`, `Report`, `On`) | `Report` | `Report` (D-073) | `Direct:FactCheckModeOverrides:<user>` |
 | Dateien aus einem KI-Assistenten (Upload-Ticket) | `Uploads:Tickets` (`Off`, `On`) | `Off` | `On` (D-076) | – |
 | Werkstatt-Menü nur für die Administration | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
@@ -48,7 +48,10 @@ Was die Werte bedeuten:
   „meldet“ („points things out“).
 - **Recherche** braucht die Fragen (`Orders:IntakeMode = On`), weil ihre Suchthemen aus dem Lesen des Auftrags stammen. Sie läuft
   nie, wenn der Auftrag Dateien hat, und nur für die erste Version (D-074). Tagesgrenzen: `Research:DailyOrderCap`,
-  `Research:DailyOrderCapPerUser`. Dieser Schalter gilt nur für den Standardweg. „Extra careful“ sucht nie im Web. Eine
+  `Research:DailyOrderCapPerUser`; ist eine erreicht, wird der Text ohne Nachschlagen geschrieben, und das Ergebnis sagt es. Sie
+  braucht einen Suchschlüssel (`TAVILY_API_KEY`); ohne ihn geht nichts an einen Suchdienst, aber jedes Ergebnis mit Suchthemen
+  meldet, dass das Nachschlagen nicht geklappt hat – ohne Schlüssel also ausschalten (`Research__Mode=Off`). Rückweg für alle:
+  `Research__Mode=Off`, für eine Person `Research__ModeOverrides__<user>=Off`. Dieser Schalter gilt nur für den Standardweg. „Extra careful“ sucht nie im Web. Eine
   Werkstatt-Vorlage oder ein eigenes Team, das jemand ausdrücklich wählt – im älteren Formular `/new` oder über die älteren
   Werkzeuge (`submit_request` mit `crewTemplate` oder `customCrew`, `submit_auto_crew_request`) –, nutzt die Quellen dieses Teams,
   und dazu kann eine Websuche gehören, sobald ein Suchschlüssel gesetzt ist, unabhängig von `Research:Mode`.

@@ -2,7 +2,7 @@
 
 *[Deutsch](14-admin-guide_de.md) · **English***
 
-*Last updated: 2026-11-26 (`Orders:TellOnce`, D-083; before that after review: web search outside the standard way, OAuth clients)*
+*Last updated: 2026-11-27 (`Research:Mode = On`, addendum to D-074; before that `Orders:TellOnce`, D-083; before that after review: web search outside the standard way, OAuth clients)*
 
 This guide is for administrators: people who add accounts, decide which features are on and look after the older workshop. How
 to install and host Atelier is in the [developer and host guide](15-developer-guide.md) and the [README](../README.md).
@@ -32,7 +32,7 @@ feature on.
 |---|---|---|---|---|
 | Questions before the start | `Orders:IntakeMode` (`Off`, `Shadow`, `On`) | `Shadow` | `On` (D-072) | – |
 | Changing a finished text | `Orders:Revise` (`Off`, `On`) | `Off` | `On` (D-078) | `Orders:ReviseOverrides:<user>` |
-| Looking things up on the web (standard way) | `Research:Mode` (`Off`, `On`) | `Off` | `Off` (D-074) | `Research:ModeOverrides:<user>` |
+| Looking things up on the web (standard way) | `Research:Mode` (`Off`, `On`) | `Off` | `On` (addendum to D-074) | `Research:ModeOverrides:<user>` |
 | Fact check | `Direct:FactCheckMode` (`Off`, `Shadow`, `Report`, `On`) | `Report` | `Report` (D-073) | `Direct:FactCheckModeOverrides:<user>` |
 | Files from an AI assistant (upload ticket) | `Uploads:Tickets` (`Off`, `On`) | `Off` | `On` (D-076) | – |
 | Workshop menu only for administrators | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
@@ -46,7 +46,10 @@ What the values mean:
   text; `On` may also correct once (D-073). The page How it works describes any mode it does not know as "points things out".
 - **Research** needs questions (`Orders:IntakeMode = On`), because its search topics come from reading the request. It never runs
   when the order has files, and only for the first version (D-074). Daily limits: `Research:DailyOrderCap`,
-  `Research:DailyOrderCapPerUser`. This switch covers the standard way only. "Extra careful" never searches the web. A workshop
+  `Research:DailyOrderCapPerUser`; when one is reached, the text is written without looking things up and the result says so. It
+  needs a search key (`TAVILY_API_KEY`); without one nothing goes to a search service, but every result with research topics says
+  that looking things up did not work, so switch it off (`Research__Mode=Off`) if you set no key. The way back for everyone is
+  `Research__Mode=Off`, for one person `Research__ModeOverrides__<user>=Off`. This switch covers the standard way only. "Extra careful" never searches the web. A workshop
   template or an own team that someone chooses explicitly – on the older form `/new` or through the older tools (`submit_request`
   with `crewTemplate` or `customCrew`, `submit_auto_crew_request`) – uses the sources of that team, and these can include a web
   search whenever a search key is set, whatever `Research:Mode` says.

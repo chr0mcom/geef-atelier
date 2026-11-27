@@ -35,7 +35,7 @@ public sealed class HowItWorksPageTests : TestContext
     }
 
     [Fact]
-    public void As_shipped_changing_is_on_and_research_is_shown_as_not_switched_on()
+    public void As_shipped_changing_and_looking_things_up_are_on()
     {
         this.AddTestAuthorization();
         UseShippedSettings();
@@ -43,15 +43,34 @@ public sealed class HowItWorksPageTests : TestContext
         var cut = Render();
 
         Assert.Equal("true", cut.Find("[data-testid='hiw-status-change']").GetAttribute("data-on"));
-        Assert.Equal("false", cut.Find("[data-testid='hiw-status-research']").GetAttribute("data-on"));
+        Assert.Equal("true", cut.Find("[data-testid='hiw-status-research']").GetAttribute("data-on"));
         Assert.Equal("true", cut.Find("[data-testid='hiw-status-questions']").GetAttribute("data-on"));
         Assert.Equal("true", cut.Find("[data-testid='hiw-status-upload']").GetAttribute("data-on"));
         Assert.Contains("changes nothing", cut.Find("[data-testid='hiw-status-factcheck']").TextContent, StringComparison.Ordinal);
         Assert.Contains(RevisionLines.ChangeButton, cut.Find("[data-testid='hiw-step-change']").TextContent, StringComparison.Ordinal);
         Assert.NotEmpty(cut.FindAll("[data-testid='hiw-assistant-change']"));
-        Assert.Empty(cut.FindAll("[data-testid='hiw-step-research']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='hiw-step-research']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='hiw-privacy-research']"));
+        Assert.Contains("short topics only", cut.Find("[data-testid='hiw-flow-search']").TextContent, StringComparison.Ordinal);
         Assert.Contains("does not change the text", cut.Find("[data-testid='hiw-step-factcheck']").TextContent, StringComparison.Ordinal);
         Assert.Contains("for everyone", cut.Find("[data-testid='hiw-status-scope']").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void As_shipped_an_exception_switches_looking_things_up_off_for_that_person_only()
+    {
+        UseShippedSettings();
+        Services.Configure<ResearchOptions>(o => o.ModeOverrides["tester"] = ResearchMode.Off);
+        var auth = this.AddTestAuthorization();
+
+        auth.SetAuthorized("tester");
+        var tester = Render();
+        Assert.Equal("false", tester.Find("[data-testid='hiw-status-research']").GetAttribute("data-on"));
+        Assert.Empty(tester.FindAll("[data-testid='hiw-step-research']"));
+        Assert.Empty(tester.FindAll("[data-testid='hiw-privacy-research']"));
+
+        auth.SetAuthorized("alice");
+        Assert.Equal("true", Render().Find("[data-testid='hiw-status-research']").GetAttribute("data-on"));
     }
 
     [Fact]
@@ -284,10 +303,17 @@ public sealed class HowItWorksPageTests : TestContext
 
         var on = Render();
 
-        Assert.Contains("never for “Extra careful”", on.Find("[data-testid='hiw-step-research']").TextContent, StringComparison.Ordinal);
-        Assert.Contains("when you add no files", on.Find("[data-testid='hiw-privacy-research']").TextContent, StringComparison.Ordinal);
-        Assert.Contains("“Extra careful” never searches the web", on.Find("[data-testid='hiw-privacy-research']").TextContent, StringComparison.Ordinal);
-        Assert.Contains("never your files", on.Find("[data-testid='hiw-flow']").TextContent, StringComparison.Ordinal);
+        var step = on.Find("[data-testid='hiw-step-research']").TextContent;
+        Assert.Contains("never for “Extra careful”", step, StringComparison.Ordinal);
+        Assert.Contains("does not search again", step, StringComparison.Ordinal);
+        Assert.Contains("daily limit", step, StringComparison.Ordinal);
+        Assert.Contains("the result says so", step, StringComparison.Ordinal);
+        var privacy = on.Find("[data-testid='hiw-privacy-research']").TextContent;
+        Assert.Contains("sends a web search service a few short search topics", privacy, StringComparison.Ordinal);
+        Assert.Contains("when you add no files", privacy, StringComparison.Ordinal);
+        Assert.Contains("never gets your answers or your files", privacy, StringComparison.Ordinal);
+        Assert.Contains("“Extra careful” never searches the web", privacy, StringComparison.Ordinal);
+        Assert.Contains("never your answers or your files", on.Find("[data-testid='hiw-flow']").TextContent, StringComparison.Ordinal);
         Assert.Contains("does not look things up on the web", on.Find("[data-testid='hiw-limit-careful']").TextContent, StringComparison.Ordinal);
     }
 

@@ -53,9 +53,10 @@ Jeder Punkt nennt die Entscheidung, die ihn beschreibt.
 
 Grenzen: Der Text kann trotzdem falsch sein; der Faktenprüfer kann etwas übersehen und meldet auch harmlose Sätze (D-075); Atelier
 ist kein Chat; es lernt nicht aus früheren Texten (Lernen pausiert, D-067; Gedächtnis nicht gebaut, D-077); Scans ohne Text kann es
-nicht lesen (D-076); „Extra careful“ nutzt die ältere Schleife, sucht nicht im Web und hat kein „What was checked“. Web-Recherche auf dem
-Standardweg ist gebaut, aber für alle ausgeschaltet, bis ihre Messung bestanden ist (D-074, D-077). Einen fertigen Text kann man
-ändern („Change something“, D-078). Ausdrücklich gewählte Werkstatt-Teams können eine eigene Websuche nutzen.
+nicht lesen (D-076); „Extra careful“ nutzt die ältere Schleife, sucht nicht im Web und hat kein „What was checked“. Auf dem
+Standardweg kann Atelier im Web nachschlagen, bei Aufträgen ohne Dateien und nur mit kurzen Themen aus dem Auftrag; gefundene
+Stellen können trotzdem falsch sein und stehen mit ihrer Seite da (D-074, nach bestandener Messung für alle eingeschaltet). Einen
+fertigen Text kann man ändern („Change something“, D-078). Ausdrücklich gewählte Werkstatt-Teams können eine eigene Websuche nutzen.
 
 ## Weiterlesen
 
@@ -241,7 +242,8 @@ ATELIER_DOMAIN=<your-domain>
 
 LLM_OPENROUTER_API_KEY=<openrouter-api-key>
 
-# Tavily Web Search (https://tavily.com) — optional; erforderlich für tavily-, news-search- und tavily-news-Grounding-Profile
+# Tavily Web Search (https://tavily.com) — nötig für das Nachschlagen auf dem Standardweg (Research:Mode, ausgeliefert On) und für
+# die Grounding-Profile tavily, news-search und tavily-news; ohne Schlüssel zusätzlich Research__Mode=Off setzen
 TAVILY_API_KEY=
 ```
 
@@ -376,7 +378,7 @@ Die Liste hält fest, wie das Projekt gewachsen ist. Sie bleibt zur Nachvollzieh
 
 **Etappe 1: Aufträge und Direktweg ✅** Der Auftrag ist die Einheit, die die Person sieht (`/start`, `/work`, `/orders/{id}`); Dateien werden einzeln mit Quittung hochgeladen und als Quellen gehalten; der Direktweg schreibt mit den Dateien im Volltext (ab 150.000 Zeichen mit Karte, ab 600.000 mit Seitenauswahl), prüft das Ergebnis ohne Modell und korrigiert einmal; MCP-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`; Migration Step48 verknüpft bestehende Läufe mit Aufträgen (D-069, D-070, 2026-11-24).
 
-**Etappen 2–6 ✅, Umbau abgeschlossen (D-077)** Rückfragen vor dem Lauf (D-071/D-072), ehrliches Schreiben mit Prüfungen (D-073), Recherche (D-074, ausgeschaltet), Ändern eines Ergebnisses (D-075, ausgeschaltet) und der vollständige MCP-Auftragsvertrag, Dateien über ein Upload-Ticket (D-076). Etappe 8a: Die Werkstatt-Einstiege sehen nur Admins (`Ui:WorkshopForAdminsOnly`). Nicht gebaut, jeweils mit Auslöser: Etappe 1b (entschärfte Schleife und erster Rückbau), Etappe 7 (Gedächtnis), der Rückbau aus Etappe 8 und Etappe 9 (D-077).
+**Etappen 2–6 ✅, Umbau abgeschlossen (D-077)** Rückfragen vor dem Lauf (D-071/D-072), ehrliches Schreiben mit Prüfungen (D-073), Recherche (D-074, nach Messung R3′ eingeschaltet), Ändern eines Ergebnisses (D-075, mit D-078 eingeschaltet) und der vollständige MCP-Auftragsvertrag, Dateien über ein Upload-Ticket (D-076). Etappe 8a: Die Werkstatt-Einstiege sehen nur Admins (`Ui:WorkshopForAdminsOnly`). Nicht gebaut, jeweils mit Auslöser: Etappe 1b (entschärfte Schleife und erster Rückbau), Etappe 7 (Gedächtnis), der Rückbau aus Etappe 8 und Etappe 9 (D-077).
 
 Aktuell: **über 1800 Tests** (grün; vorbestehende Testcontainers-/E2E-Umgebungs-Flakes ausgenommen).
 

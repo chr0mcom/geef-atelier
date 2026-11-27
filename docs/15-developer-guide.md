@@ -2,7 +2,7 @@
 
 *[Deutsch](15-developer-guide_de.md) · **English***
 
-*Last updated: 2026-11-26 (About me on the result, D-083; before that after review: web search, `/docs` rendering, admin-only settings table)*
+*Last updated: 2026-11-27 (research on for everyone and its guards, addendum to D-074; before that About me on the result, D-083; before that after review: web search, `/docs` rendering, admin-only settings table)*
 
 This guide is for developers and for people who host Atelier. It gives the map of the current system and points to the detailed
 documents. Setup commands are in the [README](../README.md); the reasons behind every rule are in the
@@ -11,7 +11,7 @@ documents. Setup commands are in the [README](../README.md); the reasons behind 
 ## The system in one picture
 
 Since the rebuild of November 2026 (D-068), the unit a person sees is the **order**. Runs stay underneath as the technical record
-(one run per version). The default way to write is the **direct path**: clarify, look things up if switched on, one writing call
+(one run per version). The default way to write is the **direct path**: clarify, look things up (`Research:Mode`, shipped `On`), one writing call
 with the files in full text, checks, at most one correction. The older loop of reviewers ("crews") still exists for "Extra
 careful" and the older tools.
 
@@ -67,8 +67,11 @@ the same options and the same exception rules as the application (`OrderOptions.
 - signed out, the page shows the values for everyone; the table with setting names and raw values is rendered for administrators
   only and never shows an exception;
 - research counts as available only together with `Orders:IntakeMode = On`, and only for the standard way: the direct template has
-  no grounding source, so its only web access is `OrderResearchService`. "Extra careful" does not search the web; teams chosen
-  explicitly in the workshop or through the older tools use their own sources, which can include a web search;
+  no grounding source, so its only web access is `OrderResearchService`, which itself also refuses every order that is not
+  `OrderMode.Direct`. "Extra careful" does not search the web; teams chosen explicitly in the workshop or through the older tools
+  use their own sources, which can include a web search;
+- research topics are checked by `ResearchQueryGate` twice: when the order is read, against the About me details the clarifier saw
+  (topics held back there are counted in `IntakeRecord.ResearchWithheld`), and at the run against the details of the briefing;
 - a fact-check mode the page does not know is described as "points things out" and never as "may fix";
 - switching a feature on for everyone needs no change of the page;
 - the box "What was checked" in the example uses the fixed sentences of `OrderCheckLines`; the leads of the open points and the

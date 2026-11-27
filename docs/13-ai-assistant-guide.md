@@ -2,7 +2,7 @@
 
 *[Deutsch](13-ai-assistant-guide_de.md) · **English***
 
-*Last updated: 2026-11-26 (`profile` saves four About me details, `aboutMeMissing`/`fromAboutMe`, D-083; before that after review: what is tested, OAuth clients, web search)*
+*Last updated: 2026-11-27 (web search switched on for everyone, addendum to D-074; before that `profile` saves four About me details, `aboutMeMissing`/`fromAboutMe`, D-083; before that after review: what is tested, OAuth clients, web search)*
 
 This guide is for people who want to use Atelier from an AI assistant such as Claude Code.
 Assistants connect through **MCP** (Model Context Protocol), a common way for assistants to use outside tools. The technical
@@ -114,9 +114,11 @@ files go as Base64 in `attachments`, which only works for small files.
 
 ## Web search
 
-- `submit_order` looks things up on the web only when research is switched on for the person, only for the first version and only
-  when the order has no files. The search gets short topics taken from the request; topics with words from the About me details
-  are held back (a word comparison, so it can miss a word in another language).
+- `submit_order` may look things up on the web (switched on for everyone since the addendum to D-074; an administrator can switch
+  it off, also per person), only for the first version, only when the questions step ran and only when the order has no files.
+  The search service gets short topics taken from the request, never the answers or the files; topics with words from the About
+  me details are held back (a word comparison, so it can miss a word in another language). `revise_order` does not search again.
+  When the daily limit is reached, the text is written without it and `lookedUp` says so; the order does not fail.
 - `submit_order` with `extraCareful` never searches the web.
 - The older tools are different: `submit_request` with a workshop template or an own team (`crewTemplate`, `customCrew`) and
   `submit_auto_crew_request` use the sources of that team, and these can include a web search, whatever the switch for the

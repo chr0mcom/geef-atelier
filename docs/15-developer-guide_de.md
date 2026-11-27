@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](15-developer-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26 (About me am Ergebnis, D-083; davor nach Prüfung: Websuche, Darstellung unter `/docs`, Einstellungstabelle nur für Admins)*
+*Letzte Aktualisierung: 2026-11-27 (Recherche für alle eingeschaltet und ihre Sperren, Zusatz zu D-074; davor About me am Ergebnis, D-083; davor nach Prüfung: Websuche, Darstellung unter `/docs`, Einstellungstabelle nur für Admins)*
 
 Dieser Leitfaden ist für Entwicklerinnen und Entwickler und für alle, die Atelier selbst betreiben. Er gibt die Karte des heutigen
 Systems und verweist auf die ausführlichen Dokumente. Die Einrichtungsbefehle stehen im [README](../README_de.md); die Gründe
@@ -11,7 +11,7 @@ hinter jeder Regel im [Entscheidungslog](05-decisions-log_de.md) (zuletzt D-067 
 ## Das System in einem Bild
 
 Seit dem Umbau im November 2026 (D-068) ist der **Auftrag** die Einheit, die eine Person sieht. Läufe bleiben darunter das
-technische Protokoll (ein Lauf je Version). Standard ist der **Direktweg**: klären, nachschlagen (wenn eingeschaltet), ein
+technische Protokoll (ein Lauf je Version). Standard ist der **Direktweg**: klären, nachschlagen (`Research:Mode`, ausgeliefert `On`), ein
 Schreibaufruf mit den Dateien im Volltext, Prüfungen, höchstens eine Korrektur. Die ältere Prüfschleife („Crews“) gibt es weiter
 für „Extra careful“ und die älteren Werkzeuge.
 
@@ -69,8 +69,11 @@ Faktenprüfung. Getestete Regeln (`tests/…/Web/HowItWorks`):
 - abgemeldet zeigt die Seite die Werte für alle; die Tabelle mit Einstellungsnamen und Rohwerten erscheint nur für Administratoren
   und zeigt nie eine Ausnahme;
 - Recherche gilt nur zusammen mit `Orders:IntakeMode = On` als verfügbar, und nur für den Standardweg: Die Vorlage `direct` hat keine
-  Grounding-Quelle, ihr einziger Webzugang ist `OrderResearchService`. „Extra careful“ sucht nicht im Web; ausdrücklich gewählte
-  Werkstatt-Teams (auch über die älteren Werkzeuge) nutzen ihre eigenen Quellen, und dazu kann eine Websuche gehören;
+  Grounding-Quelle, ihr einziger Webzugang ist `OrderResearchService`, der seinerseits jeden Auftrag ablehnt, der nicht
+  `OrderMode.Direct` ist. „Extra careful“ sucht nicht im Web; ausdrücklich gewählte Werkstatt-Teams (auch über die älteren
+  Werkzeuge) nutzen ihre eigenen Quellen, und dazu kann eine Websuche gehören;
+- Suchthemen prüft `ResearchQueryGate` zweimal: beim Lesen des Auftrags gegen die About-me-Angaben, die der Klärer sah (dort
+  zurückgehaltene Themen zählt `IntakeRecord.ResearchWithheld`), und im Lauf gegen die Angaben des Briefings;
 - einen unbekannten Modus der Faktenprüfung beschreibt die Seite als „meldet“, nie als „korrigiert“;
 - Einschalten für alle braucht keine Änderung an der Seite;
 - der Kasten „What was checked“ im Beispiel nutzt die festen Sätze aus `OrderCheckLines`; die Einleitungen der offenen Punkte und

@@ -31,6 +31,9 @@ public sealed class SelfHostWordsTests : TestContext
         Assert.Contains("On your server:", cut.Find("[data-testid='self-host-stays']").TextContent, StringComparison.Ordinal);
         Assert.Contains("to the AI services you connect", cut.Find("[data-testid='self-host-leaves']").TextContent, StringComparison.Ordinal);
         Assert.Contains("to the AI services you connect", SelfHost.Description, StringComparison.Ordinal);
+        var search = cut.Find("[data-testid='self-host-search']").TextContent;
+        Assert.Contains("without one, nothing goes to a web search", search, StringComparison.Ordinal);
+        Assert.Contains("never files or answers", search, StringComparison.Ordinal);
         Assert.Single(cut.FindAll("h1"));
     }
 

@@ -2464,6 +2464,34 @@ eine neue, größere Auftragsmenge, bei der der Klärer verlässlich Suchthemen 
 ungedeckt; der Klärer bot einmal geratene Daten als Antworten an, obwohl sein Prompt das verbietet; Zitate zeigen
 Formatzeichen der Quellseite.
 
+### Zusatz zu D-074 — Messtor R3′ bestanden, Recherche für alle eingeschaltet (2026-11-27)
+
+**Messung R3′ (Restplan, Paket 2):** neue, frei erfundene Aufträge ohne Dateien, geschrieben ohne Kenntnis des Tors; erst der
+Arm mit Recherche, dann für dieselben Aufträge der Arm ohne, beide ohne Faktenprüfung. Kriterien, Schwelle T (Rauschen des
+Jurors aus den gespeicherten R3-Daten) und Auswertung standen vor dem ersten Aufruf fest; „gedeckt“ entschied für Angaben mit
+Ziffern der Code, für den Rest ein zweiter blinder Leser mit Kontrollfällen, keine Handentscheidung. **Ergebnis: bestanden,
+alle drei Kriterien.** Texte mit Recherche gewannen deutlich öfter (a), ließen weniger nachschlagbare Lücken offen (c) und
+enthielten je Text nicht mehr, sondern weniger Angaben ohne Beleg (b′) – auch ohne die Toleranz T.
+
+**Folge:** `Research:Mode = On` in `appsettings.json` (Code-Standard bleibt `Off`), eigener Commit; Tagesgrenzen unverändert
+(`Research:DailyOrderCap`, `Research:DailyOrderCapPerUser`). Ist eine Grenze erreicht, wird der Text ohne Nachschlagen
+geschrieben, und das Ergebnis sagt es; der Auftrag scheitert nicht.
+
+**Vor dem Einschalten am Code nachgeprüft (für jedes Konto):** keine Suche mit angehängten Dateien; keine bei „Extra careful“
+(D-079; jetzt zusätzlich im Recherchedienst selbst gesperrt, nicht nur durch die Wahl des Ablaufs); an den Suchdienst gehen nur
+die kurzen Suchthemen des Klärers (höchstens fünf, je höchstens 120 Zeichen, höchstens vier Suchen), nie Antworten,
+About-me-Angaben, Dateiinhalte oder bei einem Fehlschlag der Auftragstext; gesucht wird nur, wenn die Rückfragen-Stufe lief
+(ohne geklärten Datensatz keine Themen); eine Änderung („Change something“) sucht nicht neu, sie nutzt die gespeicherte
+Recherche der ersten Version. **Gefundene Lücke, behoben:** Die Suchthemen wurden nur gegen die About-me-Angaben zum Start des
+Laufs geprüft. Wer zwischen Rückfrage und Start eine Angabe änderte oder löschte, deren Wort der Klärer in ein Thema übernommen
+hatte, hätte dieses Wort gesendet. Jetzt prüft schon das Lesen gegen die Angaben, die der Klärer sah; zurückgehaltene Themen
+zählen weiter als zurückgehalten. Damit gilt der Satz „es gilt das Profil des Briefings“ oben nur noch zusätzlich.
+
+**Rückweg:** `Research__Mode=Off` (Umgebungsvariable, Neustart von `web`, kein neues Image). Ausnahmen je Konto bleiben über
+`Research__ModeOverrides__<konto>` möglich. Ohne Suchschlüssel geht nichts an einen Suchdienst; wer Atelier selbst betreibt und
+keinen Schlüssel setzt, schaltet `Research:Mode` aus, sonst meldet jedes recherchierbare Ergebnis, dass das Nachschlagen nicht
+geklappt hat.
+
 ## D-075 — Etappe 5, Teil A: Befunde aus echten Läufen (2026-11-25)
 
 **Status:** Von vier vorgesehenen Änderungen wird **eine** ausgeliefert: (c). (a), (b) und (d) wurden gebaut, gemessen und

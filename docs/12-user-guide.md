@@ -2,7 +2,7 @@
 
 *[Deutsch](12-user-guide_de.md) · **English***
 
-*Last updated: 2026-11-26 (Tell Atelier once, D-083; before that after review: web search only on the standard way, storage, wording)*
+*Last updated: 2026-11-27 (looking things up on the web switched on for everyone, addendum to D-074; before that Tell Atelier once, D-083; before that after review: web search only on the standard way, storage, wording)*
 
 This guide is for everyone who uses Atelier in the web browser. You need no technical knowledge. The page **How it works**
 (`/how-it-works`, also open without signing in) shows the same in short, with the features that are switched on for you right
@@ -71,6 +71,7 @@ The page of your request shows, from top to bottom:
 | **What was checked** | Only the checks that really ran (see below). Always ends with: "These checks look for the problems named here. They do not prove that everything in the text is right." |
 | **Open points** | "Fill these in before you send the text" (the gaps), checks that were not met, passages that may not be backed by what you gave, problems found in your files. |
 | **Assumptions** | What you did not say and what was assumed. |
+| **Looked up** | Only when Atelier looked something up on the web for this request: passages copied word for word from the pages, with the page and the day. They show what the pages say, not that it is true. If nothing could be looked up, one sentence says why (for example, the daily limit was reached). |
 | **From your files** | Which files were used and how. |
 | **How it was made** | Your request, the steps and the versions. |
 
@@ -113,10 +114,12 @@ example your sign-off word for word, depends on the text: check the result as al
 
 - Your request, your answers, your About me details and your files go to the AI services this Atelier uses to write and check the
   text.
-- Looking things up on the web, when it is switched on, happens only on the standard way and only when you add no files. The
-  search gets only short topics taken from your request; topics with words from your About me details are held back (this compares
-  words, so it can miss a word in another language). "Extra careful" never searches the web. Teams that administrators set up
-  in the workshop can have their own web search.
+- Atelier may look things up on the web, but only on the standard way and only when you add no files. Then a web search service
+  gets a few short search topics that Atelier took from your request – never your answers or your files. Topics with words from
+  your About me details are held back (this compares words, so it can miss a word in another language). A change of a finished
+  text uses what was looked up the first time and does not search again. There is a daily limit; once it is reached, the text is
+  written without looking things up, and the result says so. "Extra careful" never searches the web. Teams that administrators
+  set up in the workshop can have their own web search.
 - Only you and the administrators of this Atelier can see your requests.
 - Atelier keeps your request, your text and what it read from your files until you delete the request under My work. Deleting it
   also deletes the files that no other request uses. The original file is removed about 30 days after the last request that used it
