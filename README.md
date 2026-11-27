@@ -51,9 +51,10 @@ Each point names the decision that describes it.
 
 Limits: the text can still be wrong; the fact check can miss things and also flags harmless sentences (D-075); Atelier is not a
 chat; it does not learn from earlier texts (learning paused, D-067; memory not built, D-077); scans without text cannot be read
-(D-076); "Extra careful" uses the older loop, does not search the web and has no "What was checked". Web research on the standard way
-is built but switched off for everyone until its measurement passes (D-074, D-077). A finished text can be changed ("Change
-something", D-078).
+(D-076); "Extra careful" uses the older loop, does not search the web and has no "What was checked". On the standard way Atelier
+may look things up on the web, for orders without files and only with short topics from the request; passages it found can still
+be wrong and are shown with their page (D-074, switched on for everyone after its measurement passed). A finished text can be
+changed ("Change something", D-078).
 Teams chosen explicitly in the workshop can use their own web search.
 
 ## Read on
@@ -241,7 +242,9 @@ ATELIER_DOMAIN=<your-domain>
 
 LLM_OPENROUTER_API_KEY=<openrouter-api-key>
 
-# Tavily web search (https://tavily.com) — optional; required for tavily, news-search, and tavily-news grounding profiles
+# Tavily web search (https://tavily.com) — needed for looking things up on the standard way (Research:Mode, shipped On) and for
+# the tavily, news-search and tavily-news grounding profiles; without a key switch research off with Research__Mode=Off under
+# services.web.environment in docker-compose.override.yml (this .env file alone does not reach the web service)
 TAVILY_API_KEY=
 ```
 
@@ -376,7 +379,7 @@ The list below records how the project grew. It is kept for provenance; the curr
 
 **Stage 1: orders and direct path ✅** The order is the unit the person sees (`/start`, `/work`, `/orders/{id}`); files are uploaded one by one with a receipt and kept as sources; the direct path writes with the files in full text (with a map above 150,000 characters, page choice above 600,000), checks the result without a model and corrects once; MCP tools `submit_order`, `get_order_status`, `get_order_result`; migration Step48 links existing runs to orders (D-069, D-070, 2026-11-24).
 
-**Stages 2–6 ✅, rebuild completed (D-077)** Questions before the run (D-071/D-072), honest writing with checks (D-073), research (D-074, switched off), changing a result (D-075, switched off) and the full MCP order contract, files over an upload ticket (D-076). Stage 8a: the workshop entries are shown to administrators only (`Ui:WorkshopForAdminsOnly`). Not built, each waiting for a trigger: stage 1b (defused loop and first removal cut), stage 7 (memory), the removal of stage 8 and stage 9 (D-077).
+**Stages 2–6 ✅, rebuild completed (D-077)** Questions before the run (D-071/D-072), honest writing with checks (D-073), research (D-074, switched on after measurement R3′), changing a result (D-075, switched on with D-078) and the full MCP order contract, files over an upload ticket (D-076). Stage 8a: the workshop entries are shown to administrators only (`Ui:WorkshopForAdminsOnly`). Not built, each waiting for a trigger: stage 1b (defused loop and first removal cut), stage 7 (memory), the removal of stage 8 and stage 9 (D-077).
 
 Currently: **over 1800 tests** (green; pre-existing Testcontainers/E2E env flakes excluded).
 

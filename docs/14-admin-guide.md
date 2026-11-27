@@ -2,7 +2,7 @@
 
 *[Deutsch](14-admin-guide_de.md) · **English***
 
-*Last updated: 2026-11-27 (switches of the older review loop, D-085; before that 2026-11-26 `Orders:TellOnce`, D-083; before that after review: web search outside the standard way, OAuth clients)*
+*Last updated: 2026-11-27 (`Orders:TellOnce = On`, addendum to D-083; `Research:Mode = On`, addendum to D-074; switches of the older review loop, D-085; before that 2026-11-26 `Orders:TellOnce`, D-083; before that after review: web search outside the standard way, OAuth clients)*
 
 This guide is for administrators: people who add accounts, decide which features are on and look after the older workshop. How
 to install and host Atelier is in the [developer and host guide](15-developer-guide.md) and the [README](../README.md).
@@ -32,7 +32,7 @@ feature on.
 |---|---|---|---|---|
 | Questions before the start | `Orders:IntakeMode` (`Off`, `Shadow`, `On`) | `Shadow` | `On` (D-072) | – |
 | Changing a finished text | `Orders:Revise` (`Off`, `On`) | `Off` | `On` (D-078) | `Orders:ReviseOverrides:<user>` |
-| Looking things up on the web (standard way) | `Research:Mode` (`Off`, `On`) | `Off` | `Off` (D-074) | `Research:ModeOverrides:<user>` |
+| Looking things up on the web (standard way) | `Research:Mode` (`Off`, `On`) | `Off` | `On` (addendum to D-074) | `Research:ModeOverrides:<user>` |
 | Fact check | `Direct:FactCheckMode` (`Off`, `Shadow`, `Report`, `On`) | `Report` | `Report` (D-073) | `Direct:FactCheckModeOverrides:<user>` |
 | Files from an AI assistant (upload ticket) | `Uploads:Tickets` (`Off`, `On`) | `Off` | `On` (D-076) | – |
 | Workshop menu only for administrators | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
@@ -40,7 +40,7 @@ feature on.
 | Skill "how to use Atelier" for AI assistants | `Mcp:Skills` (`Off`, `On`) | `Off` | `Off` (D-088) | – |
 | Questions as a form in the AI assistant | `Mcp:Elicitation` (`Off`, `On`) | `Off` | `Off` (D-088) | – |
 | Learning loop of the older way | `Learning:Enabled` | `false` | `false` (D-067) | – |
-| Offer to save missing details under About me (“Tell Atelier once”) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `WithoutPromise` (D-083; `On` after the acceptance) | – |
+| Offer to save missing details under About me (“Tell Atelier once”) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `On` (addendum to D-083, acceptance passed) | – |
 | Older review loop: best instead of most recent version | `Convergence:BestDraft` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
 | Older review loop: writer gets only blocking findings | `Convergence:WriterBlockingOnly` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
 | Older review loop: stop after two rounds without progress | `Convergence:StopWithoutProgress` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
@@ -51,7 +51,15 @@ What the values mean:
   text; `On` may also correct once (D-073). The page How it works describes any mode it does not know as "points things out".
 - **Research** needs questions (`Orders:IntakeMode = On`), because its search topics come from reading the request. It never runs
   when the order has files, and only for the first version (D-074). Daily limits: `Research:DailyOrderCap`,
-  `Research:DailyOrderCapPerUser`. This switch covers the standard way only. "Extra careful" never searches the web. A workshop
+  `Research:DailyOrderCapPerUser`; when one is reached, the text is written without looking things up and the result says so. It
+  needs a search key (`TAVILY_API_KEY`); without one nothing goes to a search service, but every result with research topics says
+  that looking things up did not work, so switch it off (`Research__Mode=Off`, see “How to set a switch” below) if you set no key. The way back for everyone is
+  `Research__Mode=Off`, for one person `Research__ModeOverrides__<user>=Off`. The switch counts twice: only a request that was read
+  while research was on for the person can search, and only while it is still on; requests read before the switch was turned on
+  never search. Atelier tries to hold back search words with an email address, a phone or account number, a date of birth or a
+  street address that it recognizes; it does not recognize every form, names and other details in plain words not at all, and the
+  person sees the words that went out on the result. This switch
+  covers the standard way only. "Extra careful" never searches the web. A workshop
   template or an own team that someone chooses explicitly – on the older form `/new` or through the older tools (`submit_request`
   with `crewTemplate` or `customCrew`, `submit_auto_crew_request`) – uses the sources of that team, and these can include a web
   search whenever a search key is set, whatever `Research:Mode` says.
@@ -60,11 +68,11 @@ What the values mean:
 - **Tell Atelier once:** shows the owner of a result one field per topic (sender, signature, form of address, language) that the
   reading of the request had to assume or leave open while About me has nothing on it, and the line “With this request the writer got
   from About me: …”; AI assistants get the same as `aboutMeMissing`/`fromAboutMe` and can save these four fields with `profile`. Saving
-  fills only fields that are still empty, in one locked step, and never overwrites. `WithoutPromise` (shipped) uses the heading “Save it
-  under About me for your next texts”; `On` uses “Tell Atelier once – it will not leave this open again” and is meant only after the
-  acceptance on the real system has shown that the writer uses what was saved. `Off` shows none of it, and `profile` is offered read
+  fills only fields that are still empty, in one locked step, and never overwrites. `On` (shipped since the acceptance passed) uses
+  the heading “Tell Atelier once – your next requests get it from About me”: every new request gets the detail, and a request that is read first no longer assumes it or asks for it; a change of an existing text keeps the details it was written with. `WithoutPromise` (the code default) uses “Save it
+  under About me for your next texts”. `Off` shows none of it, and `profile` is offered read
   only with its earlier description. Administrators never see it on someone else's order, and saving goes only into the own About me
-  (D-083). After a passed acceptance: `Orders__TellOnce=On`; way back: `Orders__TellOnce=WithoutPromise` or `Orders__TellOnce=Off`.
+  (D-083). Way back: `Orders__TellOnce=WithoutPromise` (offer without the promise) or `Orders__TellOnce=Off`.
 - **Older review loop** (“Extra careful”, workshop templates and resumed runs; never the standard way or the team draft): rounds are
   compared only over the reviewers that failed for technical reasons in none of the rounds compared. A round is better when it has
   fewer “critical” findings and, with as many, fewer blocking ones (“major” or “critical”). `BestDraft` delivers the best round after

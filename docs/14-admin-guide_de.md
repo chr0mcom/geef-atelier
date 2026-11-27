@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](14-admin-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-27 (Schalter der älteren Prüfschleife, D-085; davor 2026-11-26 `Orders:TellOnce`, D-083; davor nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
+*Letzte Aktualisierung: 2026-11-27 (`Orders:TellOnce = On`, Zusatz zu D-083; `Research:Mode = On`, Zusatz zu D-074; Schalter der älteren Prüfschleife, D-085; davor 2026-11-26 `Orders:TellOnce`, D-083; davor nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
 
 Dieser Leitfaden ist für die Administration: Menschen, die Konten anlegen, entscheiden, welche Funktionen an sind, und sich um die
 ältere Werkstatt kümmern. Installation und Betrieb beschreiben der [Leitfaden für Entwicklung und Betrieb](15-developer-guide_de.md)
@@ -33,7 +33,7 @@ muss beim Einschalten nicht geändert werden.
 |---|---|---|---|---|
 | Fragen vor dem Start | `Orders:IntakeMode` (`Off`, `Shadow`, `On`) | `Shadow` | `On` (D-072) | – |
 | Fertigen Text ändern | `Orders:Revise` (`Off`, `On`) | `Off` | `On` (D-078) | `Orders:ReviseOverrides:<user>` |
-| Im Web nachschlagen (Standardweg) | `Research:Mode` (`Off`, `On`) | `Off` | `Off` (D-074) | `Research:ModeOverrides:<user>` |
+| Im Web nachschlagen (Standardweg) | `Research:Mode` (`Off`, `On`) | `Off` | `On` (Zusatz zu D-074) | `Research:ModeOverrides:<user>` |
 | Faktenprüfung | `Direct:FactCheckMode` (`Off`, `Shadow`, `Report`, `On`) | `Report` | `Report` (D-073) | `Direct:FactCheckModeOverrides:<user>` |
 | Dateien aus einem KI-Assistenten (Upload-Ticket) | `Uploads:Tickets` (`Off`, `On`) | `Off` | `On` (D-076) | – |
 | Werkstatt-Menü nur für die Administration | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
@@ -41,7 +41,7 @@ muss beim Einschalten nicht geändert werden.
 | Skill „wie man Atelier benutzt“ für KI-Assistenten | `Mcp:Skills` (`Off`, `On`) | `Off` | `Off` (D-088) | – |
 | Rückfragen als Formular im KI-Assistenten | `Mcp:Elicitation` (`Off`, `On`) | `Off` | `Off` (D-088) | – |
 | Lernschleife des älteren Wegs | `Learning:Enabled` | `false` | `false` (D-067) | – |
-| Angebot, fehlende Angaben unter About me zu speichern („Tell Atelier once“) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `WithoutPromise` (D-083; `On` nach der Abnahme) | – |
+| Angebot, fehlende Angaben unter About me zu speichern („Tell Atelier once“) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `On` (Zusatz zu D-083, Abnahme bestanden) | – |
 | Ältere Prüfschleife: beste statt jüngster Fassung | `Convergence:BestDraft` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
 | Ältere Prüfschleife: Schreiber bekommt nur blockierende Befunde | `Convergence:WriterBlockingOnly` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
 | Ältere Prüfschleife: Stopp nach zwei Runden ohne Fortschritt | `Convergence:StopWithoutProgress` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
@@ -53,7 +53,15 @@ Was die Werte bedeuten:
   „meldet“ („points things out“).
 - **Recherche** braucht die Fragen (`Orders:IntakeMode = On`), weil ihre Suchthemen aus dem Lesen des Auftrags stammen. Sie läuft
   nie, wenn der Auftrag Dateien hat, und nur für die erste Version (D-074). Tagesgrenzen: `Research:DailyOrderCap`,
-  `Research:DailyOrderCapPerUser`. Dieser Schalter gilt nur für den Standardweg. „Extra careful“ sucht nie im Web. Eine
+  `Research:DailyOrderCapPerUser`; ist eine erreicht, wird der Text ohne Nachschlagen geschrieben, und das Ergebnis sagt es. Sie
+  braucht einen Suchschlüssel (`TAVILY_API_KEY`); ohne ihn geht nichts an einen Suchdienst, aber jedes Ergebnis mit Suchthemen
+  meldet, dass das Nachschlagen nicht geklappt hat – ohne Schlüssel also ausschalten (`Research__Mode=Off`, siehe „Einen Schalter setzen“ unten). Rückweg für alle:
+  `Research__Mode=Off`, für eine Person `Research__ModeOverrides__<user>=Off`. Der Schalter zählt doppelt: Suchen kann nur ein
+  Auftrag, der gelesen wurde, während die Recherche für die Person an war, und nur, solange sie noch an ist; vor dem Einschalten
+  gelesene Aufträge suchen nie. Atelier versucht, Suchwörter mit Mailadresse, Telefon- oder Kontonummer, Geburtsdatum oder
+  Straßenanschrift zurückzuhalten, die es erkennt; es erkennt nicht jede Schreibweise, Namen und andere Angaben in Worten gar nicht,
+  und die Person sieht am Ergebnis, welche Wörter hinausgingen.
+  Dieser Schalter gilt nur für den Standardweg. „Extra careful“ sucht nie im Web. Eine
   Werkstatt-Vorlage oder ein eigenes Team, das jemand ausdrücklich wählt – im älteren Formular `/new` oder über die älteren
   Werkzeuge (`submit_request` mit `crewTemplate` oder `customCrew`, `submit_auto_crew_request`) –, nutzt die Quellen dieses Teams,
   und dazu kann eine Websuche gehören, sobald ein Suchschlüssel gesetzt ist, unabhängig von `Research:Mode`.
@@ -64,11 +72,11 @@ Was die Werte bedeuten:
   Lesen des Auftrags angenommen oder offen gelassen werden musste und zu dem About me nichts hat, ein Feld, dazu die Zeile „With this
   request the writer got from About me: …“; KI-Assistenten bekommen dasselbe als `aboutMeMissing`/`fromAboutMe` und können diese vier
   Felder mit `profile` speichern. Gespeichert wird nur in Felder, die noch leer sind, in einem gesperrten Schritt, nie überschreibend.
-  `WithoutPromise` (ausgeliefert) nutzt die Überschrift „Save it under About me for your next texts“; `On` nutzt „Tell Atelier once – it
-  will not leave this open again“ und ist erst gedacht, wenn die Abnahme am echten System gezeigt hat, dass der Schreiber das
-  Gespeicherte verwendet. `Off` zeigt nichts davon, und `profile` wird nur lesend mit seiner früheren Beschreibung angeboten. Die
-  Administration sieht es nie an fremden Aufträgen, und gespeichert wird nur in die eigenen About-me-Angaben (D-083). Nach bestandener
-  Abnahme: `Orders__TellOnce=On`; Rückweg: `Orders__TellOnce=WithoutPromise` oder `Orders__TellOnce=Off`.
+  `On` (ausgeliefert, seit die Abnahme bestanden ist) nutzt die Überschrift „Tell Atelier once – your next requests get it from About me“: Jeder neue
+  Auftrag bekommt die Angabe, und ein Auftrag, der zuerst gelesen wird, nimmt sie nicht mehr an und fragt nicht mehr danach; eine Änderung eines vorhandenen Textes behält die Angaben, mit
+  denen er entstand. `WithoutPromise` (Code-Standard) nutzt „Save it under About me for your next texts“. `Off` zeigt nichts davon, und `profile` wird nur lesend mit seiner früheren Beschreibung angeboten. Die
+  Administration sieht es nie an fremden Aufträgen, und gespeichert wird nur in die eigenen About-me-Angaben (D-083). Rückweg:
+  `Orders__TellOnce=WithoutPromise` (Angebot ohne Zusage) oder `Orders__TellOnce=Off`.
 - **Ältere Prüfschleife** („Extra careful“, Werkstatt-Vorlagen und fortgesetzte Läufe; nie Standardweg oder Team-Entwurf): Runden
   werden nur über die Prüfer verglichen, die in keiner der verglichenen Runden technisch ausfielen. Eine Runde ist besser, wenn sie
   weniger „critical“-Befunde hat, bei gleich vielen weniger blockierende („major“ oder „critical“). `BestDraft` liefert nach einer

@@ -43,6 +43,27 @@ public sealed class DossierBuilderTests
         return reason;
     }
 
+    [Theory]
+    [InlineData("\u202E")]
+    [InlineData("\u2067")]
+    [InlineData("\u200F")]
+    [InlineData("\u0007")]
+    public void A_passage_with_a_hidden_control_or_direction_character_is_dropped_as_unsafe(string control)
+    {
+        var raw = $"Vorweg. Der gesetzliche Mindestlohn steigt zum Januar auf {control}13,90 Euro brutto je Stunde für alle Beschäftigten. Danach.";
+        var page = new ResearchPage("P9", 1, "https://amt.example/x", "Amt", raw);
+        var quote = $"Der gesetzliche Mindestlohn steigt zum Januar auf {control}13,90 Euro brutto je Stunde für alle Beschäftigten.";
+
+        var (entries, dropped) = DossierBuilder.Build([new ProposedPassage(1, "P9", quote)], [page], Request, 12, At);
+
+        Assert.Empty(entries);
+        Assert.Equal(ResearchDropReason.Unsafe, Assert.Single(dropped).Key);
+    }
+
+    [Fact]
+    public void Tabs_and_line_breaks_are_no_hidden_controls() =>
+        Assert.False("Zeile eins\n\tZeile zwei\r\n".HasHiddenControls());
+
     [Fact]
     public void A_passage_of_the_page_becomes_an_entry_with_all_fields()
     {

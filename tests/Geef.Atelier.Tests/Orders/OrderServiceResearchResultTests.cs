@@ -64,7 +64,22 @@ public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Found_research_is_not_shown_for_a_run_whose_report_does_not_say_it_used_it()
+    public async Task The_search_words_that_went_out_are_shown_to_the_owner_and_never_to_an_administrator_viewing_the_order()
+    {
+        await using var host = await StartAsync();
+        var (orderId, _) = await DeliveredAsync(host, Report(lookedUp: true), "Liebe Eltern, der Mindestlohn steigt.");
+        await StoreResearchAsync(host, orderId, OrderResearchLinesTests.Research(ResearchStatus.Found, [Entry]));
+
+        var owner = await ResultAsync(host, orderId);
+        var admin = (await host.WithScopeAsync(async sp => await sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, null, "some-admin")))!;
+
+        Assert.Equal(["minimum wage 2027"], owner.LookedUp!.SearchWords);
+        Assert.NotNull(admin.LookedUp);
+        Assert.Null(admin.LookedUp!.SearchWords);
+    }
+
+    [Fact]
+    public async Task Found_passages_are_not_shown_for_a_run_whose_report_does_not_say_it_used_them_only_the_search_words()
     {
         await using var host = await StartAsync();
         var (orderId, _) = await DeliveredAsync(host, Report(lookedUp: false), "Liebe Eltern.");
@@ -72,7 +87,9 @@ public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
 
         var result = await ResultAsync(host, orderId);
 
-        Assert.Null(result.LookedUp);
+        Assert.Empty(result.LookedUp!.Entries);
+        Assert.Equal(OrderResearchLines.NotUsedForThisText, result.LookedUp.Note);
+        Assert.False(result.UsedLookedUp());
         Assert.DoesNotContain(result.Checks!.Checked, l => l.Contains(OrderResearchLines.FromLookedUp, StringComparison.Ordinal));
     }
 
@@ -107,7 +124,7 @@ public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task A_run_without_text_keeps_the_warning_and_shows_no_research()
+    public async Task A_run_without_text_keeps_the_warning_and_shows_only_the_search_words_that_went_out()
     {
         await using var host = await StartAsync();
         var (orderId, runId) = await DeliveredAsync(host, Report(lookedUp: false), null);
@@ -116,8 +133,13 @@ public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
 
         var result = await ResultAsync(host, orderId);
 
-        Assert.Null(result.LookedUp);
+        var lookedUp = result.LookedUp!;
+        Assert.Equal(["minimum wage 2027"], lookedUp.SearchWords);
+        Assert.Null(lookedUp.Note);
+        Assert.Empty(lookedUp.Entries);
         Assert.Equal([RunWarningCodes.ResearchFailed], result.Warnings.Select(w => w.Code));
+        var other = (await host.WithScopeAsync(async sp => await sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, null, "some-admin")))!;
+        Assert.Null(other.LookedUp);
     }
 
     private static Task<OrderResult> ResultAsync(AtelierEndToEndHost host, Guid orderId) =>

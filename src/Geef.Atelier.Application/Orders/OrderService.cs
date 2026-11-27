@@ -158,9 +158,11 @@ internal sealed class OrderService(
         var report = run.ReportJson is null ? null : RunReportJson.TryParse(run.ReportJson);
         var usages = await sources.ListRunUsagesAsync(run.Id, ct);
         var hasText = !string.IsNullOrWhiteSpace(run.FinalText);
-        var lookedUp = !hasText || string.IsNullOrWhiteSpace(order.ResearchJson)
+        var viewer = viewerUsername ?? requestingUsername;
+        var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
+        var lookedUp = string.IsNullOrWhiteSpace(order.ResearchJson)
             ? null
-            : OrderResearchLines.Build(ResearchJson.TryParse(order.ResearchJson), report?.LookedUp == true);
+            : OrderResearchLines.Build(ResearchJson.TryParse(order.ResearchJson), report?.LookedUp == true, showSearchWords: showProfile, hasText: hasText);
         var warnings = (await warningRepository.ListByRunAsync(run.Id, ct)).WithoutShownResearchWarning(lookedUp);
 
         var result = new OrderResult(
@@ -183,8 +185,6 @@ internal sealed class OrderService(
             AssumptionsVersion: string.IsNullOrWhiteSpace(run.RevisionHint) ? null : FirstVersion(orderRuns),
             LengthNotice: hasText && run.GrewBeyondItsBase() ? RevisionLines.LongerThanBefore : null,
             UnansweredQuestions: UnansweredQuestions(run));
-        var viewer = viewerUsername ?? requestingUsername;
-        var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
         if (showProfile && hasText)
             result = await WithAboutMeAsync(result, order, run, ct);
         return report is null || !hasText ? result : result.WithReport(report, showProfile);

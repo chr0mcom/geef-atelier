@@ -43,6 +43,24 @@ public sealed class OrderLookedUpTests : TestContext
         Assert.Equal("found", cut.Find("[data-testid='order-looked-up']").GetAttribute("data-status"));
     }
 
+    [Fact]
+    public void The_search_words_that_went_out_are_shown_as_quoted_content_under_their_lead()
+    {
+        var view = new OrderLookedUpView(ResearchStatus.NothingFound, OrderResearchLines.NothingFound, 0, [], ["Mindestlohn 2027 Höhe", "<b>Stichtag</b>"]);
+
+        var cut = Render(view);
+
+        Assert.Contains(OrderResearchLines.SearchWordsLead, cut.Find("[data-testid='order-looked-up-words']").TextContent, StringComparison.Ordinal);
+        var words = cut.FindAll("[data-testid='order-looked-up-word']");
+        Assert.Equal(["Mindestlohn 2027 Höhe", "<b>Stichtag</b>"], words.Select(w => w.TextContent));
+        Assert.All(words, w => Assert.Equal("q", w.TagName.ToLowerInvariant()));
+        Assert.Empty(cut.FindAll("b"));
+    }
+
+    [Fact]
+    public void Without_search_words_no_list_is_shown() =>
+        Assert.Empty(Render(new OrderLookedUpView(ResearchStatus.NothingFound, OrderResearchLines.NothingFound, 0, [])).FindAll("[data-testid='order-looked-up-words']"));
+
     [Theory]
     [InlineData("javascript:alert(1)")]
     [InlineData("data:text/html,hello")]

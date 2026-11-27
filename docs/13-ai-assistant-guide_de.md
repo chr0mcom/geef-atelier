@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](13-ai-assistant-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26 (`profile` speichert vier About-me-Angaben, `aboutMeMissing`/`fromAboutMe`, D-083; davor nach Prüfung: was geprüft ist, OAuth-Clients, Websuche)*
+*Letzte Aktualisierung: 2026-11-27 (Websuche für alle eingeschaltet, Zusatz zu D-074; davor `profile` speichert vier About-me-Angaben, `aboutMeMissing`/`fromAboutMe`, D-083; davor nach Prüfung: was geprüft ist, OAuth-Clients, Websuche)*
 
 Dieser Leitfaden ist für alle, die Atelier aus einem KI-Assistenten wie Claude Code nutzen wollen. Assistenten verbinden sich über **MCP** (Model Context Protocol), einen verbreiteten Weg, auf dem Assistenten
 fremde Werkzeuge benutzen. Den technischen Vertrag jedes Werkzeugs beschreiben [04-mcp-integration_de.md](04-mcp-integration_de.md)
@@ -121,9 +121,15 @@ Upload-Ticket gehen Dateien als Base64 in `attachments`, was nur für kleine Dat
 
 ## Websuche
 
-- `submit_order` schlägt nur im Web nach, wenn die Recherche für die Person eingeschaltet ist, nur für die erste Version und nur,
-  wenn der Auftrag keine Dateien hat. Die Suche bekommt kurze Themen aus dem Auftrag; Themen mit Wörtern aus den About-me-Angaben
-  werden zurückgehalten (ein Wortvergleich, der ein Wort in einer anderen Sprache übersehen kann).
+- `submit_order` kann im Web nachschlagen (seit dem Zusatz zu D-074 für alle eingeschaltet; die Administration kann es abschalten,
+  auch je Person), nur für die erste Version, nur wenn die Rückfragen-Stufe lief und nur, wenn der Auftrag keine Dateien hat. Der
+  Suchdienst bekommt kurze Suchwörter aus dem Auftrag. Atelier versucht, Mailadressen, Telefonnummern, Kontonummern und Straßenanschriften wegzulassen, die es erkennt. Es erkennt
+  nicht jede Schreibweise, und Namen oder andere persönliche Angaben aus dem Auftrag können in den Suchwörtern landen. Antworten
+  und Dateien werden nie gesendet. Wörter aus den About-me-Angaben werden zurückgehalten, außer sie stehen auch im Auftrag; eine
+  übersetzte oder umformulierte Angabe kann aber durchrutschen. `lookedUp.searchWords` nennt die gesendeten Wörter (nur beim
+  eigenen Auftrag, auch ohne Text).
+  `revise_order` sucht nicht neu. Ist die Tagesgrenze erreicht, wird der Text ohne Nachschlagen geschrieben, und `lookedUp` sagt
+  es; der Auftrag scheitert nicht.
 - `submit_order` mit `extraCareful` sucht nie im Web.
 - Die älteren Werkzeuge sind anders: `submit_request` mit einer Werkstatt-Vorlage oder einem eigenen Team (`crewTemplate`,
   `customCrew`) und `submit_auto_crew_request` nutzen die Quellen dieses Teams, und dazu kann eine Websuche gehören – unabhängig vom

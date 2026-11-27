@@ -127,6 +127,12 @@ public sealed record GateTrace(int GapIndex, GapTopic Topic, GateDecision Decisi
 /// Everything the intake step decided; stored as <c>Orders.ClarifyJson</c> and <c>OrderIntakeShadows.RecordJson</c>.
 /// <see cref="HeldBack"/> are the questions about a possible decision of the person that the gate did not ask
 /// (<see cref="QuestionGateResult.HeldBack"/>); <c>null</c> when there are none and for records written before they existed.
+/// <see cref="ResearchWithheld"/> counts the research topics left out of <see cref="ResearchTopics"/> because they hold a word of the
+/// About me details the clarifier read (<see cref="Geef.Atelier.Core.Domain.Research.ResearchQueryGate"/>); the research checks the topics again against the
+/// details of the run, which may have changed in between. <c>null</c> when none was left out and for records written before.
+/// <see cref="ResearchAllowed"/> is <c>true</c> only when looking things up on the web was switched on for the person of a standard
+/// order when the request was read; only such a record may ever lead to a search (also when the switch changes later or a run is
+/// resumed). <c>null</c> otherwise and for records written before it existed.
 /// </summary>
 public sealed record IntakeRecord(
     int SchemaVersion,
@@ -142,7 +148,9 @@ public sealed record IntakeRecord(
     IReadOnlyList<string> ResearchTopics,
     Guid? RevisionSourceId,
     BriefMode BriefMode,
-    IReadOnlyList<string>? HeldBack = null)
+    IReadOnlyList<string>? HeldBack = null,
+    int? ResearchWithheld = null,
+    bool? ResearchAllowed = null)
 {
     /// <summary>Schema version written by this code.</summary>
     public const int CurrentSchemaVersion = 1;

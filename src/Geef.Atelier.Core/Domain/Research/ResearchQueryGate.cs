@@ -9,7 +9,8 @@ public sealed record QuerySelection(IReadOnlyList<string> Sent, int Withheld, in
 
 /// <summary>
 /// Decides without an AI model which research topics may leave the system. A topic goes out only when it holds no word of the files
-/// or the About me details that is missing from the person's own request, and nothing unsafe (links, addresses, account or access details).
+/// or the About me details that is missing from the person's own request, nothing unsafe (links, addresses, account or access details)
+/// and no contact or account detail of a person (<see cref="ResearchTopicPrivacy.HoldsContactDetails"/>, also when the request names it).
 /// </summary>
 /// <remarks>
 /// Texts are read after NFKC with format characters (soft hyphen, zero-width space and the like) removed. Words are the longest runs of
@@ -65,7 +66,7 @@ public static class ResearchQueryGate
             var topic = raw.CollapseWhiteSpace();
             if (topic.Length == 0 || !seen.Add(topic))
                 continue;
-            if (IntakeContentGuard.IsUnsafe(topic, requestText) || Reveals(topic, foreign, request) || OtherLanguage(topic, language))
+            if (IntakeContentGuard.IsUnsafe(topic, requestText) || topic.HoldsContactDetails() || Reveals(topic, foreign, request) || OtherLanguage(topic, language))
             {
                 withheld++;
                 continue;

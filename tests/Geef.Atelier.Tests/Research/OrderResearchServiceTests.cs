@@ -67,7 +67,7 @@ public sealed class OrderResearchServiceTests
     }
 
     private static string Clarify(IntakeRecordStatus status, params string[] topics) =>
-        IntakeRecordJson.Serialize(IntakeRecord.Fallback(status, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = topics });
+        IntakeRecordJson.Serialize(IntakeRecord.Fallback(status, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = topics, ResearchAllowed = true });
 
     private static OrderEntity Order(string? clarify, string? user = User, string? researchJson = null) => new()
     {
@@ -278,6 +278,7 @@ public sealed class OrderResearchServiceTests
         {
             Output = new ClarifierOutput("Aushang", "de", "Ein Aushang.", false, null, LengthScale.Standard, [], [TopicA, "sick leave rules for the employer"]),
             ResearchTopics = [TopicA, "sick leave rules for the employer"],
+            ResearchAllowed = true,
         });
 
         var withFreeText = await Ensure(s, Order(clarify), profile: "Anything else: Ich bin seit Mai krankgeschrieben.");
@@ -340,6 +341,92 @@ public sealed class OrderResearchServiceTests
         Assert.Null(await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok)), files: true));
         Assert.Empty(s.Search.Queries);
         Assert.Equal(0, s.Orders.Sets);
+    }
+
+    [Fact]
+    public async Task An_extra_careful_order_never_searches_even_with_research_on_for_everyone()
+    {
+        var s = Create();
+        var careful = Order(Clarify(IntakeRecordStatus.Ok, TopicA, TopicB)) with { Mode = OrderMode.Careful };
+
+        AssertNothingHappened(s, await Ensure(s, careful));
+        AssertNothingHappened(s, await Ensure(s, careful, files: true));
+        Assert.Null(s.Orders.Find(careful.Id)!.ResearchJson);
+    }
+
+    private static string ClarifyWithheld(int withheld, params string[] topics) =>
+        IntakeRecordJson.Serialize(IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with
+        {
+            ResearchTopics = topics,
+            ResearchWithheld = withheld,
+            ResearchAllowed = true,
+        });
+
+    [Fact]
+    public async Task An_order_read_before_research_was_switched_on_never_searches_after_the_switch()
+    {
+        var s = Create();
+        var waiting = Order(IntakeRecordJson.Serialize(IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with
+        {
+            ResearchTopics = [TopicA, TopicB],
+        }));
+
+        Assert.Null(await Ensure(s, waiting));
+        Assert.Null(await Ensure(s, waiting, files: true));
+        Assert.Empty(s.Search.Queries);
+        Assert.Empty(s.Condenser.Calls);
+        Assert.Equal((0, 0), (s.Orders.Sets, s.Orders.Counts));
+        Assert.Null(s.Orders.Find(waiting.Id)!.ResearchJson);
+    }
+
+    [Fact]
+    public async Task An_order_read_while_research_was_on_does_not_search_once_it_is_switched_off()
+    {
+        var s = Create(new ResearchOptions { Mode = ResearchMode.Off });
+
+        AssertNothingHappened(s, await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, TopicA))));
+    }
+
+    [Fact]
+    public async Task Topics_withheld_at_the_reading_stay_withheld_when_about_me_was_emptied_before_the_run()
+    {
+        var s = Create();
+        var order = Order(ClarifyWithheld(2));
+
+        var result = await Ensure(s, order, profile: null);
+
+        Assert.Equal(ResearchStatus.AllWithheld, result!.Status);
+        Assert.Equal(2, result.Withheld);
+        Assert.Empty(result.TopicsSent);
+        Assert.Empty(s.Search.Queries);
+        Assert.Empty(s.Condenser.Calls);
+        Assert.Equal(0, s.Orders.Counts);
+        Assert.Equal(ResearchJson.Serialize(result), s.Orders.Find(order.Id)!.ResearchJson);
+    }
+
+    [Fact]
+    public async Task Topics_withheld_at_the_reading_are_counted_with_those_withheld_at_the_run()
+    {
+        var s = Create();
+        var order = Order(ClarifyWithheld(1, TopicA, "Tarif Oberhuber Mindestlohn"));
+
+        var result = await Ensure(s, order, profile: "Anything else: Ich heiße Oberhuber.");
+
+        Assert.Equal(ResearchStatus.Found, result!.Status);
+        Assert.Equal(2, result.Withheld);
+        Assert.Equal([TopicA], result.TopicsSent);
+        Assert.Equal([TopicA], s.Search.Queries);
+    }
+
+    [Fact]
+    public async Task An_order_with_files_whose_topics_were_all_withheld_at_the_reading_stores_files_attached()
+    {
+        var s = Create();
+
+        var result = await Ensure(s, Order(ClarifyWithheld(1)), files: true);
+
+        Assert.Equal(ResearchStatus.FilesAttached, result!.Status);
+        Assert.Empty(s.Search.Queries);
     }
 
     [Fact]
