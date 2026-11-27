@@ -12,13 +12,18 @@ using Geef.Sdk.Results;
 
 namespace Geef.Atelier.Infrastructure.Pipeline;
 
+/// <summary>
+/// The writer of the review loop. With <paramref name="blockingFindingsOnly"/> (D-085, <c>Convergence:WriterBlockingOnly</c>) a revision
+/// lists only the blocking findings of the last round (<see cref="LoopRoundExtensions.BlockingFindings"/>); otherwise all of them.
+/// </summary>
 internal sealed class ProfileBasedExecutor(
     ExecutorProfile profile,
     ILlmClientResolver resolver,
     IPricingCatalog? pricingCatalog = null,
     ICostAccumulator? costAccumulator = null,
     IToolUseRunner? toolUseRunner = null,
-    IToolDefinitionRepository? toolDefinitionRepository = null) : IExecutionStep
+    IToolDefinitionRepository? toolDefinitionRepository = null,
+    bool blockingFindingsOnly = false) : IExecutionStep
 {
     // Revision iterations must re-emit the whole artifact. If the executor instead returns a
     // change-summary / cover letter or an abbreviated partial (known LLM failure modes on long
@@ -358,13 +363,16 @@ internal sealed class ProfileBasedExecutor(
         return tools;
     }
 
-    private static IReadOnlyList<Finding> ExtractPreviousFindings(IRunContext ctx)
+    private IReadOnlyList<Finding> ExtractPreviousFindings(IRunContext ctx)
     {
         if (ctx.TryGet(GeefKeys.IterationHistory, out var history)
             && history is not null
             && history.Records.Count > 0)
         {
-            return history.Records[^1].EvaluationResult.AllFindings;
+            var lastRound = history.Records[^1].EvaluationResult;
+            return blockingFindingsOnly
+                ? lastRound.BlockingFindings(ConvergencePolicyBuilder.BlockingSeverity)
+                : lastRound.AllFindings;
         }
         return [];
     }

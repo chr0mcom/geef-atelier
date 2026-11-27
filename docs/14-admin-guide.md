@@ -2,7 +2,7 @@
 
 *[Deutsch](14-admin-guide_de.md) · **English***
 
-*Last updated: 2026-11-26 (`Orders:TellOnce`, D-083; before that after review: web search outside the standard way, OAuth clients)*
+*Last updated: 2026-11-27 (switches of the older review loop, D-085; before that 2026-11-26 `Orders:TellOnce`, D-083; before that after review: web search outside the standard way, OAuth clients)*
 
 This guide is for administrators: people who add accounts, decide which features are on and look after the older workshop. How
 to install and host Atelier is in the [developer and host guide](15-developer-guide.md) and the [README](../README.md).
@@ -39,6 +39,9 @@ feature on.
 | Older tools for AI assistants | `Mcp:LegacyTools` | `true` | `true` (D-075) | – |
 | Learning loop of the older way | `Learning:Enabled` | `false` | `false` (D-067) | – |
 | Offer to save missing details under About me (“Tell Atelier once”) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `WithoutPromise` (D-083; `On` after the acceptance) | – |
+| Older review loop: best instead of most recent version | `Convergence:BestDraft` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
+| Older review loop: writer gets only blocking findings | `Convergence:WriterBlockingOnly` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
+| Older review loop: stop after two rounds without progress | `Convergence:StopWithoutProgress` (`Off`, `On`) | `Off` | `Off` (D-085) | – |
 
 What the values mean:
 
@@ -60,6 +63,14 @@ What the values mean:
   acceptance on the real system has shown that the writer uses what was saved. `Off` shows none of it, and `profile` is offered read
   only with its earlier description. Administrators never see it on someone else's order, and saving goes only into the own About me
   (D-083). After a passed acceptance: `Orders__TellOnce=On`; way back: `Orders__TellOnce=WithoutPromise` or `Orders__TellOnce=Off`.
+- **Older review loop** (“Extra careful”, workshop templates and resumed runs; never the standard way or the team draft): one round
+  is better than another when fewer reviewers failed for technical reasons and, with as many failed, when it has fewer blocking
+  findings (“major” or “critical” from reviewers that answered). `BestDraft` delivers the best round after a loop without approval
+  (the most recent one on a tie) and stores it as the delivered round; an approved loop delivers its last round as before.
+  `WriterBlockingOnly` hands the writer only the blocking findings of the last round, no outage notes. `StopWithoutProgress` ends
+  the loop when two rounds in a row brought no round better than all before; the run then gives the reason “Two more rounds did
+  not reduce the open points, so the work was stopped.” Approval, the round limit and the time limit come first. All three stay
+  off until the measurement of the new “Extra careful” has decided on them (D-085).
 
 **How to set a switch.** The settings are read at start. Set them as environment variables of the web service, with `__` in place
 of `:` (for example `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` passes variables one by one,

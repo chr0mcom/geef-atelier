@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-26 (D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-27 (D-085: ältere Prüfschleife, drei Schutzschalter, ausgeliefert aus; zuvor 2026-11-26, D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -3437,3 +3437,32 @@ danach bleibt `WithoutPromise`.
   servers“, dazu „briefings“, „workshop“, „GEEF loop“). Der Film bleibt unverändert, steht aber bis zum neuen Video hinter „For
   teams“. „What was checked“ sagt „starts with the text itself, not with a remark to the reader“ statt „starts directly“ (Web, MCP
   und Leitfäden). Die mitlaufende Navigation ist deckend. Die Wortliste läuft über jeden Schalterzustand.
+
+## D-085 — Ältere Prüfschleife: drei Schutzschalter, ausgeliefert aus (2026-11-27)
+
+- **Zweck:** Paket 6 des Restplans (Etappe 1b, Teil Schleife, kleinste Form). Die ältere Prüfschleife („Extra careful“,
+  Werkstatt-Vorlagen, fortgesetzte Läufe) bekommt drei Schalter, damit sie in der Messung für das neue „Extra careful“ (Paket 7)
+  fair antreten kann. Kein Umbau, keine Änderung am SDK, kein `DraftCollapseDetector`.
+- **Schalter** (Abschnitt `Convergence`, je `Off`/`On`, im Code und in `appsettings.json` `Off`):
+  `BestDraft` – endet die Schleife ohne Freigabe, wird die beste statt der vom SDK gewählten (praktisch der jüngsten) Runde
+  geliefert und als gelieferte Runde gespeichert; eine freigegebene Schleife liefert wie bisher ihre letzte Runde.
+  `WriterBlockingOnly` – der Schreiber bekommt in der Überarbeitung nur die blockierenden Befunde der letzten Runde, keine
+  Ausfallmeldungen und keine nicht blockierenden Befunde.
+  `StopWithoutProgress` – Stopp, sobald zwei Runden nacheinander keinen Fortschritt brachten; Freigabe, Höchstzahl der Runden,
+  Zeitgrenze und die Stopps des SDK gehen vor.
+- **Rang einer Runde:** zuerst die Zahl technisch ausgefallener Prüfer, dann die Zahl blockierender Befunde; kleiner ist besser,
+  bei Gleichstand gewinnt die jüngste. Blockierend sind Befunde ab „major“ von Prüfern, die geantwortet haben, und jeder Befund
+  eines ablehnenden Prüfers. Die Zahl ist genau dann 0, wenn die Richtlinie der Schleife die Runde freigibt (Test). Abweichung vom
+  Restplan, der nur „wenigste blockierende Befunde“ nennt: Eine Runde mit ausgefallenem Prüfer hat weniger Befunde, weil weniger
+  geprüft wurde, und darf deshalb nicht gewinnen. Fortschritt heißt: ein Rang streng besser als jeder frühere.
+- **Stoppgrund:** Das SDK kennt keinen passenden Wert; `StopStagnant` würde „the same points kept coming back“ zeigen, was diese
+  Regel nicht prüft. Deshalb ein eigener Wert außerhalb der SDK-Aufzählung (`LoopStopReasons.NoProgress`, als Zahl gespeichert)
+  mit dem Satz „Two more rounds did not reduce the open points, so the work was stopped.“
+- **Bitgleich, solange aus:** Mit allen drei Schaltern `Off` werden dieselben Klassen gebaut wie vorher; Tests vergleichen Fassung,
+  gelieferte Runde, Stoppgrund und die Aufträge an den Schreiber mit und ohne die neuen Parameter. Direktweg und Team-Entwurf
+  bekommen die Schalter nie.
+- **Nachweis:** Einheitstests, Pipeline-Tests über die echte Fabrik und Orchestrator-Tests gegen Postgres (auch für fortgesetzte
+  Läufe). Ein Nachspiel auf gespeicherten Läufen der älteren Schleife und ein blinder Vergleich der gelieferten mit der gewählten
+  Fassung liegen außerhalb dieses Repositorys; nach vorab festgelegter Regel bleibt ein Schalter aus, wenn seine gewählte Fassung
+  im blinden Vergleich öfter verliert als gewinnt. Den Schreiber-Schalter belegt erst der echte Lauf in Paket 7.
+- **Rückweg:** Schalter `Off` (Standard), z. B. `Convergence__BestDraft=Off`.

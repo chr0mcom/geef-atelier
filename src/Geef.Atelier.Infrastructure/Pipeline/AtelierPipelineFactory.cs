@@ -14,6 +14,7 @@ using Geef.Sdk.Runtime;
 using Geef.Sdk.Context;
 using Geef.Sdk.Events;
 using Geef.Sdk.Middleware;
+using Geef.Sdk.Policies;
 using Geef.Sdk.Providers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -39,6 +40,8 @@ internal static class AtelierPipelineFactory
     /// with the SDK builder and consulted by the runner at the appropriate lifecycle points.
     /// A <paramref name="customGroundingStep"/> replaces the briefing grounding step; the crew's grounding providers
     /// are then not called (the custom step brings its own material, as the direct path does with the order's files).
+    /// <paramref name="loopSafeguards"/> (D-085) is passed only by the review-loop assemblers (standard and resumed runs); missing or
+    /// <see cref="LoopSafeguards.None"/> builds the loop as before.
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> Build(
         CrewSnapshot snapshot,
@@ -57,8 +60,10 @@ internal static class AtelierPipelineFactory
         IExecutionStep? customExecutionStep = null,
         Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null,
         ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
-        IGroundingStep? customGroundingStep = null)
+        IGroundingStep? customGroundingStep = null,
+        LoopSafeguards? loopSafeguards = null)
     {
+        var safeguards = loopSafeguards ?? LoopSafeguards.None;
         IGroundingStep grounding = customGroundingStep ?? new BriefingGroundingStep();
         if (customGroundingStep is null && snapshot.GroundingProviders is { Count: > 0 })
         {
@@ -75,14 +80,15 @@ internal static class AtelierPipelineFactory
         }
 
         IExecutionStep execution = customExecutionStep
-            ?? new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
+            ?? new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator,
+                blockingFindingsOnly: safeguards.WriterBlockingOnly);
 
         var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator, specialReviewerResolver);
-        var finalizer = new MarkdownFinalizer();
+        var finalizer = LoopFinalizer(safeguards);
 
         var builder = CreateBuilder(grounding, execution, reviewers, finalizer,
             convergenceOptions, snapshot.ConvergenceOverride,
-            snapshot.EvaluationStrategy, loggerFactory, additionalSinks);
+            snapshot.EvaluationStrategy, loggerFactory, additionalSinks, safeguards.StopWithoutProgress);
 
         if (consultationRepository is not null && customExecutionStep is null)
             RegisterAdvisors(builder, snapshot.Advisors, resolver, consultationRepository, runId, pricingCatalog, costAccumulator);
@@ -95,7 +101,7 @@ internal static class AtelierPipelineFactory
     /// <summary>
     /// Builds the pipeline like <see cref="Build"/>, but also injects the last completed iteration's
     /// artifact text as a seed draft into the initial run context. Used by the orchestrator for resume
-    /// runs where <paramref name="seedDraftText"/> is non-null.
+    /// runs where <paramref name="seedDraftText"/> is non-null. <paramref name="loopSafeguards"/> as in <see cref="Build"/>.
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> BuildWithSeedDraft(
         CrewSnapshot snapshot,
@@ -112,8 +118,10 @@ internal static class AtelierPipelineFactory
         ICostAccumulator? costAccumulator = null,
         IGroundingRefiner? groundingRefiner = null,
         IGroundingConsultationRepository? groundingConsultationRepository = null,
-        ToolBackedGroundingProvider? toolBackedGroundingProvider = null)
+        ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
+        LoopSafeguards? loopSafeguards = null)
     {
+        var safeguards = loopSafeguards ?? LoopSafeguards.None;
         IGroundingStep grounding = new SeedDraftGroundingStep(seedDraftText);
         if (snapshot.GroundingProviders is { Count: > 0 })
         {
@@ -129,13 +137,14 @@ internal static class AtelierPipelineFactory
                 toolBackedGroundingProvider);
         }
 
-        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
+        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator,
+            blockingFindingsOnly: safeguards.WriterBlockingOnly);
         var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator);
-        var finalizer = new MarkdownFinalizer();
+        var finalizer = LoopFinalizer(safeguards);
 
         var builder = CreateBuilder(grounding, execution, reviewers, finalizer,
             convergenceOptions, snapshot.ConvergenceOverride,
-            snapshot.EvaluationStrategy, loggerFactory, additionalSinks);
+            snapshot.EvaluationStrategy, loggerFactory, additionalSinks, safeguards.StopWithoutProgress);
 
         if (consultationRepository is not null)
             RegisterAdvisors(builder, snapshot.Advisors, resolver, consultationRepository, runId, pricingCatalog, costAccumulator);
@@ -174,8 +183,13 @@ internal static class AtelierPipelineFactory
         ConvergencePolicyOverride? convergenceOverride,
         EvaluationStrategy evaluationStrategy,
         ILoggerFactory? loggerFactory,
-        IEnumerable<IGeefEventSink>? additionalSinks)
+        IEnumerable<IGeefEventSink>? additionalSinks,
+        bool stopWithoutProgress = false)
     {
+        IConvergencePolicy policy = ConvergencePolicyBuilder.Build(convergenceOptions.Value, convergenceOverride);
+        if (stopWithoutProgress)
+            policy = new NoProgressStopPolicy(policy, ConvergencePolicyBuilder.BlockingSeverity);
+
         var builder = SdkGeef.CreatePipeline<FinalizedDocument>()
             .UseGrounding(grounding)
             .UseExecution(execution);
@@ -185,7 +199,7 @@ internal static class AtelierPipelineFactory
 
         builder = builder
             .UseFinalizer(finalizer)
-            .UseConvergencePolicy(ConvergencePolicyBuilder.Build(convergenceOptions.Value, convergenceOverride))
+            .UseConvergencePolicy(policy)
             .UseEvaluationStrategy(EvaluationStrategyMapper.Map(evaluationStrategy))
             .UseMiddleware(new ExceptionHandlingMiddleware())
             .UseMiddleware(new TracingMiddleware());
@@ -204,6 +218,11 @@ internal static class AtelierPipelineFactory
 
         return builder;
     }
+
+    private static IFinalizer<FinalizedDocument> LoopFinalizer(LoopSafeguards safeguards) =>
+        safeguards.BestDraft
+            ? new BestDraftFinalizer(new MarkdownFinalizer(), ConvergencePolicyBuilder.BlockingSeverity)
+            : new MarkdownFinalizer();
 
     private static void RegisterAdvisors(
         GeefPipelineBuilder<FinalizedDocument> builder,

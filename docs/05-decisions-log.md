@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-11-26 (D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-27 (D-085: older review loop, three safeguard switches, shipped off; before that 2026-11-26, D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -3308,3 +3308,32 @@ after that it stays `WithoutPromise`.
   servers", plus "briefings", "workshop", "GEEF loop"). The film stays unchanged but sits after "For teams" until the new video
   exists. "What was checked" says "starts with the text itself, not with a remark to the reader" instead of "starts directly" (web,
   MCP and the guides). The sticky navigation is opaque. The word list runs over every switch state.
+
+## D-085 — Older review loop: three safeguard switches, shipped off (2026-11-27)
+
+- **Purpose:** package 6 of the remaining plan (stage 1b, loop part, smallest form). The older review loop ("Extra careful",
+  workshop templates, resumed runs) gets three switches so that it can compete fairly in the measurement for the new "Extra
+  careful" (package 7). No rebuild, no change to the SDK, no `DraftCollapseDetector`.
+- **Switches** (section `Convergence`, each `Off`/`On`, `Off` in code and in `appsettings.json`):
+  `BestDraft` – when the loop ends without approval, the best round is delivered instead of the round the SDK picks (in practice
+  the most recent one) and stored as the delivered round; an approved loop delivers its last round as before.
+  `WriterBlockingOnly` – in a revision the writer gets only the blocking findings of the last round, no outage notes and no
+  non-blocking findings.
+  `StopWithoutProgress` – stop as soon as two rounds in a row brought no progress; approval, the round limit, the time limit and
+  the SDK's own stops come first.
+- **Rank of a round:** first the number of reviewers that failed for technical reasons, then the number of blocking findings;
+  smaller is better, the most recent round wins a tie. Blocking are findings from "major" up by reviewers that answered, and every
+  finding of a rejecting reviewer. The number is 0 exactly when the loop's policy approves the round (test). Deviation from the
+  plan, which only says "fewest blocking findings": a round with a failed reviewer has fewer findings because less was checked, so
+  it must not win on that. Progress means a rank strictly better than every earlier one.
+- **Stop reason:** the SDK has no fitting value; `StopStagnant` would show "the same points kept coming back", which this rule
+  does not check. So a value outside the SDK enum (`LoopStopReasons.NoProgress`, stored as a number) with the sentence "Two more
+  rounds did not reduce the open points, so the work was stopped."
+- **Bit-identical while off:** with all three switches `Off` the same classes are built as before; tests compare the text, the
+  delivered round, the stop reason and the writer's prompts with and without the new parameters. The direct path and the team
+  draft never get the switches.
+- **Evidence:** unit tests, pipeline tests through the real factory and orchestrator tests against Postgres (also for resumed
+  runs). A replay on stored runs of the older loop and a blind comparison of the delivered with the chosen version are kept outside
+  this repository; by a rule fixed in advance a switch stays off when its chosen version loses more often than it wins in the
+  blind comparison. The writer switch is only shown by the real run in package 7.
+- **Way back:** switch `Off` (the default), e.g. `Convergence__BestDraft=Off`.

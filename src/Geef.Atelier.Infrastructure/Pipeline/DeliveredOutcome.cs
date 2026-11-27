@@ -14,8 +14,9 @@ internal sealed record DeliveredOutcome(RunOutcome Outcome, int? Iteration);
 internal static class DeliveredOutcomeExtensions
 {
     /// <summary>
-    /// Converged runs deliver their last iteration. Non-converged runs deliver the best-effort iteration the SDK
-    /// finalised, or nothing when the best-effort text is empty.
+    /// Converged runs deliver their last iteration. Non-converged runs deliver the round <see cref="BestDraftFinalizer"/> picked
+    /// (<see cref="AtelierContextKeys.DeliveredRound"/>, only with <c>Convergence:BestDraft</c> on) or else the best-effort iteration
+    /// the SDK finalised, or nothing when the best-effort text is empty.
     /// </summary>
     public static DeliveredOutcome ToDeliveredOutcome(this GeefPipelineResult<FinalizedDocument> result)
     {
@@ -24,6 +25,9 @@ internal static class DeliveredOutcomeExtensions
 
         if (string.IsNullOrWhiteSpace(result.Output?.Markdown))
             return new DeliveredOutcome(RunOutcome.Failed, null);
+
+        if (result.FinalContext is not null && result.FinalContext.TryGet(AtelierContextKeys.DeliveredRound, out var round))
+            return new DeliveredOutcome(RunOutcome.DeliveredWithOpenPoints, round);
 
         return new DeliveredOutcome(RunOutcome.DeliveredWithOpenPoints, result.History.BestEffortIteration());
     }
