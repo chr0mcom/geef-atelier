@@ -191,7 +191,7 @@ public sealed class RunServiceUserIsolationTests
         await warnings.ReportAsync(runId, "grounding", "grounding.provider_skipped", "first");
         await warnings.ReportAsync(runId, "review", "review.reviewer_failed", "second");
         await warnings.ReportAsync(Guid.NewGuid(), "grounding", "grounding.provider_skipped", "other run");
-        var svc = MakeService(new SingleRunRepository(MakeRun(runId, "alice"), cancellable: false), warnings);
+        var svc = MakeService(RepositoryWithDetails(runId, "alice"), warnings);
 
         var forOwner = await svc.GetRunViewAsync(runId, "alice");
         var forAdmin = await svc.GetRunViewAsync(runId, requestingUsername: null);
@@ -206,7 +206,7 @@ public sealed class RunServiceUserIsolationTests
         var runId    = Guid.NewGuid();
         var warnings = new InMemoryRunWarnings();
         await warnings.ReportAsync(runId, "grounding", "grounding.provider_skipped", "private");
-        var svc = MakeService(new SingleRunRepository(MakeRun(runId, "alice"), cancellable: false), warnings);
+        var svc = MakeService(RepositoryWithDetails(runId, "alice"), warnings);
 
         Assert.Null(await svc.GetRunViewAsync(runId, "bob"));
     }
@@ -215,7 +215,7 @@ public sealed class RunServiceUserIsolationTests
     public async Task GetRunViewAsync_UnknownRunGetsNothingForAUser()
     {
         var warnings = new InMemoryRunWarnings();
-        var svc = MakeService(new SingleRunRepository(MakeRun(Guid.NewGuid(), "alice"), cancellable: false), warnings);
+        var svc = MakeService(RepositoryWithDetails(Guid.NewGuid(), "alice"), warnings);
 
         Assert.Null(await svc.GetRunViewAsync(Guid.NewGuid(), "alice"));
     }
@@ -232,6 +232,12 @@ public sealed class RunServiceUserIsolationTests
             NullLogger<RunService>.Instance,
             warnings,
             System.Reflection.DispatchProxy.Create<Geef.Atelier.Core.Persistence.Orders.IOrderRepository, UnusedOrders>());
+    }
+
+    private static SingleRunRepository RepositoryWithDetails(Guid id, string owner)
+    {
+        var run = MakeRun(id, owner);
+        return new SingleRunRepository(run, cancellable: false, details: new RunDetails(run, []));
     }
 
     private static RunEntity MakeRun(Guid id, string? createdByUser) => new RunEntity
