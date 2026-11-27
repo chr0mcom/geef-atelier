@@ -64,7 +64,9 @@ public sealed class LoopSafeguardsTests
 
         Assert.Equal(["a-major", "a-critical", "c-minor"], round.BlockingFindings(Major).Select(f => f.Message).ToList());
         Assert.Equal(4, round.BlockingCount(Major));
-        Assert.Equal(new LoopRank(1, 4), round.Rank(Major));
+        Assert.Equal(new LoopRank(1, 4), round.Rank(Major, new HashSet<string> { "a", "b", "c", "d" }));
+        Assert.Equal(new LoopRank(1, 2), round.Rank(Major, new HashSet<string> { "a" }));
+        Assert.Equal(new LoopRank(0, 2), round.Rank(Major, new HashSet<string> { "c", "d" }));
     }
 
     [Theory]
@@ -91,17 +93,82 @@ public sealed class LoopSafeguardsTests
     };
 
     [Fact]
-    public void The_best_round_has_the_fewest_blocking_findings_the_most_recent_on_a_tie_and_a_failed_reviewer_ranks_first()
+    public void The_best_round_has_the_fewest_blocking_findings_the_most_recent_on_a_tie()
     {
-        Assert.Equal(2, History(Counts(3, 1, 2)).BestRound(Major)!.Iteration);
-        Assert.Equal(3, History(Counts(3, 1, 1)).BestRound(Major)!.Iteration);
+        Assert.Equal(2, History(Counts(3, 1, 2)).BestRound(Major, 3)!.Iteration);
+        Assert.Equal(3, History(Counts(3, 1, 1)).BestRound(Major, 3)!.Iteration);
+        Assert.Null(new IterationHistory().BestRound(Major, 1));
+    }
 
-        var withOutage = History(
+    [Fact]
+    public void A_critical_finding_weighs_more_than_any_number_of_major_ones()
+    {
+        var history = History(
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("c", SdkSeverity.Critical))),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major), ("2", Major), ("3", Major))),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("c", SdkSeverity.Critical), ("1", Major))));
+
+        Assert.Equal(2, history.BestRound(Major, 3)!.Iteration);
+    }
+
+    [Fact]
+    public void Rounds_are_compared_only_over_reviewers_that_answered_in_all_of_them()
+    {
+        var history = History(
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major), ("2", Major)), Review("b", ReviewDecision.Approved)),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major)), Review("b", ReviewDecision.Failed, ("outage", Major))),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major), ("2", Major), ("3", Major)), Review("b", ReviewDecision.Approved)));
+
+        Assert.Equal(["a"], history.Records.ReviewBasis().ToList());
+        Assert.Equal(2, history.BestRound(Major, 3)!.Iteration);
+
+        var tie = History(
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major)), Review("b", ReviewDecision.Approved)),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major)), Review("b", ReviewDecision.Failed, ("outage", Major))));
+        Assert.Equal(1, tie.BestRound(Major, 2)!.Iteration);
+
+        var noCommonReviewer = History(
+            Round(Review("a", ReviewDecision.Failed, ("outage", Major)), Review("b", ReviewDecision.ApprovedWithWarnings, ("1", Major))),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major), ("2", Major)), Review("b", ReviewDecision.Failed, ("outage", Major))));
+        Assert.Empty(noCommonReviewer.Records.ReviewBasis());
+        Assert.Equal(2, noCommonReviewer.BestRound(Major, 2)!.Iteration);
+        Assert.False(History(noCommonReviewer.Records.Select(r => r.EvaluationResult).Concat([noCommonReviewer.Records[0].EvaluationResult]).ToArray())
+            .LastTwoRoundsWithoutProgress(Major));
+    }
+
+    [Theory]
+    [InlineData("", "blank")]
+    [InlineData("   \n  ", "only white space")]
+    [InlineData("I need more details.", "a question instead of the text")]
+    public void A_round_whose_text_is_blank_or_collapsed_is_never_the_best(string stub, string label)
+    {
+        var full = new string('x', 400);
+        var history = History(
+            [stub, full, full + "y"],
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major))),
             Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major), ("2", Major))),
-            Round(Review("a", ReviewDecision.Failed, ("outage", Major))),
             Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major), ("2", Major), ("3", Major))));
-        Assert.Equal(1, withOutage.BestRound(Major)!.Iteration);
-        Assert.Null(new IterationHistory().BestRound(Major));
+
+        Assert.True(history.BestRound(Major, 3)!.Iteration == 2, label);
+    }
+
+    [Fact]
+    public void A_text_shorter_than_seventy_percent_of_the_longest_is_not_selectable_but_the_handed_round_always_is()
+    {
+        var history = History(
+            [new string('x', 69), new string('x', 70), new string('x', 100)],
+            Round(Review("a", ReviewDecision.Approved)),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major))),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major), ("2", Major))));
+
+        Assert.Equal(2, history.BestRound(Major, 3)!.Iteration);
+        Assert.Equal(1, history.BestRound(Major, 1)!.Iteration);
+
+        var stubHanded = History(
+            ["", new string('x', 100)],
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major))),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major))));
+        Assert.Equal(2, stubHanded.BestRound(Major, 1)!.Iteration);
     }
 
     [Theory]
@@ -119,6 +186,17 @@ public sealed class LoopSafeguardsTests
     }
 
     [Fact]
+    public void A_reviewer_that_keeps_failing_does_not_count_as_lack_of_progress()
+    {
+        var history = History(
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major), ("2", Major), ("3", Major), ("4", Major), ("5", Major)), Review("b", ReviewDecision.Approved)),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major), ("2", Major), ("3", Major)), Review("b", ReviewDecision.Failed, ("outage", Major))),
+            Round(Review("a", ReviewDecision.ApprovedWithWarnings, ("1", Major)), Review("b", ReviewDecision.Failed, ("outage", Major))));
+
+        Assert.False(history.LastTwoRoundsWithoutProgress(Major));
+    }
+
+    [Fact]
     public void The_stop_sentence_says_what_the_rule_checked()
     {
         Assert.Equal(RunStopMessageExtensions.NoProgressStopMessage, LoopStopReasons.NoProgress.ToRunStopMessage());
@@ -128,11 +206,21 @@ public sealed class LoopSafeguardsTests
     }
 
     [Fact]
-    public async Task With_every_switch_off_the_loop_runs_exactly_as_without_safeguards()
+    public void With_every_switch_off_the_loop_is_built_from_the_same_parts_as_before()
+    {
+        var runner = AtelierPipelineFactory.Build(
+            Snapshot(maxRounds: 3), new TestLlmClientResolver(new RoundDraftClient()), Options.Create(new ConvergenceOptions()),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(), loopSafeguards: LoopSafeguards.From(new ConvergenceOptions()));
+
+        AssertPlainLoop(runner);
+    }
+
+    [Fact]
+    public async Task With_every_switch_off_the_loop_runs_exactly_like_one_built_from_the_plain_parts()
     {
         var script = Script(Counts(2, 1, 3), minorEveryRound: true);
 
-        var baseline = await RunAsync(script, maxRounds: 3, safeguards: null);
+        var baseline = await RunPlainAsync(script, maxRounds: 3);
         var allOff = await RunAsync(script, maxRounds: 3, safeguards: LoopSafeguards.From(new ConvergenceOptions()));
 
         Assert.Equal(baseline.Result.Output.Markdown, allOff.Result.Output.Markdown);
@@ -209,14 +297,65 @@ public sealed class LoopSafeguardsTests
     }
 
     [Fact]
-    public async Task Best_draft_does_not_prefer_a_round_whose_reviewer_failed()
+    public async Task Best_draft_compares_rounds_only_over_the_reviewers_that_answered_in_all_of_them()
     {
         var script = Script(Counts(2, 1, 3));
         var run = await RunAsync(script, maxRounds: 3, safeguards: new LoopSafeguards(true, false, false), failClarityInRounds: [2]);
 
         Assert.Single(run.Result.History.Records[1].EvaluationResult.FailedReviewers);
-        Assert.Contains(RoundDraftClient.DraftOf(1), run.Result.Output.Markdown);
-        Assert.Equal(new DeliveredOutcome(RunOutcome.DeliveredWithOpenPoints, 1), run.Result.ToDeliveredOutcome());
+        Assert.Contains(RoundDraftClient.DraftOf(2), run.Result.Output.Markdown);
+        Assert.Equal(new DeliveredOutcome(RunOutcome.DeliveredWithOpenPoints, 2), run.Result.ToDeliveredOutcome());
+    }
+
+    [Fact]
+    public async Task Best_draft_never_delivers_a_blank_text_a_question_or_a_change_note()
+    {
+        var full = "Dear Ms Example,\n\n" + string.Join(" ", Enumerable.Repeat("The letter explains the matter in full.", 20));
+        foreach (var stub in new[] { "", "I need more details before I can write this.", "Changes made: shortened the second paragraph." })
+        {
+            var writer = new RoundDraftClient([stub, full + " Version two.", full + " Version three."]);
+            var run = await RunAsync(Script(Counts(1, 2, 3)), maxRounds: 3, safeguards: new LoopSafeguards(true, false, false), writer: writer);
+
+            Assert.Equal(full + " Version two.", run.Result.Output.Markdown);
+            Assert.Equal(new DeliveredOutcome(RunOutcome.DeliveredWithOpenPoints, 2), run.Result.ToDeliveredOutcome());
+        }
+    }
+
+    [Fact]
+    public async Task Stop_without_progress_ignores_a_reviewer_that_keeps_failing_while_the_others_find_less()
+    {
+        var run = await RunAsync(Script(Counts(5, 3, 1, 0)), maxRounds: 6, safeguards: new LoopSafeguards(false, false, true), failClarityInRounds: [2, 3, 4]);
+
+        Assert.True(run.Result.Success);
+        Assert.Equal(4, run.Result.TotalIterations);
+    }
+
+    [Fact]
+    public async Task Both_switches_with_a_reviewer_that_keeps_failing_deliver_the_improved_round_not_the_first_draft()
+    {
+        var run = await RunAsync(Script(Counts(6, 2, 1)), maxRounds: 3, safeguards: new LoopSafeguards(true, false, true), failClarityInRounds: [2, 3]);
+
+        Assert.Equal(ConvergenceDecision.StopMaxAttemptsReached, run.Result.StopReason);
+        Assert.Contains(RoundDraftClient.DraftOf(3), run.Result.Output.Markdown);
+        Assert.Equal(new DeliveredOutcome(RunOutcome.DeliveredWithOpenPoints, 3), run.Result.ToDeliveredOutcome());
+    }
+
+    [Fact]
+    public void A_pipeline_with_its_own_writer_never_takes_the_switches()
+    {
+        var allOn = new LoopSafeguards(true, true, true);
+        var runner = AtelierPipelineFactory.Build(
+            Snapshot(maxRounds: 3), new TestLlmClientResolver(new RoundDraftClient()), Options.Create(new ConvergenceOptions()),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(), customExecutionStep: new PassThroughWriter(), loopSafeguards: allOn);
+
+        AssertPlainLoop(runner, expectWriter: false);
+
+        var loop = AtelierPipelineFactory.Build(
+            Snapshot(maxRounds: 3), new TestLlmClientResolver(new RoundDraftClient()), Options.Create(new ConvergenceOptions()),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(), loopSafeguards: allOn);
+        Assert.IsType<BestDraftFinalizer>(Field(loop, "_finalizer"));
+        Assert.IsType<NoProgressStopPolicy>(Field(loop, "_convergencePolicy"));
+        Assert.True((bool)Field(Field(loop, "_execution")!, "blockingFindingsOnly")!);
     }
 
     [Fact]
@@ -287,7 +426,66 @@ public sealed class LoopSafeguardsTests
 
     private static RoundScript Script(Dictionary<int, int> blockingPerRound, bool minorEveryRound = false) => new(blockingPerRound, minorEveryRound);
 
-    private static async Task<LoopRun> RunAsync(RoundScript script, int maxRounds, LoopSafeguards? safeguards, int[]? failClarityInRounds = null)
+    [Fact]
+    public void The_direct_path_never_takes_the_switches_even_when_all_are_on()
+    {
+        var harness = new Geef.Atelier.Tests.Pipeline.Direct.DirectPipelineHarness();
+        var (run, _) = harness.CreateRun("Write a short note.");
+        var context = harness.Context(run) with
+        {
+            ConvergenceOptions = Options.Create(new ConvergenceOptions
+            {
+                BestDraft = LoopSwitch.On, WriterBlockingOnly = LoopSwitch.On, StopWithoutProgress = LoopSwitch.On,
+            }),
+        };
+
+        var runner = new Geef.Atelier.Infrastructure.Pipeline.Assembly.DirectPipelineAssembler(
+            Options.Create(harness.SourceOptions), Options.Create(harness.DirectOptions)).Assemble(context);
+
+        AssertPlainLoop(runner, expectWriter: false);
+    }
+
+    internal static void AssertPlainLoop(GeefPipelineRunner<FinalizedDocument> runner, bool expectWriter = true)
+    {
+        Assert.IsType<MarkdownFinalizer>(Field(runner, "_finalizer"));
+        Assert.IsType<DefaultConvergencePolicy>(Field(runner, "_convergencePolicy"));
+        if (expectWriter)
+            Assert.False((bool)Field(Field(runner, "_execution")!, "blockingFindingsOnly")!);
+    }
+
+    private static object? Field(object target, string name)
+    {
+        for (var type = target.GetType(); type is not null; type = type.BaseType)
+        {
+            var field = type.GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?? type.GetField($"<{name}>P", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            if (field is not null)
+                return field.GetValue(target);
+        }
+        throw new InvalidOperationException($"Field {name} not found on {target.GetType().Name}.");
+    }
+
+    private static async Task<LoopRun> RunPlainAsync(RoundScript script, int maxRounds)
+    {
+        var writer = new RoundDraftClient();
+        var resolver = new TestLlmClientResolver(writer);
+        var builder = Geef.Sdk.Geef.CreatePipeline<FinalizedDocument>()
+            .UseGrounding(new BriefingGroundingStep())
+            .UseExecution(new ProfileBasedExecutor(SystemCrew.DefaultExecutorProfile, resolver))
+            .AddReviewer(new ScriptedReviewer(SystemCrew.BriefingFidelityProfile.Name, script))
+            .AddReviewer(new OutageReviewer(SystemCrew.ClarityProfile.Name, []))
+            .UseFinalizer(new MarkdownFinalizer())
+            .UseConvergencePolicy(ConvergencePolicyBuilder.Build(new ConvergenceOptions(),
+                new ConvergencePolicyOverride(MaxIterations: maxRounds, AbortOnCritical: false, DetectRegression: false, StagnationThreshold: null)))
+            .UseEvaluationStrategy(new ParallelEvaluationStrategy());
+        builder.EnableBestEffortOnNonConvergence();
+        var runner = builder.Build();
+        var result = await runner.RunAsync("Write a short test text.", CancellationToken.None);
+        return new LoopRun(result, writer.Prompts.ToList());
+    }
+
+    private static async Task<LoopRun> RunAsync(RoundScript script, int maxRounds, LoopSafeguards? safeguards, int[]? failClarityInRounds = null,
+        RoundDraftClient? writer = null)
     {
         var snapshot = Snapshot(maxRounds);
         var reviewers = new Dictionary<string, IReviewer>
@@ -295,7 +493,7 @@ public sealed class LoopSafeguardsTests
             [SystemCrew.BriefingFidelityProfile.Name] = new ScriptedReviewer(SystemCrew.BriefingFidelityProfile.Name, script),
             [SystemCrew.ClarityProfile.Name] = new OutageReviewer(SystemCrew.ClarityProfile.Name, failClarityInRounds ?? []),
         };
-        var writer = new RoundDraftClient();
+        writer ??= new RoundDraftClient();
         var runner = AtelierPipelineFactory.Build(
             snapshot,
             new TestLlmClientResolver(writer),
@@ -342,11 +540,20 @@ public sealed class LoopSafeguardsTests
         History(counts.OrderBy(c => c.Key).Select(c => Round(Review("a", c.Value == 0 ? ReviewDecision.Approved : ReviewDecision.ApprovedWithWarnings,
             Enumerable.Range(1, c.Value).Select(i => (BlockingText(c.Key, i), Major)).ToArray()))).ToArray());
 
-    private static IterationHistory History(params EvaluationAggregate[] rounds)
+    private static IterationHistory History(params EvaluationAggregate[] rounds) =>
+        History(rounds.Select((_, i) => RoundDraftClient.DraftOf(i + 1)).ToArray(), rounds);
+
+    private static IterationHistory History(string[] drafts, params EvaluationAggregate[] rounds)
     {
         var history = new IterationHistory();
         for (var i = 0; i < rounds.Length; i++)
-            history.Add(new IterationRecord { Iteration = i + 1, StartedAt = DateTimeOffset.UtcNow, ExecutionDuration = TimeSpan.Zero, EvaluationResult = rounds[i] });
+        {
+            var context = new RunContext().Set(AtelierContextKeys.CurrentDraft, drafts[i]).Set(GeefKeys.CurrentIteration, i + 1);
+            history.Add(new IterationRecord
+            {
+                Iteration = i + 1, StartedAt = DateTimeOffset.UtcNow, ExecutionDuration = TimeSpan.Zero, EvaluationResult = rounds[i], Context = context,
+            });
+        }
         return history;
     }
 
@@ -363,7 +570,7 @@ public sealed class LoopSafeguardsTests
     private sealed record LoopRun(GeefPipelineResult<FinalizedDocument> Result, IReadOnlyList<string> WriterPrompts);
 
     /// <summary>Writes "Draft of round N" for the N-th writing call and keeps every prompt it got.</summary>
-    private sealed class RoundDraftClient : ILlmClient
+    private sealed class RoundDraftClient(string[]? texts = null) : ILlmClient
     {
         private int _round;
 
@@ -374,8 +581,19 @@ public sealed class LoopSafeguardsTests
         public Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct)
         {
             Prompts.Enqueue(request.UserPrompt);
-            return Task.FromResult(FakeLlmClient.MakeTextResponse(DraftOf(Interlocked.Increment(ref _round))));
+            var round = Interlocked.Increment(ref _round);
+            return Task.FromResult(FakeLlmClient.MakeTextResponse(texts is not null ? texts[round - 1] : DraftOf(round)));
         }
+    }
+
+    /// <summary>A writer of its own (like the direct path or the composer): returns the round number as text.</summary>
+    private sealed class PassThroughWriter : IExecutionStep
+    {
+        public Task<ExecutionResult> RunAsync(IRunContext context, CancellationToken cancellationToken) =>
+            Task.FromResult(new ExecutionResult
+            {
+                UpdatedContext = context.Set(AtelierContextKeys.CurrentDraft, RoundDraftClient.DraftOf(context.GetRequired(GeefKeys.CurrentIteration))),
+            });
     }
 
     /// <summary>

@@ -3321,11 +3321,17 @@ after that it stays `WithoutPromise`.
   non-blocking findings.
   `StopWithoutProgress` – stop as soon as two rounds in a row brought no progress; approval, the round limit, the time limit and
   the SDK's own stops come first.
-- **Rank of a round:** first the number of reviewers that failed for technical reasons, then the number of blocking findings;
-  smaller is better, the most recent round wins a tie. Blocking are findings from "major" up by reviewers that answered, and every
-  finding of a rejecting reviewer. The number is 0 exactly when the loop's policy approves the round (test). Deviation from the
-  plan, which only says "fewest blocking findings": a round with a failed reviewer has fewer findings because less was checked, so
-  it must not win on that. Progress means a rank strictly better than every earlier one.
+- **Rank of a round:** first the number of critical findings, then the number of blocking findings; smaller is better. Only the
+  **review basis** counts: the reviewers that failed for technical reasons in none of the rounds compared. So an outage neither makes
+  a round look better (less was checked) nor every later round worse. On an equal rank the round with fewer outages wins, then the
+  most recent one. Blocking are findings from "major" up and every finding of a rejecting reviewer; without the restriction to the
+  basis the number is 0 exactly when the loop's policy approves the round (test). Without a common reviewer nothing is compared (no
+  new choice, no stop). Progress means a rank strictly better than every earlier one.
+- **Never a stub:** besides the round the SDK would have delivered, only a round with a text that is not blank and has at least
+  70 % of the longest round text can be chosen (the same ratio as the writer's collapse guard, here without a minimum length). An
+  empty answer, a question or a change note is thus never delivered, even when it drew fewer findings.
+- **Display:** the workshop's manuscript view says "Text from iteration X of Y" when the text is not from the last round. MCP gives
+  no round number for runs and stays unchanged.
 - **Stop reason:** the SDK has no fitting value; `StopStagnant` would show "the same points kept coming back", which this rule
   does not check. So a value outside the SDK enum (`LoopStopReasons.NoProgress`, stored as a number) with the sentence "Two more
   rounds did not reduce the open points, so the work was stopped."
@@ -3333,7 +3339,9 @@ after that it stays `WithoutPromise`.
   delivered round, the stop reason and the writer's prompts with and without the new parameters. The direct path and the team
   draft never get the switches.
 - **Evidence:** unit tests, pipeline tests through the real factory and orchestrator tests against Postgres (also for resumed
-  runs). A replay on stored runs of the older loop and a blind comparison of the delivered with the chosen version are kept outside
+  runs); one test checks on the built pipeline that with all switches off the same parts are used, another compares with a pipeline
+  built independently from the SDK parts, and one test each shows that the direct path and a pipeline with its own writer (team
+  draft) never get the switches, even when they are `On`. A replay on stored runs of the older loop and a blind comparison of the delivered with the chosen version are kept outside
   this repository; by a rule fixed in advance a switch stays off when its chosen version loses more often than it wins in the
   blind comparison. The writer switch is only shown by the real run in package 7.
 - **Way back:** switch `Off` (the default), e.g. `Convergence__BestDraft=Off`.

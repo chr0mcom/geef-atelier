@@ -67,12 +67,15 @@ Was die Werte bedeuten:
   Gespeicherte verwendet. `Off` zeigt nichts davon, und `profile` wird nur lesend mit seiner früheren Beschreibung angeboten. Die
   Administration sieht es nie an fremden Aufträgen, und gespeichert wird nur in die eigenen About-me-Angaben (D-083). Nach bestandener
   Abnahme: `Orders__TellOnce=On`; Rückweg: `Orders__TellOnce=WithoutPromise` oder `Orders__TellOnce=Off`.
-- **Ältere Prüfschleife** („Extra careful“, Werkstatt-Vorlagen und fortgesetzte Läufe; nie Standardweg oder Team-Entwurf): Eine Runde
-  ist besser als eine andere, wenn weniger Prüfer technisch ausfielen, bei gleich vielen, wenn sie weniger blockierende Befunde hat
-  („major“ oder „critical“ von Prüfern, die geantwortet haben). `BestDraft` liefert nach einer Schleife ohne Freigabe die beste Runde
-  (bei Gleichstand die jüngste) und speichert sie als gelieferte Runde; eine freigegebene Schleife liefert wie bisher ihre letzte.
+- **Ältere Prüfschleife** („Extra careful“, Werkstatt-Vorlagen und fortgesetzte Läufe; nie Standardweg oder Team-Entwurf): Runden
+  werden nur über die Prüfer verglichen, die in keiner der verglichenen Runden technisch ausfielen. Eine Runde ist besser, wenn sie
+  weniger „critical“-Befunde hat, bei gleich vielen weniger blockierende („major“ oder „critical“). `BestDraft` liefert nach einer
+  Schleife ohne Freigabe die beste Runde (bei Gleichstand die mit weniger Ausfällen, dann die jüngste) und speichert sie als
+  gelieferte Runde; gewählt wird nur ein nicht leerer Text mit mindestens 70 % der Länge des längsten Rundentexts, sonst bleibt es
+  bei der bisherigen Wahl. Eine freigegebene Schleife liefert wie bisher ihre letzte Runde.
   `WriterBlockingOnly` gibt dem Schreiber nur die blockierenden Befunde der letzten Runde, keine Ausfallmeldungen.
-  `StopWithoutProgress` beendet die Schleife, wenn zwei Runden nacheinander keine Runde besser als alle früheren brachten; der Lauf
+  `StopWithoutProgress` beendet die Schleife, wenn zwei Runden nacheinander keine Runde besser als alle früheren brachten (gleicher
+  Vergleich; ohne einen Prüfer, der in allen Runden antwortete, kein Stopp); der Lauf
   nennt dann den Grund „Two more rounds did not reduce the open points, so the work was stopped.“ Freigabe, Höchstzahl der Runden
   und Zeitgrenze gehen vor. Alle drei sind aus, bis die Messung des neuen „Extra careful“ über sie entschieden hat (D-085).
 

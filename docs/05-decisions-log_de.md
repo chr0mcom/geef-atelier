@@ -3450,11 +3450,17 @@ danach bleibt `WithoutPromise`.
   Ausfallmeldungen und keine nicht blockierenden Befunde.
   `StopWithoutProgress` – Stopp, sobald zwei Runden nacheinander keinen Fortschritt brachten; Freigabe, Höchstzahl der Runden,
   Zeitgrenze und die Stopps des SDK gehen vor.
-- **Rang einer Runde:** zuerst die Zahl technisch ausgefallener Prüfer, dann die Zahl blockierender Befunde; kleiner ist besser,
-  bei Gleichstand gewinnt die jüngste. Blockierend sind Befunde ab „major“ von Prüfern, die geantwortet haben, und jeder Befund
-  eines ablehnenden Prüfers. Die Zahl ist genau dann 0, wenn die Richtlinie der Schleife die Runde freigibt (Test). Abweichung vom
-  Restplan, der nur „wenigste blockierende Befunde“ nennt: Eine Runde mit ausgefallenem Prüfer hat weniger Befunde, weil weniger
-  geprüft wurde, und darf deshalb nicht gewinnen. Fortschritt heißt: ein Rang streng besser als jeder frühere.
+- **Rang einer Runde:** zuerst die Zahl der critical-Befunde, dann die Zahl blockierender Befunde; kleiner ist besser. Gezählt wird
+  nur über die **Prüfbasis**: die Prüfer, die in keiner der verglichenen Runden technisch ausgefallen sind. So macht ein Ausfall
+  eine Runde weder besser (weniger geprüft) noch alle späteren schlechter. Bei gleichem Rang gewinnt die Runde mit weniger
+  Ausfällen, dann die jüngste. Blockierend sind Befunde ab „major“ und jeder Befund eines ablehnenden Prüfers; ohne Einschränkung
+  auf die Basis ist die Zahl genau dann 0, wenn die Richtlinie der Schleife die Runde freigibt (Test). Ohne gemeinsamen Prüfer wird
+  nicht verglichen (keine Neuwahl, kein Stopp). Fortschritt heißt: ein Rang streng besser als jeder frühere.
+- **Nie ein Stummel:** Wählbar ist neben der Runde, die das SDK geliefert hätte, nur eine Runde mit nicht leerem Text, der mindestens
+  70 % des längsten Rundentexts hat (dieselbe Quote wie der Einbruchschutz des Schreibers, hier ohne Mindestlänge). Eine leere
+  Antwort, eine Rückfrage oder eine Änderungsnotiz wird so nie geliefert, auch wenn sie weniger Befunde hatte.
+- **Anzeige:** Die Manuskript-Ansicht der Werkstatt nennt „Text from iteration X of Y“, wenn der Text nicht aus der letzten Runde
+  stammt. MCP gibt für Läufe keine Rundenzahl aus und bleibt unverändert.
 - **Stoppgrund:** Das SDK kennt keinen passenden Wert; `StopStagnant` würde „the same points kept coming back“ zeigen, was diese
   Regel nicht prüft. Deshalb ein eigener Wert außerhalb der SDK-Aufzählung (`LoopStopReasons.NoProgress`, als Zahl gespeichert)
   mit dem Satz „Two more rounds did not reduce the open points, so the work was stopped.“
@@ -3462,7 +3468,9 @@ danach bleibt `WithoutPromise`.
   gelieferte Runde, Stoppgrund und die Aufträge an den Schreiber mit und ohne die neuen Parameter. Direktweg und Team-Entwurf
   bekommen die Schalter nie.
 - **Nachweis:** Einheitstests, Pipeline-Tests über die echte Fabrik und Orchestrator-Tests gegen Postgres (auch für fortgesetzte
-  Läufe). Ein Nachspiel auf gespeicherten Läufen der älteren Schleife und ein blinder Vergleich der gelieferten mit der gewählten
+  Läufe); ein Test prüft am gebauten Ablauf, dass mit allen Schaltern aus dieselben Bausteine verwendet werden, ein weiterer
+  vergleicht mit einem unabhängig aus den SDK-Bausteinen gebauten Ablauf, und je ein Test zeigt, dass Direktweg und eine Pipeline
+  mit eigenem Schreiber (Team-Entwurf) die Schalter auch bei `On` nie bekommen. Ein Nachspiel auf gespeicherten Läufen der älteren Schleife und ein blinder Vergleich der gelieferten mit der gewählten
   Fassung liegen außerhalb dieses Repositorys; nach vorab festgelegter Regel bleibt ein Schalter aus, wenn seine gewählte Fassung
   im blinden Vergleich öfter verliert als gewinnt. Den Schreiber-Schalter belegt erst der echte Lauf in Paket 7.
 - **Rückweg:** Schalter `Off` (Standard), z. B. `Convergence__BestDraft=Off`.

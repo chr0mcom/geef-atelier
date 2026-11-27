@@ -63,13 +63,16 @@ What the values mean:
   acceptance on the real system has shown that the writer uses what was saved. `Off` shows none of it, and `profile` is offered read
   only with its earlier description. Administrators never see it on someone else's order, and saving goes only into the own About me
   (D-083). After a passed acceptance: `Orders__TellOnce=On`; way back: `Orders__TellOnce=WithoutPromise` or `Orders__TellOnce=Off`.
-- **Older review loop** (“Extra careful”, workshop templates and resumed runs; never the standard way or the team draft): one round
-  is better than another when fewer reviewers failed for technical reasons and, with as many failed, when it has fewer blocking
-  findings (“major” or “critical” from reviewers that answered). `BestDraft` delivers the best round after a loop without approval
-  (the most recent one on a tie) and stores it as the delivered round; an approved loop delivers its last round as before.
+- **Older review loop** (“Extra careful”, workshop templates and resumed runs; never the standard way or the team draft): rounds are
+  compared only over the reviewers that failed for technical reasons in none of the rounds compared. A round is better when it has
+  fewer “critical” findings and, with as many, fewer blocking ones (“major” or “critical”). `BestDraft` delivers the best round after
+  a loop without approval (on a tie the one with fewer outages, then the most recent) and stores it as the delivered round; only a
+  text that is not blank and has at least 70 % of the length of the longest round text is chosen, otherwise the earlier choice
+  stays. An approved loop delivers its last round as before.
   `WriterBlockingOnly` hands the writer only the blocking findings of the last round, no outage notes. `StopWithoutProgress` ends
-  the loop when two rounds in a row brought no round better than all before; the run then gives the reason “Two more rounds did
-  not reduce the open points, so the work was stopped.” Approval, the round limit and the time limit come first. All three stay
+  the loop when two rounds in a row brought no round better than all before (same comparison; no stop without a reviewer that
+  answered in every round); the run then gives the reason “Two more rounds did not reduce the open points, so the work was
+  stopped.” Approval, the round limit and the time limit come first. All three stay
   off until the measurement of the new “Extra careful” has decided on them (D-085).
 
 **How to set a switch.** The settings are read at start. Set them as environment variables of the web service, with `__` in place

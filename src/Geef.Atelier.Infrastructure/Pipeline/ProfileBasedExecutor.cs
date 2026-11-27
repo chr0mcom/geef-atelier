@@ -32,7 +32,7 @@ internal sealed class ProfileBasedExecutor(
     // becoming the working draft. Compared against the running high-water mark, not just the
     // immediately previous draft, so an accepted partial can never lower the bar.
     private const int    MinComparableDraftLength = 2000;
-    private const double RegressionRatio          = 0.7;
+    internal const double RegressionRatio         = 0.7;
 
     public async Task<ExecutionResult> RunAsync(IRunContext context, CancellationToken cancellationToken)
     {

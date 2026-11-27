@@ -41,7 +41,8 @@ internal static class AtelierPipelineFactory
     /// A <paramref name="customGroundingStep"/> replaces the briefing grounding step; the crew's grounding providers
     /// are then not called (the custom step brings its own material, as the direct path does with the order's files).
     /// <paramref name="loopSafeguards"/> (D-085) is passed only by the review-loop assemblers (standard and resumed runs); missing or
-    /// <see cref="LoopSafeguards.None"/> builds the loop as before.
+    /// <see cref="LoopSafeguards.None"/> builds the loop as before. A pipeline with a <paramref name="customExecutionStep"/> (direct
+    /// path, crew composition) is not the review loop and never takes them.
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> Build(
         CrewSnapshot snapshot,
@@ -63,7 +64,7 @@ internal static class AtelierPipelineFactory
         IGroundingStep? customGroundingStep = null,
         LoopSafeguards? loopSafeguards = null)
     {
-        var safeguards = loopSafeguards ?? LoopSafeguards.None;
+        var safeguards = customExecutionStep is null ? loopSafeguards ?? LoopSafeguards.None : LoopSafeguards.None;
         IGroundingStep grounding = customGroundingStep ?? new BriefingGroundingStep();
         if (customGroundingStep is null && snapshot.GroundingProviders is { Count: > 0 })
         {

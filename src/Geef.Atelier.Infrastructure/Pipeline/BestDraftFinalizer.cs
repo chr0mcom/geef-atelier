@@ -8,8 +8,9 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 
 /// <summary>
 /// Finalizes the best round (<see cref="LoopRoundExtensions.BestRound"/>) instead of the one handed over when the last round still
-/// has blocking findings (D-085, <c>Convergence:BestDraft</c>). An approved loop ends with a round without blocking findings and is
-/// finalized as it is. When it picks a round, that round's number goes to <see cref="AtelierContextKeys.DeliveredRound"/> of the final
+/// has blocking findings (D-085, <c>Convergence:BestDraft</c>). The handed-over round (the SDK's pick) is always selectable, so a round
+/// with a blank or collapsed text never replaces it. An approved loop ends with a round without blocking findings and is finalized as
+/// it is. When it picks a round, that round's number goes to <see cref="AtelierContextKeys.DeliveredRound"/> of the final
 /// context, so the stored iteration names the round the text comes from.
 /// </summary>
 internal sealed class BestDraftFinalizer(IFinalizer<FinalizedDocument> inner, SdkSeverity threshold) : IFinalizer<FinalizedDocument>
@@ -21,7 +22,8 @@ internal sealed class BestDraftFinalizer(IFinalizer<FinalizedDocument> inner, Sd
             || history is null
             || history.Records.Count == 0
             || history.Records[^1].EvaluationResult.BlockingCount(threshold) == 0
-            || history.BestRound(threshold) is not { Context: { } bestContext } best)
+            || !context.TryGet(GeefKeys.CurrentIteration, out var handedRound)
+            || history.BestRound(threshold, handedRound) is not { Context: { } bestContext } best)
             return inner.FinalizeAsync(context, cancellationToken);
 
         return inner.FinalizeAsync(bestContext.Set(AtelierContextKeys.DeliveredRound, best.Iteration), cancellationToken);
