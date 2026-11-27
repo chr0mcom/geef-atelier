@@ -128,7 +128,7 @@ und beliebig vielen `# Anhang: name.md`.
 - Faustregel je Lauf: Aufgaben × Arme Textaufrufe plus Aufgaben × Paare × 2 Urteile. `--max-judge-calls` deckelt
   die Zahl neuer Urteile; liefert der Juror ungültiges JSON, wird dasselbe Urteil einmal wiederholt (also höchstens
   doppelt so viele CLI-Aufrufe wie Urteile). Jeder CLI-Aufruf steht in `calls.jsonl`.
-- **Codex ist aus.** Das Codex-Abo gehört BookForge. Der optionale zweite Juror (`--codex-juror`) startet nur mit
+- **Codex ist aus.** Das Codex-Kontingent ist oft mit anderen Anwendungen geteilt. Der optionale zweite Juror (`--codex-juror`) startet nur mit
   `EVAL_CODEX_MAX > 0`, prüft vor jedem Aufruf `pgrep -a codex` und überspringt sich, solange Codex anderweitig
   läuft.
 
@@ -188,7 +188,8 @@ Betrieb:
 
 - Der Korpus ist synthetisch (alle Personen und Firmen erfunden) und darf ins öffentliche Git. Ablage:
   `tests/Geef.Atelier.Tests/Intake/Corpus/intake-corpus.jsonl` und `intake-corpus-second.jsonl`.
-- Der Lauf geschieht nachts und nur, wenn BookForge nicht läuft (geteiltes Claude-Kontingent).
+- Vor einem Lauf den aktuellen Stand prüfen: Nutzt gerade etwas anderes dasselbe Claude-Kontingent, ist das Gateway gesund und
+  ist genug Kontingent frei? Nur dann starten (feste Zeitfenster gibt es nicht).
 - Der Auftraggeber prüft 20 Einträge stichprobenartig und entfernt widersprüchliche.
 
 ## Faktenprüfer- und Rechenkorpus (`geef_eval/factcheck_corpus.py`)
@@ -247,8 +248,8 @@ saubere und drei fehlerhafte Texte. Der Rechenkorpus teilt weiter 70/30 über SH
 synthetisch und dürfen ins öffentliche Git; Rufnummern in den Texten sind nachträglich auf Nullen gesetzt (etwa `0170 0000000`),
 Mail- und Webadressen nutzen die reservierte Endung `.example`. Ablage
 `tests/Geef.Atelier.Tests/FactCheck/Corpus/factcheck-corpus.jsonl` und
-`tests/Geef.Atelier.Tests/Domain/Checks/Corpus/arithmetic-corpus.jsonl`. Die Läufe geschehen nachts und nur, wenn BookForge nicht
-läuft.
+`tests/Geef.Atelier.Tests/Domain/Checks/Corpus/arithmetic-corpus.jsonl`. Für die Läufe gilt dieselbe Zustandsprüfung wie beim
+Klärer-Korpus.
 
 ## Recherche: Nachprüfung, Paarvergleich R3 und Tor R2 (Etappe 4)
 

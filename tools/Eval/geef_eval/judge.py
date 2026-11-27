@@ -149,7 +149,7 @@ class ClaudeJudge:
 
 
 class CodexBusyError(RuntimeError):
-    """Codex is in use elsewhere (shared BookForge subscription) or the cap is reached."""
+    """Codex is in use elsewhere (shared subscription) or the cap is reached."""
 
 
 def codex_processes(pgrep: Callable[[], str] | None = None) -> list[str]:
@@ -163,7 +163,7 @@ def codex_processes(pgrep: Callable[[], str] | None = None) -> list[str]:
 class CodexJudge:
     """
     Optional second juror via ``codex exec``. Off unless explicitly enabled: the Codex subscription is a
-    production resource of BookForge. Refuses to start while other codex processes run and stops at a hard cap.
+    shared resource. Refuses to start while other codex processes run and stops at a hard cap.
     """
 
     def __init__(self, store: RunStore, max_calls: int, name: str = "codex", timeout_s: float = 600.0,

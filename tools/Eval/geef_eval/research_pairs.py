@@ -128,7 +128,7 @@ class CodexBlocked(RuntimeError):
 
 
 def codex_guard(lock: Path, pgrep: Callable[[], str] | None = None) -> None:
-    """Raises :class:`CodexBlocked` while ``lock`` exists or ``pgrep -a codex`` lists a job (BookForge owns the subscription)."""
+    """Raises :class:`CodexBlocked` while ``lock`` exists or ``pgrep -a codex`` lists a job (the subscription is shared)."""
     if lock.exists():
         raise CodexBlocked(f"Sperrdatei {lock} vorhanden")
     busy = codex_processes(pgrep)
