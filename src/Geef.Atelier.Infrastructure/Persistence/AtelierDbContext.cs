@@ -10,7 +10,6 @@ using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
-using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 using Geef.Atelier.Infrastructure.Persistence.Entities;
 using Geef.Atelier.Infrastructure.Persistence.Providers;
 using Geef.Atelier.Infrastructure.Persistence.SiteSettings;
@@ -53,8 +52,6 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
 
     public DbSet<IterationActorCostEntity> IterationActorCosts => Set<IterationActorCostEntity>();
 
-    internal DbSet<KnowledgeDocumentEntity> KnowledgeDocuments => Set<KnowledgeDocumentEntity>();
-    internal DbSet<KnowledgeDocumentChunkEntity> KnowledgeDocumentChunks => Set<KnowledgeDocumentChunkEntity>();
 
 
 

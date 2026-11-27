@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using Geef.Atelier.Infrastructure.Persistence;
-using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;

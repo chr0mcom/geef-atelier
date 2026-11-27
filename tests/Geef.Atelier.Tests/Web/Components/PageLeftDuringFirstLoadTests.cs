@@ -13,7 +13,6 @@ using Geef.Atelier.Web.Notifications;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Application_IKnowledgeService = Geef.Atelier.Application.Crew.Knowledge.IKnowledgeService;
 
 namespace Geef.Atelier.Tests.Web.Components;
 
@@ -88,7 +87,6 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
     {
         Services.AddSingleton(runService);
         Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
-        Services.AddSingleton<Application_IKnowledgeService>(new NoOpKnowledgeService());
         this.AddTestAuthorization().SetAuthorized("user");
     }
 

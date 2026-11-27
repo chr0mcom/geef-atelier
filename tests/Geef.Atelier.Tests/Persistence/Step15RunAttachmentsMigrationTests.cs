@@ -39,61 +39,6 @@ public sealed class Step15RunAttachmentsMigrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Migration_KnowledgeDocuments_HasScopeColumn_WithDefaultZero()
-    {
-        await using var context = NewContext();
-        await context.Database.MigrateAsync();
-
-        // Insert a document without specifying Scope — should default to 0 (Global)
-        // Use raw ADO.NET to avoid EF format-string interpretation of '{}' in SQL
-        await using var conn = new Npgsql.NpgsqlConnection(_postgres.GetConnectionString());
-        await conn.OpenAsync();
-        await using var cmd = new Npgsql.NpgsqlCommand(@"
-            INSERT INTO ""KnowledgeDocuments""
-                (""Id"", ""Title"", ""Description"", ""OriginalFilename"", ""ContentType"",
-                 ""FileSizeBytes"", ""RawContent"", ""Tags"", ""EmbeddingModel"", ""EmbeddingDimensions"",
-                 ""ChunkCount"", ""CreatedAt"", ""UpdatedAt"")
-            VALUES
-                (gen_random_uuid(), 'Scope Default Test', '', 'test.md', 'text/markdown',
-                 10, 'hello', '{}', 'openai/text-embedding-3-small', 1536,
-                 0, now(), now())", conn);
-        await cmd.ExecuteNonQueryAsync();
-
-        // Verify column exists and Scope defaulted to 0
-        var entity = await context.KnowledgeDocuments
-            .Where(d => d.Title == "Scope Default Test")
-            .FirstAsync();
-        Assert.Equal(0, entity.Scope);
-    }
-
-    [Fact]
-    public async Task Migration_KnowledgeDocuments_HasRunIdColumn_Nullable()
-    {
-        await using var context = NewContext();
-        await context.Database.MigrateAsync();
-
-        // Insert with explicit RunId = NULL using raw ADO.NET
-        await using var conn = new Npgsql.NpgsqlConnection(_postgres.GetConnectionString());
-        await conn.OpenAsync();
-        await using var cmd = new Npgsql.NpgsqlCommand(@"
-            INSERT INTO ""KnowledgeDocuments""
-                (""Id"", ""Title"", ""Description"", ""OriginalFilename"", ""ContentType"",
-                 ""FileSizeBytes"", ""RawContent"", ""Tags"", ""EmbeddingModel"", ""EmbeddingDimensions"",
-                 ""ChunkCount"", ""CreatedAt"", ""UpdatedAt"", ""RunId"")
-            VALUES
-                (gen_random_uuid(), 'Nullable RunId Test', '', 'test.md', 'text/markdown',
-                 10, 'hello', '{}', 'openai/text-embedding-3-small', 1536,
-                 0, now(), now(), NULL)", conn);
-        await cmd.ExecuteNonQueryAsync();
-
-        var entity = await context.KnowledgeDocuments
-            .Where(d => d.Title == "Nullable RunId Test")
-            .FirstAsync();
-
-        Assert.Null(entity.RunId);
-    }
-
-    [Fact]
     public async Task Migration_FkConstraint_RejectsInvalidRunId()
     {
         await using var context = NewContext();

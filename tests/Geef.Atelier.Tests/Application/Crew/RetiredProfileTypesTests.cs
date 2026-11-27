@@ -1,5 +1,4 @@
 using Geef.Atelier.Application.Crew;
-using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
@@ -29,7 +28,6 @@ public sealed class RetiredProfileTypesTests(PostgresFixture fixture)
         services.AddAtelierPersistence();
         services.AddAtelierApplication();
         services.AddSingleton<IModelCatalog, PassThroughModelCatalog>();
-        services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
         services.AddLogging();
         return services.BuildServiceProvider();
     }

@@ -99,7 +99,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: new[] { "tavily-refined", "run-attachments" },
+        GroundingProviderNames: new[] { "tavily-refined" },
         FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true,
         Domain: ModelDomain.General);
@@ -116,7 +116,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 12, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "legal-domain-expert" },
-        GroundingProviderNames: new[] { "tavily-refined", "run-attachments" },
+        GroundingProviderNames: new[] { "tavily-refined" },
         FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true,
         ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
@@ -136,7 +136,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 8, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "academic-rigor-advisor" },
-        GroundingProviderNames: new[] { "tavily-refined", "run-attachments" },
+        GroundingProviderNames: new[] { "tavily-refined" },
         FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true,
         ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
@@ -156,7 +156,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: new[] { "tavily-refined", "run-attachments" },
+        GroundingProviderNames: new[] { "tavily-refined" },
         FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true,
         ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
@@ -201,24 +201,6 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyRefinementMaxTokens]   = "2048",
             [GroundingProviderProfile.KeyRefinementMode]        = "0",
         },
-        IsSystem: true);
-
-    /// <summary>System grounding-provider profile for the full knowledge base (vector-store, Top-5 results, no tag filter).</summary>
-    public static readonly GroundingProviderProfile KnowledgeBaseDefaultProfile = new(
-        Name: "knowledge-base-default",
-        DisplayName: "Knowledge Base (All Documents)",
-        Description: "Searches the full knowledge base for briefing-relevant passages using semantic similarity. Returns the top 5 most similar chunks.",
-        ProviderType: "vector-store",
-        ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "global" },
-        IsSystem: true);
-
-    /// <summary>System grounding-provider profile for run-local attachments uploaded with the briefing.</summary>
-    public static readonly GroundingProviderProfile RunAttachmentsProfile = new(
-        Name: "run-attachments",
-        DisplayName: "Run Attachments",
-        Description: "Uses documents uploaded with the briefing as a grounding source. Activated automatically when attachments are present.",
-        ProviderType: "vector-store",
-        ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "run-local" },
         IsSystem: true);
 
     /// <summary>All system reviewer profiles, indexed by name.</summary>
@@ -314,8 +296,6 @@ public static class SystemCrew
         {
             [TavilyBasicProfile.Name]               = TavilyBasicProfile,
             [TavilyRefinedProfile.Name]              = TavilyRefinedProfile,
-            [KnowledgeBaseDefaultProfile.Name]       = KnowledgeBaseDefaultProfile,
-            [RunAttachmentsProfile.Name]             = RunAttachmentsProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>

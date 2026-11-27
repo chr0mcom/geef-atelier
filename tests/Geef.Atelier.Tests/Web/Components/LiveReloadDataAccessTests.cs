@@ -12,7 +12,6 @@ using Geef.Atelier.Web.Notifications;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Application_IKnowledgeService = Geef.Atelier.Application.Crew.Knowledge.IKnowledgeService;
 
 namespace Geef.Atelier.Tests.Web.Components;
 
@@ -157,7 +156,6 @@ public sealed class LiveReloadDataAccessTests : TestContext
         Services.AddSingleton<IRunUpdateFeed>(feed);
         Services.AddScoped<CircuitDataGate>();
         Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
-        Services.AddSingleton<Application_IKnowledgeService>(new NoOpKnowledgeService());
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         this.AddTestAuthorization().SetAuthorized("user");
         return (probe, feed, runId);
@@ -191,7 +189,6 @@ public sealed class LiveReloadDataAccessTests : TestContext
         Services.AddSingleton<IRunUpdateFeed>(feed);
         Services.AddScoped<CircuitDataGate>();
         Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
-        Services.AddSingleton<Application_IKnowledgeService>(new NoOpKnowledgeService());
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         this.AddTestAuthorization().SetAuthorized("user");
         return runService;

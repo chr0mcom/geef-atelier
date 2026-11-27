@@ -10,11 +10,9 @@ using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
-using Geef.Atelier.Infrastructure.Embeddings;
 using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Intake;
 using Geef.Atelier.Infrastructure.Pricing;
-using Geef.Atelier.Infrastructure.Knowledge;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Persistence.Runs;
@@ -73,8 +71,6 @@ builder.Services.AddDbContext<AtelierDbContext>(options =>
 builder.Services.AddAtelierPersistence();
 builder.Services.AddAtelierApplication();
 
-builder.Services.AddEmbeddings(builder.Configuration);
-builder.Services.AddKnowledge(builder.Configuration);
 
 builder.Services.AddGroundingProviders(builder.Configuration);
 builder.Services.AddResearch(builder.Configuration);

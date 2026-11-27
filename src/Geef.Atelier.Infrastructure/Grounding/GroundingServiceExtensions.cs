@@ -26,7 +26,6 @@ public static class GroundingServiceExtensions
 
         services.AddSingleton<IGroundingQueryExtractor, LlmGroundingQueryExtractor>();
         services.AddSingleton<IGroundingProvider, TavilyGroundingProvider>();
-        services.AddSingleton<IGroundingProvider, VectorStoreGroundingProvider>();
         services.AddSingleton<IGroundingProvider, StaticContextGroundingProvider>();
         services.AddSingleton<IGroundingProvider, UrlFetchGroundingProvider>();
         services.AddSingleton<IGroundingProvider, OrderSourcesGroundingProvider>();

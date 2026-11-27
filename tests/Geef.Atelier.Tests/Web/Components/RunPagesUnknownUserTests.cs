@@ -9,7 +9,6 @@ using Geef.Atelier.Web.Components.Pages;
 using Geef.Atelier.Web.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Application_IKnowledgeService = Geef.Atelier.Application.Crew.Knowledge.IKnowledgeService;
 
 namespace Geef.Atelier.Tests.Web.Components;
 
@@ -26,7 +25,6 @@ public sealed class RunPagesUnknownUserTests : TestContext
         Services.AddSingleton(NeverCalled<IRunService>.Create());
         Services.AddSingleton(NeverCalled<IRunUpdateFeed>.Create());
         Services.AddSingleton(NeverCalled<IRunArtifactRepository>.Create());
-        Services.AddSingleton(NeverCalled<Application_IKnowledgeService>.Create());
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         Services.AddScoped<CircuitDataGate>();
         JSInterop.Mode = JSRuntimeMode.Loose;

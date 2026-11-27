@@ -55,7 +55,6 @@ public sealed class ProductionWiringEndToEndTests(PostgresFixture postgres)
 
         Assert.NotNull(host.Services.GetRequiredService<Geef.Atelier.Web.Services.RunOrchestratorService>());
         var grounding = host.Services.GetRequiredService<IGroundingProviderFactory>();
-        Assert.True(grounding.IsRegistered("vector-store"));
         Assert.True(grounding.IsRegistered("tavily"));
         Assert.NotNull(host.Services.GetRequiredService<Geef.Atelier.Application.Crew.Finalizers.IFinalizerExecutorFactory>());
     }

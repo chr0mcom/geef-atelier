@@ -2,7 +2,6 @@ using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using System.Net;
 using System.Net.Sockets;
 using Geef.Atelier.Application.Auth;
-using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Profiles;
 using Geef.Atelier.Application.Sources;
@@ -113,7 +112,6 @@ internal sealed class WebTestHost : IAsyncDisposable
         builder.Services.AddAtelierPersistence();
         builder.Services.AddAtelierApplication();
         builder.Services.AddSingleton<Geef.Atelier.Application.Crew.IModelCatalog, Geef.Atelier.Tests.Fakes.PassThroughModelCatalog>();
-        builder.Services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
         builder.Services.TryAddSingleton<IOrderService, FakeOrderService>();
         builder.Services.TryAddSingleton<ISourceIntakeService, FakeSourceIntakeService>();
         builder.Services.TryAddSingleton<ISourceRefusalLog, RecordingRefusalLog>();

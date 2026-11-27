@@ -14,7 +14,6 @@ using Geef.Atelier.Web.Components.Pages;
 using Geef.Atelier.Web.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Application_IKnowledgeService = Geef.Atelier.Application.Crew.Knowledge.IKnowledgeService;
 
 namespace Geef.Atelier.Tests.Web.Components.Orders;
 
@@ -43,7 +42,6 @@ public sealed class RunDetailChangeLinkTests : TestContext
         Services.AddSingleton<IRunUpdateFeed>(sp => new InProcessRunUpdateFeed(sp.GetRequiredService<IServiceScopeFactory>(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessRunUpdateFeed>.Instance));
         Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
-        Services.AddSingleton<Application_IKnowledgeService>(new NoOpKnowledgeService());
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         if (withOptions)
         {

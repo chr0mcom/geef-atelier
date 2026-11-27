@@ -1,6 +1,5 @@
 using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using Geef.Atelier.Application.Crew.Grounding;
-using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
@@ -55,7 +54,6 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                 services.AddAtelierPersistence();
                 services.AddAtelierApplication();
                 services.AddSingleton<Geef.Atelier.Application.Crew.IModelCatalog, Geef.Atelier.Tests.Fakes.PassThroughModelCatalog>();
-                services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
 
                 services.AddSingleton<ILlmClientResolver>(new TestLlmClientResolver(llmClient));
                 services.Configure<OrchestratorOptions>(o =>

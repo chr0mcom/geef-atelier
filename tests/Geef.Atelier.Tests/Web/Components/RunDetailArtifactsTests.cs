@@ -10,7 +10,6 @@ using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Web.Components.Pages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Application_IKnowledgeService = Geef.Atelier.Application.Crew.Knowledge.IKnowledgeService;
 
 namespace Geef.Atelier.Tests.Web.Components;
 
@@ -41,7 +40,6 @@ public sealed class RunDetailArtifactsTests : TestContext
             Microsoft.Extensions.Logging.Abstractions.NullLogger<Geef.Atelier.Web.Notifications.InProcessRunUpdateFeed>.Instance));
         Services.AddSingleton<IRunArtifactRepository>(
             new StubArtifactRepository(artifacts ?? []));
-        Services.AddSingleton<Application_IKnowledgeService>(new NoOpKnowledgeService());
         Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         this.AddTestAuthorization().SetAuthorized("user");
     }

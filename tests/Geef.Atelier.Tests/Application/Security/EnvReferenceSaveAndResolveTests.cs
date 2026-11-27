@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text.Json;
 using Geef.Atelier.Application.Crew;
-using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Application.Security;
@@ -57,7 +56,6 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
         services.AddAtelierPersistence();
         services.AddAtelierApplication();
         services.AddSingleton<IModelCatalog, PassThroughModelCatalog>();
-        services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
         services.AddSingleton<IHttpClientFactory>(new AnyNameHttpClientFactory(new HttpClient(_handler)));
         services.AddLogging();
         return services.BuildServiceProvider();
