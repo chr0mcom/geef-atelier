@@ -164,7 +164,8 @@ Prerequisite: the OAuth client must be registered in the admin panel at `/admin/
 
 The order tools (`submit_order`, `answer_order`, `get_order_status`, `get_order_result`, `revise_order`, `export_order`,
 `cancel_order`, `list_orders`, `profile`) and, while `Uploads:Tickets` is `On`, `prepare_attachment`. While `Mcp:LegacyTools` is
-`true` (shipped), the older workshop tools are offered as well. Overview: [docs/13-ai-assistant-guide.md](docs/13-ai-assistant-guide.md)
+`true` (shipped), the older workshop tools are offered as well. Behind `Mcp:Skills` and `Mcp:Elicitation` (both shipped `Off`,
+D-088) the server can also offer a skill about using Atelier and ask its questions as a form of the client. Overview: [docs/13-ai-assistant-guide.md](docs/13-ai-assistant-guide.md)
 (the tool table there is checked against the server by a test); contracts: [docs/04-mcp-integration.md](docs/04-mcp-integration.md),
 [docs/09-endpoint-reference.md](docs/09-endpoint-reference.md).
 

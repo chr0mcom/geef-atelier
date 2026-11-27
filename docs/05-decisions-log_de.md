@@ -3533,3 +3533,78 @@ Apps. Sie bleiben späteren Schritten mit eigenem Schalter vorbehalten.
 die Upload-Seite; `get_order_status` mit `waitSeconds = 50` kommt ohne Abbruch zurück; eine Änderung mit `revise_order` wird erst nach
 der neuen Fassung als gemacht gemeldet. Dasselbe in claude.ai im Web. Da Clients `tools/list` zwischenspeichern können, wirken die
 neuen Beschreibungen unter Umständen erst in einer neuen Sitzung.
+
+## D-088 — MCP: Skill und Rückfragen als Formular, beide hinter Schaltern und ausgeliefert aus (2026-11-27)
+
+**Status:** gebaut und getestet (Schritte 2 und 3 der Prüfung neuer MCP-Fähigkeiten); beide Schalter ausgeliefert `Off`; Abnahme am
+echten Client offen. D-087 gehört einem parallelen Paket.
+
+**Anlass.** Claude Code und claude.ai können seit November 2026 Skills von MCP-Servern laden und Formular-Rückfragen (Elicitation)
+zeigen. Die Server-Hinweise sind auf 3.900 Zeichen begrenzt (D-086); ein Skill kann den Ablauf ausführlicher erklären, ohne Kontext zu
+kosten, solange er nicht geladen ist. Rückfragen gibt das Modell heute selbst weiter und kann dabei Optionen verlieren, raten oder die
+Herkunft falsch setzen.
+
+**Entscheidung – Skill (`Mcp:Skills`, `Off`/`On`).**
+- Ein Skill `using-atelier` aus festen Dateien im Repository (`src/Geef.Atelier.Mcp/Skills/using-atelier/`: `SKILL.md`,
+  `references/files.md`, `references/questions.md`, `references/result.md`), in die Assembly eingebettet, mit Manifest aus
+  Prüfsummen und Größen. Nie aus Aufträgen, Dateien, Nutzer- oder Laufzeitdaten zusammengesetzt, nie `dynamic`.
+- Paket `ModelContextProtocol.Extensions.Skills` exakt `[2.4.0]` (wie das SDK); `MCPEXP005` nur im Mcp- und Testprojekt unterdrückt.
+- Bei `On`: Erweiterung `io.modelcontextprotocol/skills`, Fähigkeit `resources`, die vier Dateien als Ressourcen, `skills/list` und
+  `skills/get` genau so, wie das SDK sie baut (`AtelierSkill.AddTo`). Die Server-Hinweise bleiben **unverändert**: Der empfohlene Satz
+  „load the skill“ hätte die längste Kombination über 3.900 Zeichen gebracht (Reserve 25). Stattdessen bekommt nur die Beschreibung von
+  `submit_order` einen Satz, der auf `skill://using-atelier/SKILL.md` verweist.
+- Der Skill widerspricht den Hinweisen nie: Ein Test prüft, dass 20 Kernregeln der Hinweise in allen Schalterkombinationen und sieben
+  in Werkzeugbeschreibungen gewanderte Regeln im Skill wortgleich stehen, dass 18 Gegenformulierungen fehlen, dass er nur vorhandene
+  Werkzeuge nennt, nur auf eigene Dateien verweist und die Regel aus D-081 zu übersprungenen Fragen enthält. Wo der Ablauf von
+  Schaltern abhängt (Upload-Ticket, About me speichern, ältere Werkzeuge), beschreibt der Skill beide Fälle („If prepare_attachment is
+  in your tool list …“), damit er in jeder Konfiguration stimmt.
+
+**Entscheidung – Rückfragen als Formular (`Mcp:Elicitation`, `Off`/`On`, `Mcp:ElicitationLifetime` Standard 30 Minuten).**
+- Nur in `submit_order`, nur bei `needs_input`, nur wenn der Client 2026-07-28 ausgehandelt hat (`IsMrtrSupported`, zustandslos über
+  MRTR und `InputRequiredException`) und `elicitation.form` meldet. Sonst `needs_input` wie bisher. `get_order_status` und `answer_order`
+  bleiben unverändert.
+- Formular: je Frage ein Auswahlfeld mit ihren Optionen und „You decide“, ein Feld für eigene Worte nur bei `allowFreeText` (Länge
+  `Intake:MaxFreeTextChars`), die Frage nach der zu verbessernden Datei bei `revisionFile`; nichts Pflicht, nichts vorausgewählt; feste
+  Nachricht mit „Skipping is fine“ und „Atelier never asks for passwords, PINs, TANs, keys, card or account numbers“.
+- Nie ein Formular für Fragen, Optionen oder Dateinamen, die nach Geheimnissen klingen, Links, Web- oder Mailadressen oder versteckte
+  Zeichen enthalten oder zu lang sind (240/120/120): Schutz des Klärers ohne dessen Ausnahme für passende Aufträge, dazu eine strengere
+  Wortliste (Deutsch und Englisch). Fragetexte stammen teils aus Dateiinhalten und sähen im Formular wie eine Frage von Atelier aus.
+- `requestState`: mit den Data-Protection-Schlüsseln signiert und verschlüsselt, gebunden an Auftrag, Nutzer, Client (OAuth-Client),
+  Hash der Argumente und Frage-Kennungen, mit Ablauf; er trägt die Quittungen und Hinweise des ersten Aufrufs mit, damit nichts davon
+  verloren geht. Der zweite Aufruf legt **nie** einen Auftrag an; fremder, gefälschter oder zu anderen Argumenten gehörender Wert →
+  Werkzeugfehler ohne Auskunft über den Auftrag; wartet der Auftrag nicht mehr → aktueller Zustand, nichts erneut beantwortet.
+- Abbruch, Ablehnung, Ablauf, unbrauchbare Antworten, geänderte Fragen → `needs_input` wie bisher, mit einem Satz davor; bei Ablehnung
+  mit dem Hinweis auf `skip=true`. „You decide“ und leere Fragen → „entscheide du“, offen nach D-081.
+- **Herkunft.** Darf der Server „user“ behaupten? Nein: Er sieht nicht, wer das Formular ausfüllt (Clients können Formulare
+  automatisch beantworten, etwa über Hooks). Neue Herkunft `AnswerOrigin.Form` (Draht `form`, von keinem Client über `answer_order`
+  annehmbar), im Web „(chosen in a form of your assistant)“. Für Schreiber und Faktenprüfung zählt sie wie eine Antwort der Person
+  (ohne Markierung im Auftrag an den Schreiber), weil Atelier das Formular selbst gebaut und nur eigene Optionen angeboten hat.
+- Bei `Off` wird `requestState` wie bisher übergangen; nur ein echter Wert dieses Servers (nur möglich, wenn vorher `On` galt) führt zum
+  Zustand seines Auftrags statt zu einem zweiten Auftrag.
+
+**API-Stabilität und Risiken.**
+- Das Skills-Paket ist drei Wochen alt und experimentell; die Spezifikation der Erweiterung ist Beta. Genutzt werden nur
+  `McpServerSkillPackage.Create`, `McpServerSkillFile.FromText` und `WithSkillPackages`. Weil der Schalter erst beim Aufbau der Optionen
+  gelesen wird, holt `AtelierSkill.AddTo` die Options-Einrichtung des Pakets aus einem kleinen eigenen Container und wendet sie auf die
+  Server-Optionen an; ändert ein späteres SDK diese Einrichtung, scheitert der Start nur bei `On` mit klarer Meldung, und die Tests
+  fallen vorher auf. Bei jedem SDK-Update Skills-Paket mitziehen und die Skill-Tests laufen lassen.
+- Claude Code entzieht die Freigabe eines Skills bei jeder Inhaltsänderung (Digest); Änderungen am Skill also sparsam.
+- Elicitation läuft über MRTR, das das SDK für zustandslose Server erst seit 2.0 kann; ältere Revisionen bekommen nie ein Formular.
+  Clients können Formulare verschieden darstellen (Titel, Beschreibung, Reihenfolge); Darstellung ist am echten Client zu prüfen.
+- **Rückweg:** Ein älteres Image kennt die Herkunft `Form` nicht; für Aufträge, die über ein Formular beantwortet wurden, liest es die
+  gespeicherten Antworten nicht (leere Liste). Nach einem Rückweg solche Aufträge nicht ändern oder fortsetzen. Ohne eingeschalteten
+  Schalter entstehen keine solchen Aufträge.
+
+**Tests.** Einheitentests für Formularaufbau, Filter, Lesen der Antworten, Zustandswert (Rundweg, Ablauf, Fälschung, fremder Zweck und
+Schlüssel, Argument-Hash), Ablauf (fremder Nutzer, Client, Argumente, fremder Auftrag, Doppelaufruf, Abbruch, Ablehnung, ungültig,
+Ablauf, Schalter aus), Antwortregeln mit `Form`, Brief und Web-Anzeige; Schaltertests (Werkzeugliste, Hinweise, Fähigkeiten bei `Off`
+gleich; bei `On` nur ein Satz in `submit_order`); Hash-Baselines unverändert. Ende-zu-Ende über den echten Kestrel-Server mit dem
+SDK-Client: Formular beantwortet (ein Auftrag, Herkunft `Form`, Schreiber bekommt die Antwort), Wiederholung, geänderte Argumente,
+gefälschter Wert, fremder Nutzer, Abbruch und Ablehnung mit anschließendem `answer_order`, „You decide“ nach D-081, Ablauf, Client
+2025-11-25, Client ohne Formulare, Schalter aus; Skill listen, holen und alle Dateien geprüft lesen (2026-07-28), Werkzeuge und Hinweise
+bei 2025-11-25 unverändert. Alle Beispiele sind erfunden.
+
+**Abnahme am echten Client (nach dem Deploy, nicht ausgeführt).** Claude Code interaktiv mit dem claude.ai-Connector und claude.ai im
+Web, je mit `Mcp:Skills=On` und `Mcp:Elicitation=On`: Skill erscheint und wird vor dem ersten Auftrag geladen; ein Auftrag mit offener
+Länge zeigt das Formular; Auswahl, „You decide“, Schließen und Ablehnen verhalten sich wie beschrieben; eine Testdatei mit
+eingeschleuster TAN-Frage ergibt kein Formular. Gegenprobe mit beiden Schaltern `Off`.
