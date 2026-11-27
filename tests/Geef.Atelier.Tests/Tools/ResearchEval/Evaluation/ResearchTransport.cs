@@ -75,7 +75,7 @@ public sealed class ResearchTransport(CallBudget searches, CallBudget claude)
             if (Refusal is not null)
                 return false;
             if (!request.DisableFailover)
-                return Refuse("a model call did not switch the gateway failover off, so it could have reached Codex");
+                return Refuse("a model call did not limit the gateway failover to the same model, so it could have reached Codex");
             if (!Claude.TryTake())
                 return Refuse("the model call cap of this run is reached");
             _claudeCalls++;

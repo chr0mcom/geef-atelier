@@ -3726,3 +3726,44 @@ the database cleanup, which comes as its own step after 8d.
 
 **Rollback.** The previous image; the database stays compatible because nothing was dropped or changed. In code only through Git
 (tag before the deploy).
+
+## D-090 — Gateway: failover to the same model only (`x-cli-proxy-failover: same-model`) (2026-11-27)
+
+**Status:** built and tested on branch `fix/failover-same-model`; not shipped. D-089 belongs to a parallel package.
+
+**Reason.** Atelier sends `x-cli-proxy-failover: off` with calls whose result depends on the model (writer and outline in document
+mode, fact check including its replacement model, check of the explicit requirements, research condenser, clarifier with
+`Intake:AllowFailover=false`). The gateway keeps such a request on exactly one account. When the first Claude account is at its limit,
+every one of these calls gets `503 backend_unavailable` or a limit error, although a second Claude account would have the same model
+under the same name free. `off` was meant as "no other model" but also prevented the change of account.
+
+**Decision – gateway.**
+- New value `x-cli-proxy-failover: same-model` (any case): a Claude request may move between the Claude accounts with the model
+  unchanged, for the same reasons as the ordinary failover (auth, limit; a transport fault skips the second account as always), but
+  **never** to codex. A codex request is treated exactly like `off`. Accounts whose breaker is open are skipped; with all of them
+  blocked, `503 backend_unavailable` with `Retry-After` up to the first account that takes a probe again. Breaker, limit detection,
+  "not in plan" routing and response headers as for the ordinary change between the accounts (`x-cli-proxy-failover:
+  claude->claude-alt`). With `FAILOVER_ENABLED=0` like `off`. The generic endpoint `/v1/cli/…` still ignores the header.
+- `off`/`0`/`false` and "no header" behave **exactly as before**; any other value (also `same_model`) counts as "no header".
+
+**Decision – Atelier.** `LlmRequest.DisableFailover` now sends `same-model` instead of `off`; the retry rule of the `HttpClient`
+(`LlmHttpRetry`) recognises both values. Checked per caller: writer and outline need the requested model in document mode (codex writes
+no text there anyway); the fact check needs a model other than the writer's, and the same model on another account keeps that; its
+time limit applies to the whole request, also after a change of account; its replacement model still applies when both accounts fail.
+The requirements check and the condenser want no other model, and another account with the same model does not change their path. The
+clarifier with `AllowFailover=false` gets the same. No caller has to stay on `off`. The warning "another service answered" is still not
+raised for a change `claude->claude-alt`.
+
+**Shipping order (mandatory).** Gateway first, then `web`. A gateway that does not know `same-model` reads it like "no header" and hands
+such requests over to codex in full again. Safety net: Atelier reports every change of CLI as a warning on the order.
+
+**Remaining risk.** If the second account lacks a concrete model id, the CLI may silently replace it with another model of the family;
+this holds for the ordinary change between the accounts as well and is described in the gateway documentation.
+
+**Tests.** Gateway: 50 new tests (`tests/test_failover_same_model.py`: header, order, non-streaming, buffered and token SSE,
+decision file, document mode including the empty result, legacy, generic endpoint, open breakers, "not in plan", codex), plus a
+differential test against `main` over the scenario matrix for all other header values. Atelier: the header value in all caller tests,
+both values in `LlmHttpRetryTests`.
+
+**Way back.** Rolling back the gateway image alone is not enough while `web` sends `same-model` (full failover again); roll back `web`
+first, then the gateway.

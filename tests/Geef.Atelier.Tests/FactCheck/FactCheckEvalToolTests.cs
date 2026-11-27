@@ -106,7 +106,7 @@ public sealed class FactCheckEvalToolTests
 
         Assert.Equal("http://gateway/v1/codex/chat/completions", sent!.RequestUri!.ToString());
         Assert.Equal("Bearer geheim-123", sent.Headers.Authorization!.ToString());
-        Assert.Equal("off", sent.Headers.GetValues("x-cli-proxy-failover").Single());
+        Assert.Equal("same-model", sent.Headers.GetValues("x-cli-proxy-failover").Single());
         Assert.DoesNotContain("geheim-123", body);
     }
 

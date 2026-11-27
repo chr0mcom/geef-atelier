@@ -3868,3 +3868,46 @@ Migrations-Baseline nach dem Aufräumen der Datenbank, das als eigener Schritt n
 
 **Rückweg.** Das vorige Image; die Datenbank bleibt verträglich, weil nichts gelöscht oder geändert wurde. Im Code nur über Git (Tag vor
 dem Deploy).
+
+## D-090 — Gateway: Failover nur auf dasselbe Modell (`x-cli-proxy-failover: same-model`) (2026-11-27)
+
+**Status:** gebaut und getestet auf Branch `fix/failover-same-model`; nicht ausgeliefert. D-089 gehört zu einem parallelen Paket.
+
+**Anlass.** Das Atelier schickt bei Aufrufen, deren Ergebnis vom Modell abhängt, `x-cli-proxy-failover: off` (Schreiber und
+Gliederung im Dokumentmodus, Faktenprüfung samt Ersatzmodell, Prüfung der ausdrücklichen Vorgaben, Verdichter der Recherche, Klärer
+bei `Intake:AllowFailover=false`). Das Gateway hält eine solche Anfrage bei genau einem Konto. Ist das erste Claude-Konto an seinem
+Limit, bekommt deshalb jeder dieser Aufrufe `503 backend_unavailable` oder einen Limitfehler, obwohl ein zweites Claude-Konto dasselbe
+Modell unter demselben Namen frei hätte. `off` war gedacht als „kein anderes Modell“, verhindert aber auch den Wechsel des Kontos.
+
+**Entscheidung – Gateway.**
+- Neuer Wert `x-cli-proxy-failover: same-model` (Groß-/Kleinschreibung egal): Eine Claude-Anfrage darf zwischen den Claude-Konten
+  wechseln, mit unverändertem Modell, aus denselben Gründen wie beim normalen Failover (Auth, Limit; ein Transportfehler überspringt
+  das zweite Konto wie immer), aber **nie** zu codex. Eine codex-Anfrage wird genau wie `off` behandelt. Konten mit offenem Breaker
+  werden übersprungen; sind alle gesperrt, `503 backend_unavailable` mit `Retry-After` bis zum ersten Konto, das wieder eine Probe
+  annimmt. Breaker, Limit-Erkennung, „nicht im Abo“-Routing und Antwortköpfe wie beim normalen Wechsel zwischen den Konten
+  (`x-cli-proxy-failover: claude->claude-alt`). Mit `FAILOVER_ENABLED=0` wie `off`. Der generische Endpunkt `/v1/cli/…` wertet den
+  Kopf weiterhin nicht aus.
+- `off`/`0`/`false` und „kein Kopf“ verhalten sich **exakt wie bisher**; jeder andere Wert (auch `same_model`) gilt wie „kein Kopf“.
+
+**Entscheidung – Atelier.** `LlmRequest.DisableFailover` schickt jetzt `same-model` statt `off`; die Wiederholungsregel des
+`HttpClient` (`LlmHttpRetry`) erkennt beide Werte. Geprüft je Aufrufer: Schreiber und Gliederung brauchen das angefragte Modell im
+Dokumentmodus (codex liefert dort ohnehin keinen Text); die Faktenprüfung braucht ein anderes Modell als der Schreiber, und dasselbe
+Modell auf einem anderen Konto erhält das; ihr Zeitlimit gilt für die ganze Anfrage, also auch nach einem Kontowechsel; ihr Ersatzmodell
+greift weiter, wenn beide Konten scheitern. Die Vorgaben-Prüfung und der Verdichter wollen kein anderes Modell, ein anderes Konto mit
+demselben Modell ändert ihren Pfad nicht. Der Klärer mit `AllowFailover=false` bekommt dasselbe. Kein Aufrufer muss bei `off`
+bleiben. Die Warnung „anderer Dienst hat geantwortet“ erscheint wie bisher nicht bei einem Wechsel `claude->claude-alt`.
+
+**Reihenfolge beim Ausliefern (zwingend).** Zuerst das Gateway, dann `web`. Ein Gateway, das `same-model` noch nicht kennt, liest den
+Wert wie „kein Kopf“ und übergibt solche Anfragen wieder voll an codex. Sicherheitsnetz: Das Atelier meldet jeden Wechsel der CLI als
+Warnung am Auftrag.
+
+**Restrisiko.** Kennt das zweite Konto eine konkrete Modell-ID nicht, kann die CLI sie still durch ein anderes Modell der Familie
+ersetzen; das gilt beim normalen Wechsel zwischen den Konten genauso und ist in der Gateway-Doku beschrieben.
+
+**Tests.** Gateway: 50 neue Tests (`tests/test_failover_same_model.py`: Kopf, Reihenfolge, nicht streamend, SSE gepuffert und Token,
+decision-file, Dokumentmodus inkl. leerem Ergebnis, Legacy, generischer Endpunkt, offene Breaker, „nicht im Abo“, codex), dazu ein
+Differenztest gegen `main` über die Szenario-Matrix für alle übrigen Kopfwerte. Atelier: Kopfwert in allen Aufrufer-Tests, beide Werte in
+`LlmHttpRetryTests`.
+
+**Rückweg.** Gateway-Image zurück genügt nicht allein, solange `web` `same-model` schickt (dann wieder volles Failover); also zuerst
+`web` zurück, dann das Gateway.

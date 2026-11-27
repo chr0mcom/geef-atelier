@@ -787,26 +787,51 @@ def _retarget(req: ChatCompletionRequest, primary: str, target: str) -> ChatComp
     return req.model_copy(update={"model": FAILOVER_CODEX_MODEL if failover.cli_of(target) == "codex" else ""})
 
 
-#: Request header that switches the failover off for one request (values off/0/false, any case).
-#: The same name as the response header that reports a handover; a request never carries that one.
+#: Request header that limits the failover for one request (values below, any case, surrounding
+#: white space ignored). The same name as the response header that reports a handover; a request
+#: never carries that one.
 FAILOVER_CONTROL_HEADER = "x-cli-proxy-failover"
 _FAILOVER_OFF_VALUES = frozenset({"off", "0", "false"})
 
+#: Failover modes of one request. ON: the full chain (no header, or any value not listed here).
+#: OFF: only the requested backend. SAME_MODEL: only the accounts of the requested CLI with the
+#: requested model unchanged -- claude <-> claude-alt, never across to codex or back; for a codex
+#: request it is the same as OFF.
+FAILOVER_ON = "on"
+FAILOVER_OFF = "off"
+FAILOVER_SAME_MODEL = "same-model"
 
-def _failover_allowed(request: Request) -> bool:
-    """False when the caller asked for no handover (`x-cli-proxy-failover: off`): its result
-    depends on the model, so a different backend's answer is worse than an error. Without the
+
+def _failover_mode(request: Request) -> str:
+    """The failover mode the caller asked for. `off` (also `0`/`false`): its result depends on the
+    model, so a different backend's answer is worse than an error. `same-model`: a second account
+    of the same CLI may serve, because it runs the same model under the same name. Without the
     header, or with any other value, the gateway behaves exactly as before."""
     value = request.headers.get(FAILOVER_CONTROL_HEADER)
-    return value is None or value.strip().lower() not in _FAILOVER_OFF_VALUES
+    if value is None:
+        return FAILOVER_ON
+    value = value.strip().lower()
+    if value in _FAILOVER_OFF_VALUES:
+        return FAILOVER_OFF
+    if value == FAILOVER_SAME_MODEL:
+        return FAILOVER_SAME_MODEL
+    return FAILOVER_ON
 
 
-def _backend_unavailable(backend: str) -> OpenAIError:
-    """503 `backend_unavailable` for a request that may not leave `backend` while its breaker is open."""
-    retry_after = max(1, int(failover.open_until(backend) - time.time()))
+def _backend_unavailable(backend: str, mode: str = FAILOVER_OFF, members: tuple[str, ...] = ()) -> OpenAIError:
+    """503 `backend_unavailable` for a request that may not leave `backend` while its breaker is open.
+
+    With `same-model`, `members` are the accounts the request could have used; Retry-After is the
+    time until the first of them takes a probe again."""
+    members = members or (backend,)
+    retry_after = max(1, int(min(failover.open_until(m) for m in members) - time.time()))
+    rule = ("failover is switched off for this request" if mode == FAILOVER_OFF else
+            "this request may only use the requested model on an account of the same CLI "
+            "(x-cli-proxy-failover: same-model)")
+    scope = "" if len(members) == 1 else f" on every account ({', '.join(members)})"
     return OpenAIError(
-        f"Backend {backend} is temporarily unavailable after repeated failures, and failover "
-        f"is switched off for this request. Retry in about {retry_after} s.",
+        f"Backend {backend} is temporarily unavailable after repeated failures{scope}, and "
+        f"{rule}. Retry in about {retry_after} s.",
         status_code=503, type="api_error", code="backend_unavailable",
         headers={"Retry-After": str(retry_after)},
     )
@@ -817,21 +842,34 @@ def _route_reason(backend: str, model: str) -> str | None:
     return model_routing.route_to_alt(model) if backend == "claude" else None
 
 
-def _attempt_order(backend: str, allow_failover: bool, route_to_alt: bool = False) -> list[str]:
-    """The failover chain, or only `backend` when the caller switched the failover off.
+def _attempt_order(backend: str, mode: str, route_to_alt: bool = False) -> list[str]:
+    """The failover chain (`on`), only `backend` (`off`), or only the accounts of the requested CLI
+    (`same-model`).
 
-    An open breaker is honoured for such a request too: it is answered at once with 503
-    `backend_unavailable` instead of being sent to a backend the breaker currently keeps out
-    (or to its partner). Once the open window elapses one probe passes, as for every request.
+    An open breaker is honoured for a limited request too: a member whose breaker is open is left
+    out, and with none left the request is answered at once with 503 `backend_unavailable` instead
+    of being sent to a backend the breaker currently keeps out (or to its partner). Once the open
+    window elapses one probe passes, as for every request.
+
+    `same-model` is the full chain restricted to the members that run the requested CLI, so for a
+    Claude request it is claude -> claude-alt (breaker sorting as usual) and never codex; for a
+    codex request, or with the failover switched off globally (FAILOVER_ENABLED=0), it is `off`.
 
     `route_to_alt` (a model only the alternative Claude account has) replaces the primary account
-    by the alternative one in both cases; it is routing, so the failover switch does not stop it.
+    by the alternative one in every mode; it is routing, so the failover switch does not stop it.
     """
-    if allow_failover:
+    if mode == FAILOVER_ON:
         return failover.attempt_order(backend, to_alt=route_to_alt)
     target = failover.ALT if route_to_alt and backend == "claude" else backend
+    if mode == FAILOVER_SAME_MODEL and failover.ENABLED and failover.cli_of(target) == "claude":
+        chain = tuple(m for m in failover.attempt_order(backend, to_alt=route_to_alt)
+                      if failover.cli_of(m) == "claude")
+        ready = [m for m in chain if failover.available(m)]
+        if not ready:
+            raise _backend_unavailable(target, mode, chain)
+        return ready
     if not failover.available(target):
-        raise _backend_unavailable(target)
+        raise _backend_unavailable(target, mode)
     return [target]
 
 
@@ -848,14 +886,15 @@ def _not_in_plan_error(target: str, exc: BaseException) -> OpenAIError:
 
 
 def _requeue_after_not_in_plan(
-    target: str, model: str, rest: list[str], tried: set[str], allow_failover: bool,
+    target: str, model: str, rest: list[str], tried: set[str], mode: str,
 ) -> tuple[list[str], str | None]:
     """Remember that `target` lacks `model` and return (remaining attempts, account switched to).
 
-    The other Claude account comes next when it may have the model -- also with the failover off,
-    since it is the same CLI and the same model. Claude accounts known to lack the model drop out.
-    A sibling whose breaker is open is answered with 503 when the failover is off (as for every
-    request) and otherwise goes behind the remaining members, like the breaker sorting does."""
+    The other Claude account comes next when it may have the model -- also with the failover off
+    or `same-model`, since it is the same CLI and the same model. Claude accounts known to lack the
+    model drop out. A sibling whose breaker is open is answered with 503 when the failover is
+    limited (as for every such request) and otherwise goes behind the remaining members, like the
+    breaker sorting does."""
     failover.mark_not_in_plan(target, model_routing.model_key(model))
     log.info("%s: model %s is not in the plan of this account (marked for %ss, no breaker change)",
              target, model or "(default)", failover.NOT_IN_PLAN_TTL_SECONDS)
@@ -867,8 +906,8 @@ def _requeue_after_not_in_plan(
     rest = [t for t in rest if t != other]
     if failover.available(other):
         return [other, *rest], other
-    if not allow_failover:
-        raise _backend_unavailable(other)
+    if mode != FAILOVER_ON:
+        raise _backend_unavailable(other, mode)
     return [*rest, other], other
 
 
@@ -888,7 +927,7 @@ def _empty_result_error(backend: str, target: str, handed_over_flag: bool | None
 
 
 async def _complete_with_failover(
-    req: ChatCompletionRequest, backend: str, response: Response, allow_failover: bool = True,
+    req: ChatCompletionRequest, backend: str, response: Response, mode: str = FAILOVER_ON,
 ) -> ChatCompletionResponse:
     """Serve the completion, handing over to the partner CLI when this one is faulted.
 
@@ -902,7 +941,7 @@ async def _complete_with_failover(
     origin's (which already holds the origin's own fault).
     """
     route = _route_reason(backend, req.model)
-    queue = _attempt_order(backend, allow_failover, route_to_alt=route is not None)
+    queue = _attempt_order(backend, mode, route_to_alt=route is not None)
     routed: set[str] = set()
     origin = backend
     if route is not None:
@@ -934,7 +973,7 @@ async def _complete_with_failover(
             finished = True
             if isinstance(exc, claude_adapter.NotInPlanError):
                 queue, switched = _requeue_after_not_in_plan(
-                    target, target_req.model, queue, tried, allow_failover)
+                    target, target_req.model, queue, tried, mode)
                 if switched is not None and backend == "claude":
                     routed.add(switched)
                     origin = switched
@@ -971,7 +1010,7 @@ async def _complete_with_failover(
 
 
 def _stream_completion(
-    req: ChatCompletionRequest, backend: str, allow_failover: bool = True,
+    req: ChatCompletionRequest, backend: str, mode: str = FAILOVER_ON,
 ) -> StreamingResponse:
     """Streaming (SSE) completion. Tool/structured extraction needs the full text, so when
     those are requested we fall back to a single buffered delta; otherwise we stream tokens.
@@ -987,7 +1026,7 @@ def _stream_completion(
     """
     primary = backend
     route = _route_reason(primary, req.model)
-    order = _attempt_order(primary, allow_failover, route_to_alt=route is not None)
+    order = _attempt_order(primary, mode, route_to_alt=route is not None)
     routed: set[str] = {failover.ALT} if route is not None else set()
     if route is not None:
         model_routing.log_route(req.model, primary, failover.ALT, route)
@@ -1097,7 +1136,7 @@ def _stream_completion(
                 if not emitted and isinstance(exc, claude_adapter.NotInPlanError):
                     try:
                         queue, switched = _requeue_after_not_in_plan(
-                            target, target_req.model, queue, tried, allow_failover)
+                            target, target_req.model, queue, tried, mode)
                     except OpenAIError as unavailable:
                         raise RuntimeError(unavailable.message) from exc
                     if switched is not None and primary == "claude":
@@ -1274,11 +1313,11 @@ async def claude_completions(req: ChatCompletionRequest, http_request: Request, 
     _check_auth(http_request)
     _begin_request(req)
     _begin_timeout(http_request)
-    allow_failover = _failover_allowed(http_request)
+    mode = _failover_mode(http_request)
     if req.stream:
-        return _stream_completion(req, "claude", allow_failover)
+        return _stream_completion(req, "claude", mode)
     async with _inflight_guard():
-        return await _complete_with_failover(req, "claude", response, allow_failover)
+        return await _complete_with_failover(req, "claude", response, mode)
 
 
 @app.post("/v1/codex/chat/completions", response_model=ChatCompletionResponse)
@@ -1289,11 +1328,11 @@ async def codex_completions(req: ChatCompletionRequest, http_request: Request, r
     _begin_request(req)
     _begin_timeout(http_request)
     req = await _resolve_codex_alias(req)
-    allow_failover = _failover_allowed(http_request)
+    mode = _failover_mode(http_request)
     if req.stream:
-        return _stream_completion(req, "codex", allow_failover)
+        return _stream_completion(req, "codex", mode)
     async with _inflight_guard():
-        return await _complete_with_failover(req, "codex", response, allow_failover)
+        return await _complete_with_failover(req, "codex", response, mode)
 
 
 # ---------------------------------------------------------------------------
@@ -1410,11 +1449,11 @@ async def chat_completions(req: ChatCompletionRequest, http_request: Request, re
                 "Use /v1/claude/chat/completions or /v1/codex/chat/completions instead."
             ),
         )
-    allow_failover = _failover_allowed(http_request)
+    mode = _failover_mode(http_request)
     if req.stream:
-        return _stream_completion(req, backend, allow_failover)
+        return _stream_completion(req, backend, mode)
     async with _inflight_guard():
-        return await _complete_with_failover(req, backend, response, allow_failover)
+        return await _complete_with_failover(req, backend, response, mode)
 
 
 @app.get("/v1/claude/models")

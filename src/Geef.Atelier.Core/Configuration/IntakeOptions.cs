@@ -61,7 +61,10 @@ public sealed class IntakeOptions
     /// <summary>Reasoning effort sent with the clarifier call.</summary>
     public string ReasoningEffort { get; set; } = "low";
 
-    /// <summary>Whether the gateway may answer from another CLI when the first one fails.</summary>
+    /// <summary>
+    /// Whether the gateway may answer from another CLI when the first one fails. When false, only another account of the same CLI
+    /// with the same model may answer (<c>x-cli-proxy-failover: same-model</c>).
+    /// </summary>
     public bool AllowFailover { get; set; } = true;
 
     /// <summary>Most shadow clarifications per UTC day.</summary>

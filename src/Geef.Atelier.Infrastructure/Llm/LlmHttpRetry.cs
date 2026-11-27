@@ -3,8 +3,8 @@ using System.Net;
 namespace Geef.Atelier.Infrastructure.Llm;
 
 /// <summary>
-/// Rules for the retry of the shared "llm" <c>HttpClient</c>. A request sent with failover switched off
-/// (<see cref="LlmRequest.DisableFailover"/>) belongs to a caller that handles the cli-proxy answers
+/// Rules for the retry of the shared "llm" <c>HttpClient</c>. A request sent with the failover limited to the requested model
+/// (<see cref="LlmRequest.DisableFailover"/>, header value <c>same-model</c> or the older <c>off</c>) belongs to a caller that handles the cli-proxy answers
 /// <see cref="LlmApiError.EmptyResultCode"/> (502) and <see cref="LlmApiError.BackendUnavailableCode"/> (503) itself:
 /// one retry with a hint for an empty result, an immediate plain message when the CLI is unavailable. Retrying these
 /// answers in the <c>HttpClient</c> would hide the first one and wait for the <c>Retry-After</c> of the second one.
@@ -12,7 +12,7 @@ namespace Geef.Atelier.Infrastructure.Llm;
 internal static class LlmHttpRetry
 {
     /// <summary>
-    /// True when <paramref name="response"/> is a 502 or 503 answer to a request with failover switched off; the
+    /// True when <paramref name="response"/> is a 502 or 503 answer to a request with the failover limited to the requested model; the
     /// <c>HttpClient</c> must not retry it. The request is read from <see cref="HttpResponseMessage.RequestMessage"/>,
     /// which the primary handler sets.
     /// </summary>
@@ -24,8 +24,12 @@ internal static class LlmHttpRetry
         var sent = response.RequestMessage;
         return sent is not null
                && sent.Headers.TryGetValues(OpenAiCompatibleClient.FailoverHeader, out var values)
-               && values.Contains(OpenAiCompatibleClient.FailoverOff, StringComparer.OrdinalIgnoreCase);
+               && values.Any(IsLimitedFailover);
     }
+
+    private static bool IsLimitedFailover(string value) =>
+        string.Equals(value.Trim(), OpenAiCompatibleClient.FailoverSameModel, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(value.Trim(), OpenAiCompatibleClient.FailoverOff, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// True when <paramref name="request"/> carries a time limit for the CLI process (<see cref="OpenAiCompatibleClient.TimeoutHeader"/>).

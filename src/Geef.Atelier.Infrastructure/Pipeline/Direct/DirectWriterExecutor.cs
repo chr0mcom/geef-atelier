@@ -227,7 +227,7 @@ internal sealed class DirectWriterExecutor(
         }
         catch (ProxySignalException signal)
         {
-            logger.LogWarning("Direct writer: the writing service is unavailable and failover is off (iteration {Iteration}): {Detail}", iteration, signal.Detail);
+            logger.LogWarning("Direct writer: the writing service is unavailable and failover to another model is not allowed (iteration {Iteration}): {Detail}", iteration, signal.Detail);
             throw new DirectPathException(DirectPathException.WritingServiceBusy);
         }
 

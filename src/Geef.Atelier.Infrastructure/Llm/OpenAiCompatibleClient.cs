@@ -14,7 +14,15 @@ internal sealed class OpenAiCompatibleClient(
     /// <summary>Header the cli-proxy sets when another CLI served the request (e.g. <c>codex->claude</c>).</summary>
     internal const string FailoverHeader = "x-cli-proxy-failover";
 
-    /// <summary>Value of <see cref="FailoverHeader"/> on a request that must not be failed over.</summary>
+    /// <summary>
+    /// Value of <see cref="FailoverHeader"/> that keeps a request on the requested CLI and model: the cli-proxy may move it to
+    /// another account of the same CLI (same model name), never to another CLI. Sent for <see cref="LlmRequest.DisableFailover"/>.
+    /// A gateway that does not know the value treats it like a request without the header (full failover), so the gateway has
+    /// to be updated before this client.
+    /// </summary>
+    internal const string FailoverSameModel = "same-model";
+
+    /// <summary>Value of <see cref="FailoverHeader"/> that keeps a request on the requested CLI account; no longer sent, still recognised.</summary>
     internal const string FailoverOff = "off";
 
     /// <summary>Request header with the time limit of the CLI process in seconds (<see cref="LlmRequest.ProxyTimeoutSeconds"/>).</summary>
@@ -36,7 +44,7 @@ internal sealed class OpenAiCompatibleClient(
         if (apiKey is { Length: > 0 })
             httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
         if (request.DisableFailover)
-            httpRequest.Headers.Add(FailoverHeader, FailoverOff);
+            httpRequest.Headers.Add(FailoverHeader, FailoverSameModel);
         if (request.ProxyTimeoutSeconds is { } seconds)
             httpRequest.Headers.Add(TimeoutHeader, seconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
         httpRequest.Content = new StringContent(body, Encoding.UTF8, "application/json");
