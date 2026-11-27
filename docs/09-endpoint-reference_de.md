@@ -5,7 +5,8 @@
 *Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: `extraCareful` entfernt; D-091: Etappe 8d, entfernte Endpunkte, Seiten und Werkzeuge herausgenommen: zehn MCP-Werkzeuge und für eine Version fünf Stummel, kein Artefakt-Download, kein SignalR-Hub, keine Werkstatt-Editoren; zuvor `Research:Mode` ausgeliefert `On`; D-083: `profile` und About-me-Felder; Etappe 6: Upload-Ticket; Etappe 5: Werkzeuge für gelieferte Aufträge; Etappen 1 bis 4: Auftrags-Werkzeuge, Rückfragen, Prüfstand, nachgeschlagene Stellen)*
 
 Alle von außen erreichbaren HTTP-Endpunkte von Geef.Atelier: MCP, OAuth 2.1
-sowie Web-UI- und Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
+sowie Web-UI- und Account-Endpunkte. Die Beispiele nutzen die Basis-URL `https://atelier.example.com`; bei dir ist es die
+öffentliche Adresse deiner Installation (`OAuth:Issuer`).
 
 ---
 
@@ -24,7 +25,7 @@ Der eigentliche MCP-Endpunkt. Clients senden hier ihre JSON-RPC-Requests (Tool-C
 
 Wenn kein oder ein ungültiges Token mitgeschickt wird, antwortet der Server mit `401 Unauthorized` und dem Header:
 ```
-WWW-Authenticate: Bearer resource_metadata="https://geef.stefan-bechtel.de/.well-known/oauth-protected-resource"
+WWW-Authenticate: Bearer resource_metadata="https://atelier.example.com/.well-known/oauth-protected-resource"
 ```
 Darüber entdecken OAuth-fähige Clients automatisch den Authorization Server.
 
@@ -284,11 +285,11 @@ Gibt die Server-Metadaten als JSON zurück. Clients nutzen diesen Endpunkt zur a
 
 ```json
 {
-  "issuer": "https://geef.stefan-bechtel.de",
-  "authorization_endpoint": "https://geef.stefan-bechtel.de/oauth/authorize",
-  "token_endpoint": "https://geef.stefan-bechtel.de/oauth/token",
-  "registration_endpoint": "https://geef.stefan-bechtel.de/oauth/register",
-  "revocation_endpoint": "https://geef.stefan-bechtel.de/oauth/revoke",
+  "issuer": "https://atelier.example.com",
+  "authorization_endpoint": "https://atelier.example.com/oauth/authorize",
+  "token_endpoint": "https://atelier.example.com/oauth/token",
+  "registration_endpoint": "https://atelier.example.com/oauth/register",
+  "revocation_endpoint": "https://atelier.example.com/oauth/revoke",
   "response_types_supported": ["code"],
   "grant_types_supported": ["authorization_code", "refresh_token"],
   "code_challenge_methods_supported": ["S256"],
@@ -308,8 +309,8 @@ Gibt Metadaten zur geschützten Ressource (dem MCP-Server) zurück.
 
 ```json
 {
-  "resource": "https://geef.stefan-bechtel.de/mcp",
-  "authorization_servers": ["https://geef.stefan-bechtel.de"],
+  "resource": "https://atelier.example.com/mcp",
+  "authorization_servers": ["https://atelier.example.com"],
   "bearer_methods_supported": ["header"],
   "scopes_supported": ["mcp:full"]
 }
@@ -376,7 +377,7 @@ Startet den Authorization-Code-Flow. Zeigt dem eingeloggten Nutzer die Consent-S
 
 Beispiel-URL wie sie Claude Desktop aufruft:
 ```
-https://geef.stefan-bechtel.de/oauth/authorize
+https://atelier.example.com/oauth/authorize
   ?response_type=code
   &client_id=claude-ai
   &redirect_uri=https%3A%2F%2Fclaude.ai%2Fapi%2Fmcp%2Fauth_callback
@@ -394,7 +395,7 @@ Die `GET /oauth/authorize`-Seite ist eine server-gerenderte Blazor-Consent-Seite
 
 #### `POST /oauth/consent`
 
-**Auth:** Cookie (Geef.Atelier-Login); ohne Anti-Forgery-Token (die Anfrage wird gegen die registrierten Redirect-URIs geprüft)  
+**Auth:** Cookie (Geef.Atelier-Login)  
 **Content-Type:** `application/x-www-form-urlencoded`
 
 Submit-Ziel der Consent-Seite. Verarbeitet die Zustimmung/Ablehnung des Nutzers,

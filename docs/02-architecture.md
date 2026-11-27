@@ -121,7 +121,7 @@ Geef pipeline from the run's snapshot:
    "What was checked" sentences of the web page and of `get_order_result` come from it.
 
 **Convergence policy:** `DefaultConvergencePolicy` built from the `Convergence` section (`ConvergenceOptions`) and
-overridden by the setup (both setups: two passes, no abort on a critical finding, no regression detection). A reviewer that
+overridden by the setup (two passes, no abort on a critical finding, no regression detection). A reviewer that
 fails for technical reasons does not block; the run records a warning.
 
 ## Run orchestrator
@@ -145,8 +145,7 @@ their result was being stored) get an outcome and a warning (see below).
 Each run stores a `CrewSnapshot` (JSON in `Runs.CrewSnapshot`): schema version, setup name, the full writer profile, the
 check profiles, the evaluation strategy and the convergence override. It is built by `ICrewService` from the code-only
 profiles: the model matrix (`ModelMatrix`, `IModelAssignmentService`, D-066) assigns a model to every role with a slot, and
-model aliases are resolved to concrete ids. There are no user-editable profiles or templates any more. The request check has
-no slot and keeps a fixed binding, on another model than the writer.
+model aliases are resolved to concrete ids. There are no user-editable profiles or templates any more.
 
 ## Data model
 
@@ -334,17 +333,6 @@ dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "FullyQu
 
 The tests need Docker and run in their own collection without parallelism. A new path through the system should get its own
 end-to-end test, from the entry point to the stored result.
-
-### Test against exported snapshots
-
-`ProductionSnapshotFixtureTests` reads exported snapshots through the strict run-time read and checks that each one either
-runs on the direct path or is refused with the plain sentence above. The exports contain real orders and are **never** part
-of the repository; without the variables the test is skipped.
-
-| Variable | Meaning |
-|---|---|
-| `ATELIER_SNAPSHOT_FIXTURES` | Directory with one exported snapshot per run (`*.json`). |
-| `ATELIER_SNAPSHOT_FIXTURES_MIN` | Minimum number of files the export must contain (default 1), so that an incomplete export fails. |
 
 ### Measuring tools and operations scripts
 

@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: „Extra careful“ entfernt, eine Aufstellung; D-091: Stufe 8d, neu geschrieben auf den heutigen Stand: zwei Aufstellungen im Code, Crew-Snapshot, Modellmatrix, Prüfer des Direktwegs, alte Läufe; die entfernten Teile stehen am Ende; zuvor 2026-11-26 Hinweis, wo das Crew-System steht, D-076: Dateien über das Upload-Ticket; 2026-11-25, D-075 Teil B: Nachbesserungslauf, D-074: Recherche im Grounding-Schritt; 2026-11-24, D-067: strenges Lesen des Snapshots; ältere Vermerke stehen in der Git-Historie)
+Letzte Aktualisierung: 2026-11-27 (zweiter Zusatz zu D-087: „Extra careful“ entfernt, eine Aufstellung; D-091: Stufe 8d, neu geschrieben auf den heutigen Stand: die Aufstellung im Code, Crew-Snapshot, Modellmatrix, Prüfer des Direktwegs, alte Läufe; die entfernten Teile stehen am Ende; zuvor 2026-11-26 Hinweis, wo das Crew-System steht, D-076: Dateien über das Upload-Ticket; 2026-11-25, D-075 Teil B: Nachbesserungslauf, D-074: Recherche im Grounding-Schritt; 2026-11-24, D-067: strenges Lesen des Snapshots; ältere Vermerke stehen in der Git-Historie)
 
 ## Überblick
 
@@ -81,24 +81,24 @@ Das Beispiel zeigt den **Aufbau**. Prompts sind gekürzt, Modell-IDs sind Platzh
   Modell-IDs, und ein fortgesetzter Lauf nutzt dieselben. Ist der Katalog nicht erreichbar, bleibt der Alias stehen.
 
 **Snapshot für einen Lauf lesen (D-067).** Der Orchestrator liest ihn streng mit `CrewSnapshot.DeserializeForRun`. Ein
-fehlender, unlesbarer oder leerer Snapshot, eine Schema-Version außerhalb von 1 bis 3 oder ein Snapshot ohne Schreiber,
-Reviewer-Liste oder Advisor-Liste löst `InvalidCrewSnapshotException` aus, und der Lauf endet `Failed` mit klarer Meldung.
+fehlender, unlesbarer oder leerer Snapshot, eine andere Schema-Version als die aktuelle (4, seit D-092) oder ein Snapshot
+ohne Schreiber oder Reviewer-Liste löst `InvalidCrewSnapshotException` aus, und der Lauf endet `Failed` mit klarer Meldung.
 Eine Ersatz-Aufstellung gibt es nicht. Das tolerante `CrewSnapshot.Deserialize` dient nur der Anzeige. Auch ein Snapshot ohne
 Reviewer oder mit einem Reviewer, den diese Version nicht kennt, wird beim Bau der Pipeline abgelehnt: Ohne Prüfungen gibt
 es keinen Text.
 
 ## Modellmatrix (D-066)
 
-Ein Profil nennt seine **Rolle** (`ModelSlot`), die Aufstellung ihre **Domäne** (`ModelDomain`; beide Aufstellungen sind
+Ein Profil nennt seine **Rolle** (`ModelSlot`), die Aufstellung ihre **Domäne** (`ModelDomain`; `direct` ist
 `General`), und `Core/Domain/Crew/Models/ModelMatrix` hält die geordneten Kandidaten. `SystemCrew` enthält keine
 Modell-Literale: Die an einem Profil gezeigte Bindung ist der erste Kandidat seines Slots. Claude läuft über `claude-cli`,
 OpenAI über `codex-cli`.
 
 | Slot | Verwendet von | Kandidaten der Reihe nach (General) |
 |---|---|---|
-| `Executor` | Schreiber, Planungsaufruf | Claude Opus, Codex Sol |
+| `Executor` | Schreiber | Claude Opus, Codex Sol |
 | `FactReviewer` | Faktenprüfung | Codex Astra, Claude Opus, Gemini 4 Neon (bezahlt), Claude Sonnet |
-| `Intake` | Rückfragen vor dem Schreiben (D-071); die Prüfung der Anforderungen nimmt den ersten Kandidaten als feste Bindung | Claude Sonnet, Codex Sol |
+| `Intake` | Rückfragen vor dem Schreiben (D-071) | Claude Sonnet, Codex Sol |
 | `GroundingRefiner` | Auswahl der Ausschnitte in der Recherche | Claude Sonnet, Codex Sol |
 
 Enum und Matrix behalten weitere Slots und Domänen, die derzeit keine Aufstellung nutzt; die Zahlen stehen in alten
@@ -298,7 +298,7 @@ Modells samt seinem einen Ersatz lassen die Tatsachen ungeprüft, und „What wa
   Failover des Gateways ist auf dasselbe Modell beschränkt (D-090). Aufrufe, Modell und Ersatz stehen im Bericht
   (`factCheck`), nie als Warnung.
 - **Persistenz:** Befunde behalten `Category = fact-check`, `Code` (`fact.unsupported`, `fact.instruction`, `fact.superseded`,
-  `fact.source_conflict`) und `Quote`; `Runs.FactCheckMode` hält den Modus des Laufs (Migration Step50). Wird ein Konto gelöscht
+  `fact.source_conflict`) und `Quote`; `Runs.FactCheckMode` hält den Modus des Laufs. Wird ein Konto gelöscht
   oder umbenannt, verlieren seine Läufe jede Kopie der About-me-Angaben: den Block im Auftrag, den Auftrag in den gespeicherten
   Ereignissen (`PipelineStartedEvent.Input` und jeder andere Text eines Ereignisses, der den Block oder die Angaben wörtlich
   enthält) und was die Faktenprüfung in Bericht, Befunde und Ereignisse kopiert hat. Läufe, die eine frühere Version schon
@@ -366,7 +366,7 @@ ist, kommt sie deshalb außerhalb des MCP-Aufrufs an:
 **Aufräumen** (stündlicher Aufräumdienst der Quellen): `Receiving` länger als `Sources:UploadTimeout` + 1 Minute → `Open` bzw.
 `Failed` (nach einem Absturz; ein laufender Upload endet vorher an der Zeitgrenze seiner Anfrage). Dieselbe Frist prüft der
 Ticketdienst bei jedem Zugriff auf das Ticket (Seite, Token- oder Seiten-Upload) und gibt ein hängendes Ticket sofort frei, statt
-auf den nächsten Lauf zu warten; der Versuch bleibt dabei gezählt. Tickets 7 Tage
+auf den nächsten Lauf zu warten; der Versuch bleibt dabei gezählt. Tickets werden 7 Tage
 (`Uploads:TicketRetention`) nach Ablauf der Seite gelöscht; Zeilen in `SourceRefusals` nach 180 Tagen
 (`Uploads:RefusalRetention`). Wird eine Quelle gelöscht, wird `UploadTickets.SourceId` `NULL`.
 
@@ -444,7 +444,7 @@ als `ParentRunId` und Ausgangstext, ihr Brief neu zusammengesetzt, gespeichert �
 
 ## Entfernte Teile (Stufe 8d, D-091)
 
-Der Code der folgenden Teile ist entfernt; ihre Datenbanktabellen und -spalten bleiben unangetastet.
+Der Code der folgenden Teile ist entfernt; ihre Datenbanktabellen und -spalten wurden mit dem Aufräumen der Datenbank gelöscht (D-092).
 
 - Die alte Prüfschleife mit den Vorlagen `klassik`, `juristisch`, `akademisch`, `marketing` und jedem eigenen Team; die
   Werkstatt-Seiten und Editoren für Teams und Profile (die Provider-Seiten bleiben) und das Werkstatt-Dashboard.

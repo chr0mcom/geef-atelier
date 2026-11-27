@@ -126,7 +126,7 @@ weist jeden Lauf ab, den keiner annimmt.
    (`Outcome`) gesetzt wird. Die Sätze „What was checked“ der Webseite und von `get_order_result` stammen daraus.
 
 **Konvergenzregel:** `DefaultConvergencePolicy` aus dem Abschnitt `Convergence` (`ConvergenceOptions`), überschrieben von
-der Zusammenstellung (beide: zwei Durchgänge, kein Abbruch bei einem kritischen Befund, keine Regressionserkennung). Ein
+der Zusammenstellung (zwei Durchgänge, kein Abbruch bei einem kritischen Befund, keine Regressionserkennung). Ein
 Reviewer, der technisch ausfällt, blockiert nicht; der Lauf bekommt eine Warnung.
 
 ## Lauf-Orchestrator
@@ -152,8 +152,7 @@ Jeder Lauf speichert einen `CrewSnapshot` (JSON in `Runs.CrewSnapshot`): Schemav
 vollständige Schreiberprofil, die Prüfprofile, die Auswertungsstrategie und die Konvergenz-Überschreibung. `ICrewService`
 baut ihn aus den Profilen, die nur im Code stehen: Die Modellmatrix (`ModelMatrix`, `IModelAssignmentService`, D-066) weist
 jeder Rolle mit Slot ein Modell zu, und Modell-Aliasse werden zu konkreten IDs aufgelöst. Von Nutzern änderbare Profile oder
-Vorlagen gibt es nicht mehr. Die Anforderungsprüfung hat keinen Slot und behält eine feste Bindung, auf einem anderen Modell
-als der Schreiber.
+Vorlagen gibt es nicht mehr.
 
 ## Datenmodell
 
@@ -342,17 +341,6 @@ dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "FullyQu
 
 Die Tests brauchen Docker und laufen in einer eigenen Sammlung ohne Parallelität. Ein neuer Weg durch das System soll einen
 eigenen Ende-zu-Ende-Test bekommen, vom Eingang bis zum gespeicherten Ergebnis.
-
-### Test gegen exportierte Snapshots
-
-`ProductionSnapshotFixtureTests` liest exportierte Snapshots durch das strenge Lesen zur Laufzeit und prüft, dass jeder
-entweder auf dem Direktweg läuft oder mit dem einfachen Satz oben abgewiesen wird. Die Exporte enthalten echte Aufträge und
-gehören **nie** ins Repository; ohne die Variablen wird der Test übersprungen.
-
-| Variable | Bedeutung |
-|---|---|
-| `ATELIER_SNAPSHOT_FIXTURES` | Verzeichnis mit einem exportierten Snapshot je Lauf (`*.json`). |
-| `ATELIER_SNAPSHOT_FIXTURES_MIN` | Mindestzahl der Dateien im Export (Standard 1), damit ein unvollständiger Export auffällt. |
 
 ### Messwerkzeuge und Betriebsskripte
 

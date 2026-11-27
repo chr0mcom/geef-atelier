@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-11-27 (second addendum to D-087: "Extra careful" removed, one setup; D-091: stage 8d, rewritten to what exists now: two setups in code, crew snapshot, model matrix, reviewers of the direct path, the removed parts are listed at the end; before that 2026-11-26 note on where the crew system fits, D-076: files through the upload ticket; 2026-11-25, D-075 part B: change run, D-074: research in the grounding step; 2026-11-24, D-067: strict snapshot reading; older notes are in the git history)
+Last updated: 2026-11-27 (second addendum to D-087: "Extra careful" removed, one setup; D-091: stage 8d, rewritten to what exists now: the setup in code, crew snapshot, model matrix, reviewers of the direct path, the removed parts are listed at the end; before that 2026-11-26 note on where the crew system fits, D-076: files through the upload ticket; 2026-11-25, D-075 part B: change run, D-074: research in the grounding step; 2026-11-24, D-067: strict snapshot reading; older notes are in the git history)
 
 ## Overview
 
@@ -80,22 +80,22 @@ The example shows the **structure**. Prompts are cut and model ids are placehold
   ids, and a resumed run uses the same ones. If the catalog cannot be reached, the alias stays.
 
 **Reading a snapshot for a run (D-067).** The orchestrator reads it strictly with `CrewSnapshot.DeserializeForRun`. A missing,
-unreadable or empty snapshot, a schema version outside 1 to 3, or a snapshot without writer, reviewer list or advisor list
-raises `InvalidCrewSnapshotException`, and the run ends `Failed` with a clear message. There is no fallback setup. The
+unreadable or empty snapshot, a schema version other than the current one (4, since D-092), or a snapshot without writer or
+reviewer list raises `InvalidCrewSnapshotException`, and the run ends `Failed` with a clear message. There is no fallback setup. The
 tolerant `CrewSnapshot.Deserialize` is for display only. A snapshot without any reviewer, or with a reviewer this version does
 not know, is refused as well when the pipeline is built: there is no text without checks.
 
 ## Model matrix (D-066)
 
-A profile states its **role** (`ModelSlot`), the setup states its **domain** (`ModelDomain`; both setups are `General`), and
+A profile states its **role** (`ModelSlot`), the setup states its **domain** (`ModelDomain`; `direct` is `General`), and
 `Core/Domain/Crew/Models/ModelMatrix` holds the ordered candidates. `SystemCrew` has no model literals: the binding shown on a
 profile is the primary of its slot. Claude runs through `claude-cli`, OpenAI through `codex-cli`.
 
 | Slot | Used by | Candidates in order (General) |
 |---|---|---|
-| `Executor` | writer, planning call | Claude Opus, Codex Sol |
+| `Executor` | writer | Claude Opus, Codex Sol |
 | `FactReviewer` | fact check | Codex Astra, Claude Opus, Gemini 4 Neon (paid), Claude Sonnet |
-| `Intake` | questions before writing (D-071); the request check takes its primary as a fixed binding | Claude Sonnet, Codex Sol |
+| `Intake` | questions before writing (D-071) | Claude Sonnet, Codex Sol |
 | `GroundingRefiner` | picking passages in the research | Claude Sonnet, Codex Sol |
 
 The enum and the matrix keep further slots and domains that no setup uses now; the numbers are stored in old snapshots, so
@@ -291,7 +291,7 @@ model and its one fallback leave the facts unchecked, and "What was checked" say
   gateway's own failover is limited to the same model (D-090). Calls, model and fallback are in the report (`factCheck`),
   never shown as a warning.
 - **Persistence:** findings keep `Category = fact-check`, `Code` (`fact.unsupported`, `fact.instruction`, `fact.superseded`,
-  `fact.source_conflict`) and `Quote`; `Runs.FactCheckMode` holds the mode of the run (migration Step50). When an account is
+  `fact.source_conflict`) and `Quote`; `Runs.FactCheckMode` holds the mode of the run. When an account is
   deleted or renamed, its runs lose every copy of the About me details: the block in the briefing, the briefing in the stored
   events (`PipelineStartedEvent.Input` and any other text of an event that holds the block or the details word for word) and
   what the fact check copied into report, findings and events. Runs cleaned by an earlier version are cleaned again with the
@@ -357,7 +357,7 @@ arrives outside the MCP call:
 **Cleanup** (hourly cleanup service of the sources): `Receiving` for longer than `Sources:UploadTimeout` + 1 minute → `Open` or
 `Failed` (after a crash; a running upload ends earlier at the time limit of its request). The ticket service checks the same
 deadline at every access to the ticket (page, token or page upload) and releases a hanging ticket right away instead of waiting
-for the next pass; the attempt stays counted. tickets deleted 7 days
+for the next pass; the attempt stays counted. Tickets are deleted 7 days
 (`Uploads:TicketRetention`) after the page expired; rows of `SourceRefusals` after 180 days (`Uploads:RefusalRetention`). When a
 source is deleted, `UploadTickets.SourceId` becomes `NULL`.
 
@@ -435,7 +435,7 @@ when a later version of the order has a text (`RevisionLines.ResumeLaterVersion`
 
 ## Removed parts (stage 8d, D-091)
 
-The code of the following parts is gone; their database tables and columns stay untouched.
+The code of the following parts is gone; their database tables and columns were dropped with the database cleanup (D-092).
 
 - The old review loop with the templates `klassik`, `juristisch`, `akademisch`, `marketing` and every own team; the workshop
   pages and editors for teams and profiles (the provider pages stay) and the workshop dashboard.

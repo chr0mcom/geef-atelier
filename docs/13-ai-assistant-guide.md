@@ -124,7 +124,7 @@ list is refused with a plain sentence, and no order is created.
   it off, also per person), only for the first version, only when the questions step ran and only when the order has no files.
   The search service gets short search words taken from the request. Atelier tries to leave out email addresses, phone numbers, account numbers and street addresses that it recognizes. It does
   not recognize every form, and names or other personal details in the request can end up in the search words. The answers and
-  files are never sent. Words from the About me details are held back unless the request also has them in the request, but a
+  files are never sent. Words from the About me details are held back unless the request has them too, but a
   translated or reworded detail can slip through. `lookedUp.searchWords` lists the words that went out (only for the person's
   own order, also without a text). `revise_order` does not search again.
   When the daily limit is reached, the text is written without it and `lookedUp` says so; the order does not fail.
