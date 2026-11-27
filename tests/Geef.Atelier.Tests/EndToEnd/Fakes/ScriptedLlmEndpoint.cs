@@ -116,6 +116,20 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
     public static bool IsRecheckCall(RecordedLlmCall call) => SchemaName(call.RawBody) == FactCheckSchema.RecheckName;
 
     /// <summary>Answer of the research condenser once the queue is empty: no passage.</summary>
+    /// <summary>Default answer of the requirements check of the outline template (D-087): nothing listed.</summary>
+    public const string DefaultRequirementsJson = """{"requirements":[]}""";
+
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(string? Json, int Status, string? Code)> _requirementsAnswers = new();
+
+    /// <summary>Queues the answer of the next requirements check.</summary>
+    public void EnqueueRequirementsJson(string json) => _requirementsAnswers.Enqueue((json, 200, null));
+
+    /// <summary>Queues a failing requirements check.</summary>
+    public void EnqueueRequirementsError(int status, string code = "scripted") => _requirementsAnswers.Enqueue((null, status, code));
+
+    /// <summary>True for a call of the requirements check.</summary>
+    public static bool IsRequirementsCall(RecordedLlmCall call) => SchemaName(call.RawBody) == Geef.Atelier.Infrastructure.Pipeline.Direct.RequirementsCheckReviewer.SchemaName;
+
     public const string DefaultPassagesJson = """{"passages":[]}""";
 
     private readonly System.Collections.Concurrent.ConcurrentQueue<(string? Json, int Status, string? Code)> _passagesAnswers = new();
@@ -163,6 +177,11 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
                 return factCode is not null
                     ? PlainError(factStatus, factCode)
                     : Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = factJson }, "stop"));
+            case Geef.Atelier.Infrastructure.Pipeline.Direct.RequirementsCheckReviewer.SchemaName:
+                var (reqJson, reqStatus, reqCode) = _requirementsAnswers.TryDequeue(out var req) ? req : (DefaultRequirementsJson, 200, null);
+                return reqCode is not null
+                    ? PlainError(reqStatus, reqCode)
+                    : Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = reqJson }, "stop"));
             case FactCheckSchema.RecheckName:
                 var recheckJson = _recheckAnswers.TryDequeue(out var recheck) ? recheck : DefaultRecheckJson;
                 return Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = recheckJson }, "stop"));

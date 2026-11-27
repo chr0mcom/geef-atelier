@@ -3522,6 +3522,25 @@ with and without the clarifier.
 
 **Way back:** switch `Off` (default), remove the exceptions.
 
+**Addendum to D-087 – repair of K (2026-11-27).** The measurement showed that neither K nor L won against the direct path. Under the rule
+fixed in advance, exactly one repair of K follows. According to the reasons of the blind juror, K lost mainly on explicit requirements
+of the request it did not meet. The repair is general, not cut to particular tasks, and sits in the same switch `Orders:CarefulOutline`
+(unchanged with `Off`):
+- The template `direct-outline` gets a third check `requirements-check`. After the **first** version, one call of a model other than the
+  writer (the intake's standard model, without falling back to another model, 120 s) gets only the person's own words: the request text,
+  their own answers and the changes they asked for, never assumptions, About me, headings or files. It lists every explicit requirement
+  word for word and says whether the text meets it. The code still checks the length.
+- Only “not met” with a quote of at least three words or twelve characters that stands in these words at word boundaries (compared
+  without case and white space) blocks, at most ten. Finding and correction consist only of the fixed sentence “The request asks: "…".
+  The text does not meet this yet.” with the verified quote; free text of the check reaches neither the writer nor the report or the page.
+- Later versions are not checked again (cost cap), so whether the correction meets every point stays unchecked.
+- A failure is not repeated and never blocks; the order gets the note “Whether the text meets every point of the request could not be
+  checked.”, and a call without an answer still gets a cost line. The prompt names no kind of text.
+- Evidence: unit tests (reading, the quote must stand in the request, the sentence, the prompt), pipeline tests over the real assembly
+  (met, not met with correction, quote not in the request, failure, direct path never checks) and end-to-end over MCP. The repair is
+  measured with the same criteria against the stored texts of the direct path. Without a win the checkbox goes and long texts run on the
+  direct path.
+
 ## D-088 — MCP: skill and questions as a form, both behind switches and shipped off (2026-11-27)
 
 **Status:** built and tested (steps 2 and 3 of the review of new MCP capabilities); both switches shipped `Off`; acceptance on the

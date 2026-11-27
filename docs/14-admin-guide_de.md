@@ -94,7 +94,8 @@ Was die Werte bedeuten:
   `Orders__CarefulOutlineOverrides__<name>=On`): Mit `On` läuft ein „Extra careful“-Auftrag ohne gewähltes Team auf dem Standardweg mit
   einem Aufruf vorweg, der den Text in Abschnitte mit Wortbudgets gliedert (aus der verlangten Länge, wenn sie sich ohne Modell lesen
   lässt); der Schreiber schreibt danach, mit denselben automatischen Prüfungen, derselben Faktenprüfung und demselben „What was
-  checked“ wie der Standardweg. Kommt keine brauchbare Gliederung zurück, wird in einem Zug geschrieben und der Auftrag sagt das. Ein
+  checked“ wie der Standardweg, dazu einer Prüfung nach der ersten Fassung, ob jede ausdrückliche Vorgabe des Auftrags erfüllt ist
+  (sonst eine Korrektur). Kommt keine brauchbare Gliederung zurück, wird in einem Zug geschrieben und der Auftrag sagt das. Ein
   gewähltes Team, Änderungen und fortgesetzte Läufe planen nie. Bleibt aus, bis die Messung von Paket 7 entschieden hat (D-087).
 
 **Einen Schalter setzen.** Die Einstellungen werden beim Start gelesen. Setz sie als Umgebungsvariablen des Webdienstes, mit `__`

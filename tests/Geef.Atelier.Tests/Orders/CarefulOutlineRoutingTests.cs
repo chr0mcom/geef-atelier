@@ -86,7 +86,14 @@ public sealed class CarefulOutlineRoutingTests
 
         Assert.Equal(SystemCrew.DirectOutlineTemplateName, resolved.Snapshot.TemplateName);
         Assert.Null(resolved.Snapshot.GroundingProviders);
-        Assert.Equal(SystemCrew.DirectTemplate with { Name = SystemCrew.DirectOutlineTemplateName, DisplayName = SystemCrew.DirectOutlineTemplate.DisplayName, Description = SystemCrew.DirectOutlineTemplate.Description }, SystemCrew.DirectOutlineTemplate);
+        Assert.Equal(SystemCrew.DirectTemplate with
+        {
+            Name = SystemCrew.DirectOutlineTemplateName,
+            DisplayName = SystemCrew.DirectOutlineTemplate.DisplayName,
+            Description = SystemCrew.DirectOutlineTemplate.Description,
+            ReviewerProfileNames = SystemCrew.DirectOutlineTemplate.ReviewerProfileNames,
+        }, SystemCrew.DirectOutlineTemplate);
+        Assert.Equal([.. SystemCrew.DirectTemplate.ReviewerProfileNames, SystemCrew.RequirementsCheckProfile.Name], SystemCrew.DirectOutlineTemplate.ReviewerProfileNames);
         Assert.True(SystemCrew.IsDirectPathTemplate(SystemCrew.DirectOutlineTemplateName));
         Assert.True(SystemCrew.IsDirectPathTemplate(SystemCrew.DirectTemplateName));
         Assert.False(SystemCrew.IsDirectPathTemplate(SystemCrew.KlassikTemplateName));

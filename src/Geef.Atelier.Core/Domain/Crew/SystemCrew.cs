@@ -887,6 +887,21 @@ public static class SystemCrew
         IsSystem: true,
         ModelSlot: ModelSlot.FactReviewer);
 
+    /// <summary>
+    /// Check of "Extra careful" with an outline (D-087, repair): lists the explicit requirements of the request word for word and says
+    /// whether the first version meets them; the implementation is injected at pipeline build time. Fixed to the standard model of the
+    /// intake (another model than the writer), without a slot, so that the model assignment keeps it.
+    /// </summary>
+    public static readonly ReviewerProfile RequirementsCheckProfile = new(
+        Name: "requirements-check",
+        DisplayName: "Request check",
+        Description: "Checks whether the first version meets every explicit requirement of the request. Injected at pipeline build time.",
+        SystemPrompt: "Requirements check -- injected at pipeline build time.",
+        Provider: ModelMatrix.Primary(ModelSlot.Intake).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.Intake).Model,
+        MaxTokens: 8192,
+        IsSystem: true);
+
     /// <summary>Passes the files attached to an order in full text (careful mode).</summary>
     public static readonly GroundingProviderProfile OrderSourcesProfile = new(
         Name: "order-sources",
@@ -916,13 +931,15 @@ public static class SystemCrew
 
     /// <summary>
     /// Code-only template of "Extra careful" with an outline first (D-087): the direct template under its own name, so that the run
-    /// records that one call planned sections with word budgets before the writing pass. Same writer, checks, fact check and passes.
+    /// records that one call planned sections with word budgets before the writing pass. Same writer, checks, fact check and passes, plus
+    /// the check of the explicit requirements of the request after the first version (<see cref="RequirementsCheckProfile"/>, repair of D-087).
     /// </summary>
     public static readonly CrewTemplate DirectOutlineTemplate = DirectTemplate with
     {
         Name = DirectOutlineTemplateName,
         DisplayName = "Extra careful",
-        Description = "Plans the text in sections with word budgets first, then one writing pass along that plan, with the same automatic checks, fact check and correction as the direct path.",
+        Description = "Plans the text in sections with word budgets first, then one writing pass along that plan, with the same automatic checks and fact check as the direct path and a check that every explicit requirement of the request is met, followed by at most one correction.",
+        ReviewerProfileNames = [DeterministicChecksProfile.Name, SourceFactCheckProfile.Name, RequirementsCheckProfile.Name],
     };
 
     /// <summary>Executor profiles that exist only in code, indexed by name.</summary>
@@ -938,6 +955,7 @@ public static class SystemCrew
         {
             [DeterministicChecksProfile.Name] = DeterministicChecksProfile,
             [SourceFactCheckProfile.Name] = SourceFactCheckProfile,
+            [RequirementsCheckProfile.Name] = RequirementsCheckProfile,
         };
 
     /// <summary>Crew templates that exist only in code, indexed by name.</summary>

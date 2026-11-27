@@ -3656,6 +3656,26 @@ Ende-zu-Ende über MCP mit und ohne Klärer.
 
 **Rückweg:** Schalter `Off` (Standard), Ausnahmen entfernen.
 
+**Zusatz zu D-087 – Reparatur an K (2026-11-27).** Die Messung ergab: Weder K noch L gewann gegen den Direktweg. Nach der vorab
+festgelegten Regel folgt genau eine Reparatur an K. Laut den Begründungen des blinden Jurors verlor K vor allem an nicht eingehaltenen
+ausdrücklichen Vorgaben des Auftrags. Die Reparatur ist allgemein gehalten, nicht auf einzelne Aufgaben zugeschnitten, und liegt im
+selben Schalter `Orders:CarefulOutline` (mit `Off` unverändert):
+- Die Vorlage `direct-outline` bekommt eine dritte Prüfung `requirements-check`. Nach der **ersten** Fassung bekommt ein Aufruf eines
+  anderen Modells als des Schreibers (das Standardmodell des Klärers, ohne Ausweichen auf ein anderes Modell, 120 s) nur die eigenen
+  Worte der Person: den Auftragstext, ihre eigenen Antworten und ihre Änderungswünsche, nie Annahmen, About me, Überschriften oder
+  Dateien. Er listet jede ausdrückliche Vorgabe wörtlich auf und sagt, ob der Text sie erfüllt. Die Länge prüft weiter der Code.
+- Blockierend wird nur „nicht erfüllt“ mit einem Zitat von mindestens drei Wörtern oder zwölf Zeichen, das in diesen Worten an
+  Wortgrenzen steht (Vergleich ohne Groß-/Kleinschreibung und Leerraum), höchstens zehn. Befund und Korrektur bestehen nur aus dem
+  festen Satz „The request asks: "…". The text does not meet this yet.“ mit dem geprüften Zitat; freier Text des Prüfers erreicht
+  weder den Schreiber noch Bericht oder Anzeige.
+- Spätere Fassungen werden nicht erneut geprüft (Kostendeckel). Ob die Korrektur jeden Punkt trifft, bleibt deshalb ungeprüft.
+- Ein Ausfall wird nicht wiederholt und blockiert nie; der Auftrag bekommt den Hinweis „Whether the text meets every point of the request
+  could not be checked.“, und auch ein Aufruf ohne Antwort bekommt einen Kostenposten. Der Prompt nennt keine Textsorte.
+- Nachweis: Einheitstests (Lesen, Zitat muss im Auftrag stehen, Satz, Prompt), Pipeline-Tests über den echten Zusammenbau (erfüllt,
+  nicht erfüllt mit Korrektur, Zitat nicht im Auftrag, Ausfall, Direktweg prüft nie) und Ende-zu-Ende über MCP. Gemessen wird die
+  Reparatur mit denselben Kriterien gegen die gespeicherten Texte des Direktwegs. Ohne Sieg entfällt das Häkchen, und lange Texte laufen
+  im Direktweg.
+
 ## D-088 — MCP: Skill und Rückfragen als Formular, beide hinter Schaltern und ausgeliefert aus (2026-11-27)
 
 **Status:** gebaut und getestet (Schritte 2 und 3 der Prüfung neuer MCP-Fähigkeiten); beide Schalter ausgeliefert `Off`; Abnahme am
