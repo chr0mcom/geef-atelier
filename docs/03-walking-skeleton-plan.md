@@ -212,7 +212,7 @@ Details see decisions log D-017 (step-6 section)
 
 **Goal:** a second frontend adapter alongside the web UI. External MCP clients (Claude Desktop, Claude Code, own agents) can submit jobs, query status, fetch results.
 
-**Prerequisite:** steps 1–8 + M1 in main. App reachable at `95.216.100.213:8080` with cookie auth already. Step 9 adds a second auth path (bearer token) and a second frontend adapter (MCP) — the existing cookie UI stays unchanged.
+**Prerequisite:** steps 1–8 + M1 in main. App reachable at `<server-ip>:8080` with cookie auth already. Step 9 adds a second auth path (bearer token) and a second frontend adapter (MCP) — the existing cookie UI stays unchanged.
 
 **Architectural implication:** with step 9 the system has, for the first time, **two frontends running in parallel** over the same application service layer (`IRunService`). This is the actual litmus test for the layering discipline of the previous steps. If `IRunService` and its contracts are clean enough, MCP should require no pipeline/domain/orchestrator changes.
 
@@ -250,7 +250,7 @@ Details see decisions log D-017 (step-6 section)
 
 **Goal:** deployable on the target server.
 
-**Prerequisite:** all 9 steps + M1 in main. The app container already runs at `95.216.100.213:8080` (direct port from step-8 R5). 85/85 tests green, all frontends (UI + MCP) functionally verified.
+**Prerequisite:** all 9 steps + M1 in main. The app container already runs at `<server-ip>:8080` (direct port from step-8 R5). 85/85 tests green, all frontends (UI + MCP) functionally verified.
 
 **Scope reduction vs. the original plan form:** step 10 is not a classic "initial deploy" — the container is already functional on the target server. Step 10 is **routing-and-TLS setup**: Traefik labels for `geef.stefan-bechtel.de`, a Let's Encrypt certificate, turning off direct port exposure, enabling cookie `SecurePolicy.Always`. Effort: significantly less than initially planned.
 
@@ -269,7 +269,7 @@ Details see decisions log D-017 (step-6 section)
 - The app connects to the existing Postgres instance
 - Health check and auth work behind the reverse proxy
 
-**Note from the step-8 report:** the app already runs at `95.216.100.213:8080` (without Traefik routing) and was verified there by R5 for the auth flows. Step 10 is therefore no longer a classic "first deploy" but a **routing-and-domain setup**: Traefik labels for `geef.stefan-bechtel.de`, TLS termination, possibly production hardening (e.g. revisiting the migration strategy). The effort is considerably reduced because the container image is already functional.
+**Note from the step-8 report:** the app already runs at `<server-ip>:8080` (without Traefik routing) and was verified there by R5 for the auth flows. Step 10 is therefore no longer a classic "first deploy" but a **routing-and-domain setup**: Traefik labels for `geef.stefan-bechtel.de`, TLS termination, possibly production hardening (e.g. revisiting the migration strategy). The effort is considerably reduced because the container image is already functional.
 
 ---
 

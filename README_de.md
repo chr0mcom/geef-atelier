@@ -1,5 +1,37 @@
 # Geef.Atelier
 
+> [!IMPORTANT]
+> **Du siehst Version 1 von Geef.Atelier, die Version mit einstellbaren Crews** (Stand 23. November 2026).
+> Sie bleibt zum Nachschlagen erhalten, zum Beispiel für Leserinnen und Leser von Artikeln darüber. **Sie wird nicht mehr gepflegt.**
+>
+> **Die aktuelle Version 2 ist ein großer Umbau:** [Hauptzweig](https://github.com/chr0mcom/geef-atelier/blob/main/README_de.md) ·
+> [Was sich mit Version 2 geändert hat](https://github.com/chr0mcom/geef-atelier/blob/main/docs/16-version-2_de.md)
+
+> [!WARNING]
+> **Betreibe Version 1 nur auf dem eigenen Rechner, nie aus einem Netz oder dem Internet erreichbar.** Sie hat bekannte Fehler und
+> Sicherheitslücken, die erst in Version 2 behoben sind, und ihr lokaler Aufbau verwendet veröffentlichte Standardpasswörter.
+
+**Lokal ausprobieren** (am 28. November 2026 geprüft: Sie baut und startet; Anmeldung und Crew-Seiten funktionieren):
+
+```bash
+git clone --branch v1.0.0 https://github.com/chr0mcom/geef-atelier geef-atelier-v1
+cd geef-atelier-v1
+docker compose -f docker-compose.dev.yml up --build -d
+```
+
+Danach `http://localhost:8080` öffnen und als `admin` mit dem Passwort `DevPassword!` anmelden (nur lokale Entwicklung). Port 8080
+so lassen: Mit einem anderen äußeren Port scheitert die Anmeldung. Dieser Aufbau zeigt die Anwendung; **zum Schreiben von Texten
+braucht es zusätzlich Zugänge zu Sprachmodellen** (das Gateway in `cli-proxy/` und die Einstellungen in `docker-compose.yml`). Das
+Schreiben wurde nicht erneut geprüft.
+
+**Unterschiede zum ursprünglichen Commit `ad732037`:** dieser Hinweis; zwei Zeilen im Dockerfile der Web-App entfernt (es erwartete
+einen lokalen Paketordner, der nicht im Repository liegt; Geef.SDK 1.5.0 kommt heute von nuget.org); der lokale Aufbau lauscht nur
+auf `127.0.0.1` und verwendet eigene Namen, damit er sich keine Datenbank mit Version 2 teilt; eine Kontakt-E-Mail-Adresse und eine Server-Adresse wurden entfernt. Der folgende Text ist der ursprüngliche
+von Version 1.
+> Die Abschnitte **Production-Deployment** und **Backup & Restore** weiter unten bleiben nur als Historie stehen: Folge ihnen
+> nicht, und starte das `docker-compose.yml` dieser Version nie auf einem Rechner, auf dem Version 2 läuft (gleiche Projekt- und
+> Volume-Namen).
+
 *[English](README.md) · **Deutsch***
 
 Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/chr0mcom/geef). Mehrere Modelle arbeiten in konfigurierbaren Crews zusammen — Executor schreibt, Reviewer bewerten, die Pipeline iteriert bis zur Konvergenz.

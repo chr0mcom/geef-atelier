@@ -24,7 +24,7 @@ Six corrections: SDK `FindingSeverity { Info, Warning, Error, Critical }`; `Defa
 Reality facts about the original Anthropic layer. The concepts (tool use, defensive JSON, API key per request, resilience) remain valid in M1.
 
 ### D-014: production domain for step 10
-`geef.stefan-bechtel.de`, IP `95.216.100.213`, Traefik with TLS.
+`geef.stefan-bechtel.de`, IP `<server-ip>`, Traefik with TLS.
 
 ### D-015: Step 4 — event sink and persistence
 `IRunPersistenceService`, `PostgresEventSink` with an injected `Guid runId`, severity mapping via `ToAtelierSeverity()`, token tracking via a context key, critical-abort from `PipelineFailedEvent.History` (SDK decompilation), `_lastExecutionContext` as `volatile`, `IServiceScopeFactory.CreateAsyncScope()` per event.
@@ -335,7 +335,7 @@ Since commit `28daafb`, `appsettings.Development.json` is no longer tracked. Rat
 
 ## D-027 — post-skeleton step 4: CLI provider adapter (2026-05-13)
 
-**Context:** all three provider calls ran via OpenRouter (pay-as-you-go) so far. On the Atelier server (Hetzner, `95.216.100.213`), `claude` (Claude Code CLI, subscription) and `codex` (OpenAI Codex CLI, subscription) are installed — subscription capacity without token billing. Goal: a second provider path via a new side container that exposes these CLIs as OpenAI-compatible HTTP.
+**Context:** all three provider calls ran via OpenRouter (pay-as-you-go) so far. On the Atelier server (Hetzner, `<server-ip>`), `claude` (Claude Code CLI, subscription) and `codex` (OpenAI Codex CLI, subscription) are installed — subscription capacity without token billing. Goal: a second provider path via a new side container that exposes these CLIs as OpenAI-compatible HTTP.
 
 **Decisions:**
 

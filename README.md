@@ -1,5 +1,34 @@
 # Geef.Atelier
 
+> [!IMPORTANT]
+> **You are looking at version 1 of Geef.Atelier, the version with configurable crews** (state of 23 November 2026).
+> It is kept for reference, for example for readers of articles about it. **It is no longer maintained.**
+>
+> **The current version 2 is a major rebuild:** [main branch](https://github.com/chr0mcom/geef-atelier) ·
+> [What changed in version 2](https://github.com/chr0mcom/geef-atelier/blob/main/docs/16-version-2.md)
+
+> [!WARNING]
+> **Run version 1 only on your own computer, never reachable from a network or the internet.** It has known faults and security
+> gaps that were fixed only in version 2, and its local setup uses published default passwords.
+
+**Try it locally** (checked on 28 November 2026: it builds and starts; signing in and the crew pages work):
+
+```bash
+git clone --branch v1.0.0 https://github.com/chr0mcom/geef-atelier geef-atelier-v1
+cd geef-atelier-v1
+docker compose -f docker-compose.dev.yml up --build -d
+```
+
+Then open `http://localhost:8080` and sign in as `admin` with the password `DevPassword!` (local development only). Use port 8080
+as it is: with a different outer port, signing in fails. This setup shows the application; **writing texts also needs access to
+language models** (the gateway in `cli-proxy/` and the settings in `docker-compose.yml`). Writing was not checked again.
+
+**Differences from the original commit `ad732037`:** this notice; two lines removed from the web Dockerfile (it expected a local
+package folder that is not in the repository; Geef.SDK 1.5.0 now comes from nuget.org); the local setup listens on `127.0.0.1`
+only and uses names of its own, so it does not share a database with version 2; a contact e-mail address and a server address were removed. The text below is the original one of version 1.
+> The sections **Production deployment** and **Backup & restore** further down are kept as history only: do not follow them, and
+> never start this version's `docker-compose.yml` on a computer that runs version 2 (same project and volume names).
+
 *[Deutsch](README_de.md) · **English***
 
 Text-generation pipeline platform built on the [Geef SDK](https://github.com/chr0mcom/geef). Multiple models collaborate in configurable crews — the executor writes, the reviewers assess, and the pipeline iterates until convergence.

@@ -80,7 +80,7 @@ public static class GroundingServiceExtensions
         {
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "Geef.Atelier/1.0 (mailto:geef-atelier@stefan-bechtel.de; +https://geef.stefan-bechtel.de)");
+                "Geef.Atelier/1.0 (+https://github.com/chr0mcom/geef-atelier)");
         });
 
         // Generic REST-API grounding client — no auto-redirect for SSRF safety

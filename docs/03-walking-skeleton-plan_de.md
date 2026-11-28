@@ -211,7 +211,7 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 
 **Ziel:** Zweiter Frontend-Adapter neben der Web-UI. Externe MCP-Clients (Claude Desktop, Claude Code, eigene Agenten) können Aufträge stellen, Status abfragen, Ergebnisse abholen.
 
-**Voraussetzung:** Schritte 1–8 + M1 in main. App auf `95.216.100.213:8080` mit Cookie-Auth bereits erreichbar. Schritt 9 fügt einen zweiten Auth-Pfad (Bearer-Token) und einen zweiten Frontend-Adapter (MCP) hinzu — bestehende Cookie-UI bleibt unverändert.
+**Voraussetzung:** Schritte 1–8 + M1 in main. App auf `<server-ip>:8080` mit Cookie-Auth bereits erreichbar. Schritt 9 fügt einen zweiten Auth-Pfad (Bearer-Token) und einen zweiten Frontend-Adapter (MCP) hinzu — bestehende Cookie-UI bleibt unverändert.
 
 **Architekturelle Implikation:** Mit Schritt 9 hat das System zum ersten Mal **zwei parallel laufende Frontends** über denselben Application-Service-Layer (`IRunService`). Das ist der eigentliche Lackmustest für die Schichten-Disziplin der bisherigen Schritte. Wenn `IRunService` und seine Verträge sauber genug sind, sollte MCP keine Pipeline-/Domain-/Orchestrator-Änderungen erfordern.
 
@@ -248,7 +248,7 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 
 **Ziel:** Deploybar auf dem Zielserver.
 
-**Voraussetzung:** Alle 9 Schritte + M1 in main. App-Container läuft bereits auf `95.216.100.213:8080` (Direkt-Port aus Schritt-8-R5). 85/85 Tests grün, alle Frontends (UI + MCP) funktional verifiziert.
+**Voraussetzung:** Alle 9 Schritte + M1 in main. App-Container läuft bereits auf `<server-ip>:8080` (Direkt-Port aus Schritt-8-R5). 85/85 Tests grün, alle Frontends (UI + MCP) funktional verifiziert.
 
 **Scope-Reduktion gegenüber ursprünglicher Plan-Form:** Schritt 10 ist kein klassischer "Initial-Deploy" — der Container ist bereits funktional auf dem Zielserver. Schritt 10 ist **Routing-und-TLS-Setup**: Traefik-Labels für `geef.stefan-bechtel.de`, Let's-Encrypt-Zertifikat, Direkt-Port-Exposure abschalten, Cookie-`SecurePolicy.Always` aktivieren. Aufwand: deutlich geringer als initial geplant.
 
@@ -267,7 +267,7 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 - App verbindet sich mit der bestehenden Postgres-Instanz
 - Health-Check und Auth funktionieren hinter Reverse-Proxy
 
-**Hinweis aus Schritt-8-Bericht:** Die App läuft bereits auf `95.216.100.213:8080` (ohne Traefik-Routing) und wurde dort von R5 für die Auth-Flows verifiziert. Schritt 10 wird damit kein klassischer "ersten-Deploy" mehr, sondern ein **Routing-und-Domain-Setup**: Traefik-Labels für `geef.stefan-bechtel.de`, TLS-Termination, ggf. Production-Hardening (z.B. Migration-Strategie revisiten). Der Aufwand reduziert sich erheblich, weil das Container-Image bereits funktional ist.
+**Hinweis aus Schritt-8-Bericht:** Die App läuft bereits auf `<server-ip>:8080` (ohne Traefik-Routing) und wurde dort von R5 für die Auth-Flows verifiziert. Schritt 10 wird damit kein klassischer "ersten-Deploy" mehr, sondern ein **Routing-und-Domain-Setup**: Traefik-Labels für `geef.stefan-bechtel.de`, TLS-Termination, ggf. Production-Hardening (z.B. Migration-Strategie revisiten). Der Aufwand reduziert sich erheblich, weil das Container-Image bereits funktional ist.
 
 ---
 
