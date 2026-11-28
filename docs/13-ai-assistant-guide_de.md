@@ -96,8 +96,8 @@ Ohne Upload-Ticket gehen Dateien als Base64 in `attachments`, was nur für klein
 Namen als Stummel gelistet, weil Clients Werkzeuglisten zwischenspeichern: `submit_request`, `submit_auto_crew_request`,
 `get_run_status`, `get_run_result` und `get_run_details`. Alle ihre Parameter sind optional, ihre Beschreibung beginnt mit
 „Removed: use … instead.“, und jeder Aufruf scheitert mit einer Fehlermeldung, die den Nachfolger nennt (`submit_order`,
-`get_order_status`, `get_order_result`). Alle anderen alten Werkzeugnamen gibt es nicht mehr. Aufträge aus früheren Versionen
-bleiben über `list_orders` und `get_order_result` erreichbar. Den Parameter `extraCareful` hat `submit_order` nicht mehr (zweiter
+`get_order_status`, `get_order_result`). Alle anderen alten Werkzeugnamen gibt es nicht mehr. Aufträge aus der Zeit vor dem
+Aufräumen der Datenbank (D-092) gibt es nicht mehr. Den Parameter `extraCareful` hat `submit_order` nicht mehr (zweiter
 Zusatz zu D-087); ein Aufruf mit `extraCareful=true` aus einer gespeicherten
 alten Werkzeugliste wird mit einem klaren Satz abgelehnt, und es entsteht kein Auftrag.
 

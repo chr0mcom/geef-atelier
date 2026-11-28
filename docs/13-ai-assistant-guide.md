@@ -91,7 +91,7 @@ Without the upload ticket, files go as Base64 in `attachments`, which only works
 as stubs, because clients keep tool lists cached: `submit_request`, `submit_auto_crew_request`, `get_run_status`,
 `get_run_result` and `get_run_details`. All their parameters are optional, their description starts with "Removed: use … instead.",
 and every call fails with an error that names the successor (`submit_order`, `get_order_status`, `get_order_result`). All other
-old tool names are gone. Orders from earlier versions stay available through `list_orders` and `get_order_result`.
+old tool names are gone. Orders from before the database cleanup (D-092) no longer exist.
 `submit_order` no longer has the parameter `extraCareful` (second addendum to D-087); a call with `extraCareful=true` from a cached older tool
 list is refused with a plain sentence, and no order is created.
 

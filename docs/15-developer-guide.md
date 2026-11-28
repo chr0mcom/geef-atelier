@@ -6,7 +6,7 @@
 
 This guide is for developers and for people who host Atelier. It gives the map of the current system and points to the detailed
 documents. Setup commands are in the [README](../README.md); the reasons behind every rule are in the
-[decisions log](05-decisions-log.md) (most recently D-091, stage 8d).
+[decisions log](05-decisions-log.md) (most recently D-092, database cleanup).
 
 ## The system in one picture
 
@@ -31,7 +31,7 @@ flowchart TB
     R --> O["RunOrchestratorService"]
     O --> PA["IPipelineAssemblerSelector<br/>DirectPipelineAssembler (the only one)"]
     PA --> G["OrderGroundingStep<br/>files in full text, research W1, brief"]
-    G --> X["Writer (document mode,<br/>failover off)"]
+    G --> X["Writer (document mode,<br/>failover only to<br/>the same model)"]
     X --> C["DeterministicChecksReviewer<br/>SourceFactCheckReviewer"]
     C -->|"blocking, once"| X
     C --> REP["RunReport (Runs.ReportJson)"]

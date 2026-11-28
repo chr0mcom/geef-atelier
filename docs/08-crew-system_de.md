@@ -434,7 +434,7 @@ als `ParentRunId` und Ausgangstext, ihr Brief neu zusammengesetzt, gespeichert �
   übernommen, von ihm schon übernommene (mit `FromVersion`) immer. Offene Punkte und Annahmen des Schreibers der Vorversion, die die neue
   nicht wortgleich in derselben Art (`SameAssumptionKey`) wiederholt, stehen in `RunReport.EarlierOpenPoints` mit Version und
   `EarlierPointKind` (auch die von der Vorversion schon übernommenen), dazu ein fester Satz (`EarlierPointKind.Note`) für ihre Notizen und
-  Stellen, die nicht gezeigt werden konnten. Hat die Vorversion keinen Bericht (z. B. ein Lauf der entfernten Prüfschleife), sagt der feste Satz
+  Stellen, die nicht gezeigt werden konnten. Hat die Vorversion keinen Bericht, sagt der feste Satz
   `ChecksNotTakenOverFormat`, dass ihre Prüfungen nicht übernommen und nicht erneut geprüft wurden. Kann der frühere Bericht nicht gelesen
   werden, steht im Bericht ein Satz dazu; der Lauf geht weiter. Wurde eine Vorversion ohne lesbaren Bericht selbst als „Ready – please
   check“ gezeigt (`DirectRevision.NeedsCheck`, bestimmt mit `OrderStateResolver`), setzt der Bericht `RunReport.EarlierNeedsCheck`; eine

@@ -37,6 +37,11 @@ Der MCP-Server bietet genau diese zehn Werkzeuge an: `submit_order`, `answer_ord
 [Stummel entfernter Werkzeuge](#stummel-entfernter-werkzeuge-eine-version). Aufträge sind wie in der Web-UI
 besitzergeprüft (D-042): Wer kein Administrator ist, erreicht nur die eigenen Aufträge.
 
+Mit `Mcp:Skills` auf `On` (so ausgeliefert) bietet der Server außerdem den Skill `using-atelier` als Ressourcen an
+(`skill://using-atelier/SKILL.md` und seine `references/*.md`). Mit `Mcp:Elicitation` auf `On` (so ausgeliefert) kann
+`submit_order` Clients der Revision 2026-07-28, die Formulare anbieten, statt `needs_input` mit einem Formular antworten.
+Einzelheiten stehen in der [MCP-Integration](04-mcp-integration_de.md).
+
 #### Aufträge: `submit_order`, `get_order_status`, `get_order_result`
 
 Seit Etappe 1 ist der **Auftrag** die Einheit, die der Mensch sieht; Läufe bleiben das technische Protokoll darunter (ein Auftrag kann mehrere Läufe haben). Aufträge sind besitzergeprüft: Nicht-Admins sehen nur ihre eigenen Aufträge, ein unbekannter oder fremder Auftrag ergibt den Fehler `Order not found.` Parameter- und Feldnamen sind camelCase.
@@ -230,7 +235,7 @@ Nur solange `Uploads:Tickets` `On` ist (Standard im Code `Off`; `appsettings.jso
   "tokenExpiresAt": "<ISO 8601, 15 Minuten>",
   "pageExpiresAt": "<ISO 8601, 24 Stunden>",
   "maxBytes": 26214400,
-  "next": "Run curlCommand with the path of the file in single quotes; for a path with a quote, a line break or another unusual character, first copy the file under a plain name as the description of prepare_attachment says, or use the link. If the answer has usable false, tell the person its reason word for word and do not upload the same file again. If the command is not possible or fails without an answer from Atelier, give the person this link word for word: <uploadPage>. Then call submit_order with uploadIds."
+  "next": "Run curlCommand with the path of the file in single quotes; for a path with a quote, a line break or another unusual character, copy it under a plain name and upload the copy in ONE shell command as the description of prepare_attachment says, or use the link. If the answer has usable false, tell the person its reason word for word and do not upload the same file again. If the command is not possible or fails without an answer from Atelier, give the person this link word for word: <uploadPage>. Then call submit_order with uploadIds."
 }
 ```
 
@@ -475,7 +480,7 @@ Response-Header: `Cache-Control: no-store`, `Pragma: no-cache` (RFC 6749 §5.1).
 **Content-Type:** `application/x-www-form-urlencoded`  
 **RFC:** 7009
 
-Widerruft einen Access-Token oder Refresh-Token. Gibt immer `200 OK` zurück (auch wenn das Token unbekannt ist).
+Widerruft einen Access-Token oder Refresh-Token. Gibt `200 OK` zurück, auch bei unbekanntem Token; ohne `token` oder `client_id` kommt `400 invalid_request`.
 
 ```
 token=<token>

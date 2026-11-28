@@ -27,7 +27,7 @@ Freigestellte Feder/Quill in drei Tintefarb-Varianten (1254×1254 px, transparen
 
 ### Favicon-Sets
 
-Drei Sets in den Größen 16/24/32/48/64/96/128/192/256/512 px:
+Drei Sets: Noir in den Größen 16/24/32/48/64/96/128/192/256/512 px, Vellum und Transparent in denselben Größen ohne 192:
 
 | Prefix | Beschreibung |
 |---|---|
@@ -35,7 +35,7 @@ Drei Sets in den Größen 16/24/32/48/64/96/128/192/256/512 px:
 | `favicon-noir-*.png` | Noir-Palette — Dark-Mode-Hint im Browser |
 | `favicon-transparent-*.png` | Transparenter Hintergrund |
 
-Direkt adressierte Größen (ohne Prefix) sind Duplikate des Vellum-Sets:
+Direkt adressierte Größen (ohne Prefix); bis auf `favicon-192.png`, das dort kein Gegenstück hat, sind sie Duplikate des Vellum-Sets:
 
 | Datei | Quelle |
 |---|---|

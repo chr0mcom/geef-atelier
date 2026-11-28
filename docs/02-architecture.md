@@ -106,7 +106,7 @@ Geef pipeline from the run's snapshot:
 
 1. **`OrderGroundingStep`** loads the order and its files, renders the files into the background document, reads the rules
    the request states, records the `RunSourceUsages`, prepares the material of the fact check and fixes the fact-check mode
-   of the run (`Runs.FactCheckMode`). For the first version of an order of mode `Direct` without files it asks `OrderResearchService` for
+   of the run (`Runs.FactCheckMode`). For the first version of an order without files it asks `OrderResearchService` for
    passages from the web (Tavily; switch `Research:Mode`). This order grounding step plus the web research is the only
    grounding there is.
 2. **`DirectWriterExecutor`** writes the text. With a CLI provider it writes into a document (`draft.md`) and asks the
@@ -200,7 +200,7 @@ Problems a run worked around instead of stopping (D-067). Deleted together with 
 | Id | uuid (PK) | |
 | RunId | uuid (FK→Runs) | indexed |
 | Iteration | int | nullable; pass in which the problem occurred |
-| Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `run`, `intake` or `fact-check` (`RunWarningSources`) |
+| Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `run` or `intake` (`RunWarningSources`) |
 | Code | varchar(100) | stable machine-readable code, e.g. `grounding.research_failed`, `grounding.source_warning`, `review.reviewer_failed`, `llm.failover`, `writer.partial_read`, `run.result_not_saved`, `run.restarted_while_finishing` (`RunWarningCodes`, `DirectWarningCodes`). |
 | Message | text | short plain-English explanation for the user |
 | CreatedAt | timestamptz | |
@@ -425,15 +425,15 @@ Anonymous browser → /runs → [Authorize] → RedirectToLogin
 ```
 Geef.Atelier.Core/Configuration/AtelierUserOptions.cs   → POCO for username/password hash
 Geef.Atelier.Application/Auth/IUserAuthenticator.cs     → interface (Application, not Infrastructure)
-Geef.Atelier.Application/Auth/AtelierUserAuthenticator.cs → BCrypt.Verify + CryptographicOperations.FixedTimeEquals
+Geef.Atelier.Application/Auth/AtelierUserAuthenticator.cs → user lookup + BCrypt.Verify
 Geef.Atelier.Application/Auth/ApplicationAuthExtensions.cs → AddAtelierAuth(IServiceCollection, IConfiguration)
 ```
 
 `AtelierUserAuthenticator` is `internal sealed`. The env-var fallback (`ATELIER_USER`/`ATELIER_PASSWORD_HASH`) is resolved in `ApplicationAuthExtensions` — docker-compose users do not need to know the ASP.NET Core double-underscore convention.
 
-**Timing protection:** `FixedTimeEquals` for the username comparison, `BCrypt.Verify` called even for a wrong username (constant-timing property). No username/password hash is written to logs — only `"Login attempt rejected"` (without PII).
+**Timing protection:** `AtelierUserAuthenticator` looks the user up and checks the password with `BCrypt.Verify`. An unknown or deactivated account is checked against a throwaway hash with the same work factor, so the rejection takes about as long as for a wrong password. Only the reason of a rejection is logged (`Login attempt rejected: …`), never a name or a hash.
 
-**Lazy-fail on missing configuration:** the service starts even without env vars, login returns `false`. The health check stays anonymous (`.AllowAnonymous()` on `MapHealthChecks`). An init-warning log on the first misconfigured login attempt.
+**Lazy-fail on missing configuration:** the service starts even without `ATELIER_USER`/`ATELIER_PASSWORD_HASH`; it then creates no administrator, so signing in works only for accounts that already exist. The health check stays anonymous (`.AllowAnonymous()` on `MapHealthChecks`).
 
 **`ForwardedHeaders` before `UseAuthentication`:**
 
@@ -526,7 +526,7 @@ Uploaded originals live on the volume `geef-atelier-sources`, outside the databa
 
 ### Reviewer calibration
 
-[`06-reviewer-calibration.md`](06-reviewer-calibration.md) describes the severity taxonomy and rules for reviewer roles.
+[`06-reviewer-calibration.md`](06-reviewer-calibration.md) keeps the former severity taxonomy (marked as historical) and the current convergence values.
 
 ### Deployment procedure
 

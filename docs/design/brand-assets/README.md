@@ -27,7 +27,7 @@ A cut-out quill in three ink-color variants (1254×1254 px, transparent backgrou
 
 ### Favicon sets
 
-Three sets in the sizes 16/24/32/48/64/96/128/192/256/512 px:
+Three sets: Noir in the sizes 16/24/32/48/64/96/128/192/256/512 px, Vellum and Transparent in the same sizes without 192:
 
 | Prefix | Description |
 |---|---|
@@ -35,7 +35,7 @@ Three sets in the sizes 16/24/32/48/64/96/128/192/256/512 px:
 | `favicon-noir-*.png` | Noir palette — dark-mode hint in the browser |
 | `favicon-transparent-*.png` | Transparent background |
 
-Directly addressed sizes (without a prefix) are duplicates of the Vellum set:
+Directly addressed sizes (without a prefix); except for `favicon-192.png`, which has no counterpart there, they are duplicates of the Vellum set:
 
 | File | Source |
 |---|---|

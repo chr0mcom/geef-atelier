@@ -24,11 +24,11 @@ public static class RetiredTools
 
     /// <summary>The error of <c>get_run_status</c>.</summary>
     public const string StatusMessage =
-        "This tool was removed. Call get_order_status with the orderId; list_orders shows the orders, also the earlier ones.";
+        "This tool was removed. Call get_order_status with the orderId; list_orders shows the orders.";
 
     /// <summary>The error of <c>get_run_result</c> and <c>get_run_details</c>.</summary>
     public const string ResultMessage =
-        "This tool was removed. Call get_order_result with the orderId; list_orders shows the orders, also the earlier ones.";
+        "This tool was removed. Call get_order_result with the orderId; list_orders shows the orders.";
 
     private const string Unused = "Not used any more.";
 

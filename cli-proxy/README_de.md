@@ -41,6 +41,8 @@ networks:
 |---------|------|--------------|
 | `POST` | `/v1/claude/chat/completions` | Direkt zur claude CLI — kein Model-Name-Routing |
 | `POST` | `/v1/codex/chat/completions`  | Direkt zur codex CLI — kein Model-Name-Routing |
+| `POST` | `/v1/cli/{provider}/chat/completions` | Direkt zum CLI-Anbieter mit diesem Namen |
+| `GET`  | `/v1/cli/{provider}/models` | Modellliste dieses CLI-Anbieters |
 | `POST` | `/v1/codex/images/generations` | Bilderzeugung (OpenAI Images API, nur codex, `b64_json`/PNG, ein Bild je Anfrage) |
 | `POST` | `/v1/chat/completions` | **DEPRECATED** Legacy-Endpoint mit Model-Name-Routing. Loggt WARNING. |
 | `GET`  | `/v1/claude/models` | Modellliste der claude CLI (Always-latest-Aliase plus die konkreten IDs, zu denen die CLI sie auflöst; bei mehreren Claude-Konten die Vereinigung aller) |
@@ -50,7 +52,7 @@ networks:
 
 ### Explizite Endpoints (empfohlen)
 
-Die neuen Endpunkte `/v1/claude/chat/completions` und `/v1/codex/chat/completions` routen deterministisch anhand des Pfades — unabhängig vom `model`-Feld im Request. Dies ist die empfohlene Variante für alle neuen Profile.
+Die neuen Endpunkte `/v1/claude/chat/completions` und `/v1/codex/chat/completions` routen deterministisch anhand des Pfades — unabhängig vom `model`-Feld im Request. Dies ist die empfohlene Variante für alle neuen Aufrufer.
 
 ### Legacy-Endpoint (veraltet)
 
@@ -71,8 +73,8 @@ Der Proxy zielt auf praktische Drop-in-Kompatibilität mit der OpenAI-Chat-Compl
 | **Streaming** (`stream: true`) | ✅ SSE-`chat.completion.chunk`-Stream, abschließendes `data: [DONE]`. `stream_options.include_usage` ergänzt einen finalen Usage-Chunk. claude streamt Token-Deltas; codex liefert die Agent-Nachricht als (gepufferten) Delta. Anfragen mit `tools`/`response_format` puffern den vollen Text und emittieren ihn dann. |
 | **Echte Token-Usage** | ✅ `usage` wird aus dem CLI-Output geparst (claude `--output-format json`, codex `exec --json`), inkl. `prompt_tokens_details.cached_tokens` und `completion_tokens_details.reasoning_tokens`. |
 | **Error-Envelope** | ✅ `{"error": {"message","type","param","code"}}` mit korrekten Status-Codes (422→400, 401, 404, 429, 5xx). |
-| **`response_format`** | ✅ `json_object` und `json_schema` (serverseitig gegen das Schema validiert, mit einem Retry, sonst `refusal`). Geprüft wird jedes JSON-Objekt der Antwort (Fences, vorangestellte Prosa, verirrte Klammern, wiederholtes Schema); das erste schemakonforme gewinnt. claude wiederholt im **Lean-Modus** (siehe `README.md`, Abschnitt „Lean mode“; Schalter `CLAUDE_STRUCTURED_LEAN_RETRY`, Standard an, und `CLAUDE_LEAN_CHAT`, Standard an). |
-| **Tool-Calling** | ✅ `tool_choice` `auto`/`required`/`none`/spezifisch, parallele Tool-Calls, Multi-Turn-Replay (emuliert via Prompt + JSON-Extraktion). |
+| **`response_format`** | ✅ `json_object` und `json_schema` (serverseitig gegen das Schema validiert, mit einem Retry, sonst `refusal`). Geprüft wird jedes JSON-Objekt der Antwort (Fences, vorangestellte Prosa, verirrte Klammern, wiederholtes Schema); das erste schemakonforme gewinnt. claude wiederholt im **Lean-Modus** (siehe [Lean-Modus](#lean-modus-claude-seit-2026-11-07); Schalter `CLAUDE_STRUCTURED_LEAN_RETRY`, Standard an, und `CLAUDE_LEAN_CHAT`, Standard an). |
+| **Tool-Calling** | ✅ `tool_choice` `auto`/`required`/`none`/spezifisch, parallele Tool-Calls, Multi-Turn-Replay (emuliert; siehe [Tool-Use](#tool-use)). |
 | **Multimodal** | ⚠️ Best-Effort: http(s)-`image_url`-Parts werden als Referenzen durchgereicht (claude kann sie per WebFetch laden); inline `data:`-Bilder werden mit Warnung verworfen. |
 | **Auth** | ✅ Opt-in Bearer (`CLI_PROXY_API_KEYS`); ungesetzt = offen (rückwärtskompatibel). |
 | **`logprobs` / `n>1`** | ❌ mit `400` abgelehnt — die CLI liefert keine Token-Wahrscheinlichkeiten, und `n>1` würde den Abo-Verbrauch vervielfachen. |
@@ -114,13 +116,30 @@ Jeder CLI-Lauf einer Anfrage startet in einer eigenen Prozessgruppe. Endet ein L
 - **Ohne Header und mit verbundenem Aufrufer:** Antworten, Fehler und Zeitüberschreitungen wie bisher; die eigene Obergrenze (`CLI_TIMEOUT_SECONDS`) behält ihren Fehlertext und ihre Wirkung auf Failover und Breaker, beendet jetzt aber auch die Hilfsprozesse der CLI.
 - **Hinweis Container:** uvicorn als PID 1 würde verwaiste Enkelprozesse nicht abräumen. Deshalb setzt der Compose-Dienst `init: true`: Ein Init-Prozess läuft als PID 1 und räumt beendete Helfer ab, es bleiben keine Zombies zurück. Wer das Image anders startet, nimmt ebenfalls einen Init-Prozess (`docker run --init`).
 
+## Lean-Modus (claude, seit 2026-11-07)
+
+Ein gewöhnlicher Aufruf `claude -p` ist eine vollständige Agenten-Sitzung von Claude Code: Vor dem Text des Aufrufers stehen der Agenten-Systemprompt, die Definitionen der eingebauten Werkzeuge, die Liste der synchronisierten Skills und das Gedächtnis des Arbeitsverzeichnisses (rund 23.000 Prompt-Token), und die OpenAI-Systemnachricht des Aufrufers kommt nur als `[SYSTEM]`-Text innerhalb der Nutzernachricht an. Bei Rollenspiel oder Prompts der Art „antworte aus deiner eigenen Sicht“ lehnte die Agenten-Rolle dann oft in Prosa ab, sodass strukturierte Ausgaben als `refusal: "no JSON object found"` zurückkamen (2026-11-07, gemessen an einer Anfrage mit strukturierter Ausgabe: 4 von 6 Wiederholungen).
+
+Der Lean-Modus führt `claude -p --output-format json --system-prompt-file <file> --tools "" --disable-slash-commands --strict-mcp-config --no-session-persistence` in einem leeren Verzeichnis je Aufruf aus: Die System- und Developer-Nachrichten des Aufrufers werden zum echten Systemprompt (ohne solche gilt ein neutraler Standard), ohne Werkzeuge (bei angeforderter Websuche `WebSearch` und `WebFetch`; sonst nur `WebFetch`, und das nur, wenn die Anfrage http(s)-Bilder nennt), ohne Skills, ohne Gedächtnis, ohne Sitzungsprotokoll. Die Prompt-Größe sinkt bei einer Anfrage von rund 1.500 Token auf rund 2.000 Token.
+
+| Variable | Standard | Wirkung |
+|----------|----------|---------|
+| `CLAUDE_STRUCTURED_LEAN_RETRY` | `1` | Der eine Wiederholungsversuch nach einer ungültigen strukturierten Ausgabe von claude läuft im Lean-Modus (statt den Aufruf im Agenten-Modus mit einem „CRITICAL“-Hinweis zu wiederholen). `0` stellt den alten Wiederholungsversuch wieder her. |
+| `CLAUDE_LEAN_CHAT` | `1` | Einfacher Chat ohne Streaming (ohne `tools`, ohne Dokumentmodus) und alle Anfragen an claude mit `response_format` nutzen den Lean-Modus ab dem ersten Versuch, sodass sich das Gateway wie eine einfache OpenAI-API verhält. `0` stellt das Verhalten als Agenten-Sitzung von vor dem 2026-11-07 wieder her. Gestreamter Chat, Tool-Calling (auch `tool_choice` mit einem bestimmten Werkzeug), decision-file und Dokumentmodus bleiben immer unberührt; codex ist nie betroffen. |
+
+Der Lean-Modus ist seit dem 2026-11-07 der Standard. Der Preis dafür: keine Websuche ohne ausdrückliche Anforderung (siehe [Websuche](#websuche-opt-in-seit-2026-11-07)), und das Modell sieht die Agenten-Anweisungen von Claude Code nicht mehr, die einfache Chat-Aufrufer und Aufrufer mit strukturierter Ausgabe nicht brauchen.
+
+Unabhängig vom Modus **hinterlässt und liest kein CLI-Prozess Spuren**: Jeder claude-Aufruf läuft mit `--no-session-persistence` und `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` (die Gedächtnisnotizen des Betreibers erreichen nie einen Prompt), jeder codex-Aufruf mit `--ephemeral`. Siehe `src/policy.py`.
+
 ## Tool-Use
 
-Wenn der Request `tools` + `tool_choice` enthält, wird das Schema als Prompt-Addendum eingebettet:
+Tool-Calling wird nachgebildet; die CLI führt die Werkzeuge des Aufrufers nie selbst aus.
 
-> "Respond ONLY with a valid JSON object conforming to schema ..."
-
-Der CLI-Output wird dann auf einen JSON-Block gescannt (inkl. Markdown-Fence-Stripping) und als `tool_calls`-Response zurückgegeben.
+- **`tool_choice` `auto` oder `required`** (beide Backends): Die CLI schreibt den nächsten Werkzeugaufruf oder die Schlussantwort in eine Datei
+  `decision.json`, die das Gateway als `tool_calls`-Antwort oder als Text zurückgibt. Fehlt eine brauchbare Datei, fragt es einmal nach.
+- **Ein erzwungenes einzelnes Werkzeug** (`tool_choice` nennt genau eine Funktion): Das Schema wird an den Prompt angehängt, und die CLI-Ausgabe
+  wird nach einem JSON-Objekt durchsucht (inkl. Entfernen von Markdown-Fences), das als `tool_calls`-Antwort zurückkommt.
+- Bei `response_format` hat die strukturierte Ausgabe Vorrang vor offenem Tool-Calling.
 
 ## Websuche (opt-in seit 2026-11-07)
 
@@ -130,6 +149,8 @@ Bei eingeschalteter Suche entscheidet das Modell selbst, ob es aktuelle Informat
 
 - **claude** — Aufruf mit `--allowedTools "WebSearch,WebFetch"`. Nur die Web-Tools sind allowlisted; Bash/Edit/Write sind **nicht** aktiviert (kein voller Permission-Bypass).
 - **codex** — Aufruf mit dem globalen `--search`-Flag, platziert **vor** dem `exec`-Subcommand (codex lehnt es als `exec`-Argument ab). Es aktiviert das native Responses-`web_search`-Tool ohne Per-Call-Approval.
+
+Eine Anfrage, die auf http(s)-Bilder verweist, behält `WebFetch` (claude muss sie herunterladen), bekommt auf diesem Weg aber nie die Suche.
 
 **Kosten:** Die Websuche läuft über das Abo (Claude / Codex), nicht pro Suche abgerechnet — kein Tavily-artiges Per-Request-Billing auf dem CLI-Pfad.
 

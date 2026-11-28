@@ -41,6 +41,8 @@ networks:
 |---------|------|--------------|
 | `POST` | `/v1/claude/chat/completions` | Directly to the claude CLI — no model-name routing |
 | `POST` | `/v1/codex/chat/completions`  | Directly to the codex CLI — no model-name routing |
+| `POST` | `/v1/cli/{provider}/chat/completions` | Directly to the CLI provider with this name |
+| `GET`  | `/v1/cli/{provider}/models` | Model list of that CLI provider |
 | `POST` | `/v1/codex/images/generations` | Image generation (OpenAI Images API, codex only, `b64_json`/PNG, one image per request) |
 | `POST` | `/v1/chat/completions` | **DEPRECATED** legacy endpoint with model-name routing. Logs a WARNING. |
 | `GET`  | `/v1/claude/models` | Model list of the claude CLI (always-latest aliases plus the concrete ids the CLI resolves them to; with several Claude accounts the union of all of them) |
@@ -50,7 +52,7 @@ networks:
 
 ### Explicit endpoints (recommended)
 
-The newer endpoints `/v1/claude/chat/completions` and `/v1/codex/chat/completions` route deterministically by path — independent of the `model` field in the request. This is the recommended variant for all new profiles.
+The newer endpoints `/v1/claude/chat/completions` and `/v1/codex/chat/completions` route deterministically by path — independent of the `model` field in the request. This is the recommended variant for all new callers.
 
 ### Legacy endpoint (deprecated)
 
@@ -72,7 +74,7 @@ The proxy targets practical drop-in compatibility with the OpenAI Chat Completio
 | **Real token usage** | ✅ `usage` is parsed from the CLI output (claude `--output-format json`, codex `exec --json`), incl. `prompt_tokens_details.cached_tokens` and `completion_tokens_details.reasoning_tokens`. |
 | **Error envelope** | ✅ `{"error": {"message","type","param","code"}}` with faithful status codes (422→400, 401, 404, 429, 5xx). |
 | **`response_format`** | ✅ `json_object` and `json_schema` (validated server-side against the schema, with one retry, then a `refusal`). Every JSON object in the answer is considered (fences, leading prose, stray braces, an echoed schema); the first one that satisfies the schema wins. claude retries in **lean mode** (see below). |
-| **Tool calling** | ✅ `tool_choice` `auto`/`required`/`none`/specific, parallel tool calls, multi-turn replay (emulated via prompt + JSON extraction). |
+| **Tool calling** | ✅ `tool_choice` `auto`/`required`/`none`/specific, parallel tool calls, multi-turn replay (emulated; see [Tool use](#tool-use)). |
 | **Multimodal** | ⚠️ best-effort: http(s) `image_url` parts are passed as references (claude can WebFetch them); inline `data:` images are dropped with a warning. |
 | **Auth** | ✅ opt-in Bearer (`CLI_PROXY_API_KEYS`); unset = open (back-compat). |
 | **`logprobs` / `n>1`** | ❌ rejected with `400` — the CLI cannot produce token probabilities, and `n>1` would multiply subscription cost. |
@@ -118,7 +120,7 @@ Every CLI run of a request starts in its own process group, and whenever a run e
 
 A default `claude -p` call is a full Claude Code agent session: agent system prompt, built-in tool definitions, the synced skill list and the auto-memory of the working directory precede the caller's text (~23k prompt tokens), and the caller's OpenAI system message only arrives as `[SYSTEM]` text inside the user turn. For role-play or "answer from your own perspective" prompts the agent persona then often declines in prose, so structured outputs came back as `refusal: "no JSON object found"` (2026-11-07, measured on a structured-output request: 4 of 6 replays).
 
-Lean mode runs `claude -p --output-format json --system-prompt-file <file> --tools "" --disable-slash-commands --strict-mcp-config --no-session-persistence` in an empty per-call directory: the caller's system/developer messages become the real system prompt (neutral default if there is none), no tools (WebSearch/WebFetch only when the request references http(s) images), no skills, no memory, no session transcript. Prompt size drops to ~2k tokens for a ~1.5k-token request.
+Lean mode runs `claude -p --output-format json --system-prompt-file <file> --tools "" --disable-slash-commands --strict-mcp-config --no-session-persistence` in an empty per-call directory: the caller's system/developer messages become the real system prompt (neutral default if there is none), no tools (with web search requested: `WebSearch` and `WebFetch`; otherwise only `WebFetch`, and only when the request references http(s) images), no skills, no memory, no session transcript. Prompt size drops to ~2k tokens for a ~1.5k-token request.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
@@ -131,11 +133,13 @@ Independent of the mode, **no CLI process leaves a trace or reads one**: every c
 
 ## Tool use
 
-If the request contains `tools` + `tool_choice`, the schema is embedded as a prompt addendum:
+Tool calling is emulated; the CLI never runs the caller's tools.
 
-> "Respond ONLY with a valid JSON object conforming to schema ..."
-
-The CLI output is then scanned for a JSON block (incl. Markdown-fence stripping) and returned as a `tool_calls` response.
+- **`tool_choice` `auto` or `required`** (both backends): the CLI writes the next tool call or the final answer into a file
+  `decision.json`, which the gateway returns as a `tool_calls` response or as text. If there is no usable file, it asks once more.
+- **A forced single tool** (`tool_choice` naming one function): the schema is added to the prompt, and the CLI output is scanned
+  for a JSON object (incl. Markdown-fence stripping), returned as a `tool_calls` response.
+- With `response_format`, structured output takes precedence over open tool calling.
 
 ## Web search (opt-in since 2026-11-07)
 

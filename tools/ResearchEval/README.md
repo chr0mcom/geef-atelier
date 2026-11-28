@@ -25,7 +25,7 @@ dotnet run --project tools/ResearchEval -- evaluate $SETS --holdout $EVAL_RESEAR
 |---|---|
 | `orders` | zeigt die Mengen: 12 Entwicklungsaufträge (die ersten nach Kennung), 9 zurückgehaltene, 15 für R3 reservierte. Kein Aufruf. |
 | `probe-tavily` | VT: je Thema genau ein `POST search` wie im Betrieb (`basic`, `max_results` 3, `include_raw_content` an, `include_answer` aus), Schlüssel im Körper; nach 401/403 genau eine Anfrage mit `Authorization: Bearer`. Themen: das erste Thema, das der Herkunftsfilter für die ersten Entwicklungsaufträge freigibt. Speichert Status, Dauer, Anteil und Länge der Rohtexte und alle Antwortfelder außer Inhalten (Ergebnistexte, Tavily-Antwort, Bilder), dazu die Kopfzeilen. Gibt die Entscheidung nach Vertrag 3.2 aus, auch „Kreditverbrauch unbekannt“. |
-| `run` | VR: echter `ResearchQueryGate`, `TavilySearchClient`, `LlmDossierCondenser` (Sonnet, Failover aus) und `DossierBuilder`, Auftrag für Auftrag. Je Auftrag eine Zeile mit Rohtexten (gekürzt wie im Betrieb), Vorschlägen, Rohantwort, Einträgen mit Start/Länge, Verwurfgründen, Dauer und Eingabe-Hash. |
+| `run` | VR: echter `ResearchQueryGate`, `TavilySearchClient`, `LlmDossierCondenser` (Sonnet, Failover nur auf dasselbe Modell) und `DossierBuilder`, Auftrag für Auftrag. Je Auftrag eine Zeile mit Rohtexten (gekürzt wie im Betrieb), Vorschlägen, Rohantwort, Einträgen mit Start/Länge, Verwurfgründen, Dauer und Eingabe-Hash. |
 | `judge` | VR: je zurückgehaltenem Auftrag mit Einträgen ein Opus-Aufruf, blind: sieht nur Themen und Ausschnitte, nie Seite, Adresse, Titel oder Modell; je Ausschnitt „hilft beim Thema ja/nein“. |
 | `evaluate` | Tor VR auf der zurückgehaltenen Menge (K1, Gültigkeit, Ausbeute, Relevanz, Median) und Zahlen der Entwicklungsmenge ohne Urteil. |
 
@@ -48,7 +48,7 @@ Ergebnisdatei im Git-Baum, Zeilen zu einer anderen Eingabe, Transport hat eine A
   Ein Auftrag startet nur, wenn beide Kappen ihn ganz decken (alle seine Suchen und ein Aufruf). Die Obergrenzen gelten je Datei;
   wer für eine Promptrunde eine neue Datei beginnt, achtet selbst auf die Summe (Vertrag: ≤ 87 Suchen, ≤ 33 Sonnet, ≤ 9 Opus).
 - **Transportwächter:** Eine Suche geht nur hinaus, wenn ihr `query` genau ein vom Herkunftsfilter gesendetes Thema des laufenden
-  Auftrags ist. Ein Modellaufruf geht nur hinaus mit abgeschaltetem Gateway-Failover und nur über die Claude-Route; Codex wird nie
+  Auftrags ist. Ein Modellaufruf geht nur hinaus mit Gateway-Failover höchstens auf dasselbe Modell (`same-model`) und nur über die Claude-Route; Codex wird nie
   aufgerufen. Eine abgelehnte Anfrage wird nicht gesendet, die Zeile bleibt, der Lauf endet mit 2.
 - **Codex-Wächter** vor jedem Auftrag (wie `FactCheckEval`): Halt, solange eine `--codex-lock`-Datei existiert oder `pgrep -a codex`
   einen laufenden `exec`-Auftrag findet; Halt auch, wenn die Prozessliste nicht lesbar ist.

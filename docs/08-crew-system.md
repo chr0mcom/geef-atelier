@@ -425,8 +425,7 @@ when a later version of the order has a text (`RevisionLines.ResumeLaterVersion`
   findings it had carried over (with `FromVersion`) always are. The writer's open points and assumptions of the earlier version that
   the new one does not repeat word for word in the same kind (`SameAssumptionKey`) go to `RunReport.EarlierOpenPoints` with their
   version and `EarlierPointKind` (including those the earlier version had carried over), together with a fixed sentence
-  (`EarlierPointKind.Note`) for its notes and flagged passages that could not be shown. When the earlier version has no report (for
-  example a run of the removed review loop), the fixed sentence `ChecksNotTakenOverFormat` says that its checks were not taken over and not checked
+  (`EarlierPointKind.Note`) for its notes and flagged passages that could not be shown. When the earlier version has no report, the fixed sentence `ChecksNotTakenOverFormat` says that its checks were not taken over and not checked
   again. When the earlier report cannot be read, the report says so in one sentence and the run goes on. When an earlier version
   without a readable report was itself shown as "Ready – please check" (`DirectRevision.NeedsCheck`, resolved with
   `OrderStateResolver`), the report sets `RunReport.EarlierNeedsCheck`; a later version inherits it from the report of its base.

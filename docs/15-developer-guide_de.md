@@ -6,7 +6,7 @@
 
 Dieser Leitfaden ist für Entwicklerinnen und Entwickler und für alle, die Atelier selbst betreiben. Er gibt die Karte des heutigen
 Systems und verweist auf die ausführlichen Dokumente. Die Einrichtungsbefehle stehen im [README](../README_de.md); die Gründe
-hinter jeder Regel im [Entscheidungslog](05-decisions-log_de.md) (zuletzt D-091, Stufe 8d).
+hinter jeder Regel im [Entscheidungslog](05-decisions-log_de.md) (zuletzt D-092, Datenbank aufgeräumt).
 
 ## Das System in einem Bild
 
@@ -31,7 +31,7 @@ flowchart TB
     R --> O["RunOrchestratorService"]
     O --> PA["IPipelineAssemblerSelector<br/>DirectPipelineAssembler (der einzige)"]
     PA --> G["OrderGroundingStep<br/>Dateien im Volltext, Recherche W1, Briefing"]
-    G --> X["Schreiber (Dokumentmodus,<br/>ohne Failover)"]
+    G --> X["Schreiber (Dokumentmodus,<br/>Failover nur auf<br/>dasselbe Modell)"]
     X --> C["DeterministicChecksReviewer<br/>SourceFactCheckReviewer"]
     C -->|"blockierend, einmal"| X
     C --> REP["RunReport (Runs.ReportJson)"]

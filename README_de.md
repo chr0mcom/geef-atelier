@@ -174,7 +174,7 @@ oder in `.mcp.json`:
 
 URL `https://<your-domain>/mcp` im Client eintragen — der Client erkennt den `WWW-Authenticate`-Header mit der Resource-Metadata-URL und startet den OAuth-Flow automatisch (Dynamic Client Registration → Browser-Login → Consent-Seite → Token-Exchange).
 
-Voraussetzung: Der OAuth-Client muss im Admin-Panel unter `/admin/oauth-clients` registriert sein, oder der Client registriert sich selbst per Dynamic Client Registration (`POST /oauth/register`).
+Voraussetzung: Der OAuth-Client muss im Menü unter **OAuth clients** (`/admin/oauth-clients`) eingetragen sein, oder der Client registriert sich selbst per Dynamic Client Registration (`POST /oauth/register`). Die Nutzung direkt aus dem Chatfenster von claude.ai und aus Claude Desktop ist nicht getestet; siehe den [Leitfaden für KI-Assistenten](docs/13-ai-assistant-guide_de.md).
 
 ### MCP-Werkzeuge
 
@@ -322,7 +322,7 @@ automatisches Upgrade**: Die App startet auf einer solchen Datenbank nicht und �
 | `https://<your-domain>/start`, `/work` | Neuer Auftrag und „My work“ |
 | `https://<your-domain>/crew/providers` | Anbieter (nur Admin) |
 | `https://<your-domain>/admin/users` | Benutzerverwaltung (nur Admin) |
-| `https://<your-domain>/admin/oauth-clients` | OAuth-Client-Verwaltung (nur Admin) |
+| `https://<your-domain>/admin/oauth-clients` | OAuth-Clients (eintragen kann jede angemeldete Person, löschen nur die Administration) |
 | `https://<your-domain>/.well-known/oauth-authorization-server` | OAuth Server Metadata |
 
 ---
@@ -333,7 +333,8 @@ Der `postgres-backup`-Container erstellt automatisch tägliche Backups.
 
 - **Zeitplan:** täglich 03:00 UTC
 - **Retention:** 7 Tages-, 4 Wochen-, 6 Monats-Snapshots
-- **Speicherort:** Docker-Volume `geef-atelier-backups`
+- **Speicherort:** Docker-Volume `geef-atelier_geef-atelier-backups` (Compose setzt den Projektnamen `geef-atelier` vor jeden
+  Volume-Namen aus `docker-compose.yml`; `docker volume ls` zeigt die vollen Namen)
 - **Format:** `.sql.gz` (gzip-komprimiertes pg_dump)
 
 ```bash
@@ -358,8 +359,8 @@ curl https://<your-domain>/health
 > **Hinweis:** `scripts/restore-backup.sh` **ersetzt** alle Daten der Datenbank. Es arbeitet in einer Transaktion: Lässt sich
 > der Dump nicht vollständig einspielen, ändert sich nichts, und die Web-App bleibt angehalten (`docker compose start web` holt
 > sie zurück). Vorher eine aktuelle Sicherung ziehen. Der Dump enthält weder die hochgeladenen Originaldateien (Volume
-> `geef-atelier-sources`) noch die Anmeldungen der KI-Werkzeuge (`geef-atelier-cli-auth`) oder die Schlüssel der
-> Anmelde-Cookies (`geef-atelier-dpkeys`); diese getrennt sichern.
+> `geef-atelier_geef-atelier-sources`) noch die Anmeldungen der KI-Werkzeuge (`geef-atelier_geef-atelier-cli-auth`) oder die Schlüssel der
+> Anmelde-Cookies (`geef-atelier_geef-atelier-dpkeys`); diese getrennt sichern.
 
 ---
 

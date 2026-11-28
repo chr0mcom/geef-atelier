@@ -243,6 +243,14 @@ def test_incomplete_account_file_names_missing_keys_only(sandbox):
     assert PASSWORD not in r.stdout + r.stderr
 
 
+def test_without_a_base_url_nothing_is_sent_anywhere(sandbox):
+    env_file = write_env(sandbox / "smoke.env")
+    proc = run(sandbox, env_file, https_proxy="http://127.0.0.1:9")
+    assert proc.returncode == 2
+    assert "ATELIER_SMOKE_BASE_URL" in proc.stdout
+    assert PASSWORD not in proc.stdout + proc.stderr
+
+
 @pytest.mark.parametrize(("extra", "expected"), [({"FAKE_HEALTH_FAIL": "1"}, "nicht erreichbar"), ({"FAKE_HEALTH_BODY": "Unhealthy"}, "Unhealthy")])
 def test_health_failure_exits_3(sandbox, extra, expected):
     r = run(sandbox, write_env(sandbox / "s.env"), **extra)

@@ -27,6 +27,8 @@
 - Say the change is made only when get_order_result shows the new version. Until then, and if it cannot be finished,
   get_order_result shows the earlier one and its note says so: tell the person.
 - Show the new version like every result, with what was checked, the open points and the assumptions.
+- When lengthNotice is set, the changed version became clearly longer than the one before: show the person that sentence with
+  the text.
 - If the change is refused, give the person the answer and do not change the text yourself.
 
 ## The text as a file

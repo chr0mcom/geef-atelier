@@ -92,7 +92,7 @@ services:
       - INSTRUCTION_ARG_LIMIT=100000
       - CLAUDE_HOME=/auth/claude
       # Zweites Claude-Abo als Ausweichstufe (claude -> claude-alt -> codex). Aktiv erst, wenn
-      # dort ein Login liegt (.claude/.credentials.json); Anmeldung siehe docs/cli-proxy-failover.md.
+      # dort ein Login liegt (.claude/.credentials.json); Anmeldung siehe cli-proxy/README.md, "Optional: a second Claude account".
       - CLAUDE_HOME_ALT=/auth/claude-alt
       - CODEX_HOME=/auth/codex
       - GEMINI_HOME=/auth/gemini

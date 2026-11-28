@@ -35,7 +35,7 @@ geändert werden.
 |---|---|---|---|---|
 | Fragen vor dem Start | `Orders:IntakeMode` (`Off`, `Shadow`, `On`) | `Shadow` | `On` (D-072) | – |
 | Fertigen Text ändern | `Orders:Revise` (`Off`, `On`) | `Off` | `On` (D-078) | `Orders:ReviseOverrides:<user>` |
-| Im Web nachschlagen (Standardweg) | `Research:Mode` (`Off`, `On`) | `Off` | `On` (Zusatz zu D-074) | `Research:ModeOverrides:<user>` |
+| Im Web nachschlagen | `Research:Mode` (`Off`, `On`) | `Off` | `On` (Zusatz zu D-074) | `Research:ModeOverrides:<user>` |
 | Faktenprüfung | `Direct:FactCheckMode` (`Off`, `Shadow`, `Report`, `On`) | `Report` | `Report` (D-073) | `Direct:FactCheckModeOverrides:<user>` |
 | Dateien aus einem KI-Assistenten (Upload-Ticket) | `Uploads:Tickets` (`Off`, `On`) | `Off` | `On` (D-076) | – |
 | Werkstatt-Menü nur für die Administration | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |

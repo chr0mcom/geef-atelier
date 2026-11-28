@@ -118,7 +118,7 @@ nächsten Aufträge. Ob der Schreiber es wirklich verwendet, etwa deinen Gruß w
 
 - Dein Auftrag, deine Antworten, deine About-me-Angaben und deine Dateien gehen an die KI-Dienste, die dieses Atelier zum
   Schreiben und Prüfen nutzt.
-- Atelier kann im Web nachschlagen, aber nur auf dem Standardweg und nur, wenn du keine Dateien anhängst. Dann bekommt ein
+- Atelier kann im Web nachschlagen, aber nur, wenn du keine Dateien anhängst. Dann bekommt ein
   Suchdienst einige kurze Suchwörter aus deinem Auftrag. Atelier versucht, Mailadressen, Telefonnummern, Kontonummern und Straßenanschriften wegzulassen, die es erkennt. Es erkennt
   nicht jede Schreibweise, und Namen oder andere persönliche Angaben aus deinem Auftrag können in den Suchwörtern landen. Deine
   Antworten und Dateien werden nie gesendet. Wörter aus deinen About-me-Angaben werden zurückgehalten, außer du hast sie auch in

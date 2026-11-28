@@ -35,7 +35,7 @@ Das Skript legt nichts an. Die Einrichtung macht ein Admin in der Oberfläche:
 
 1. **Benutzer anlegen:** `/admin/users` → neuer Benutzer `<smoke-user>`, **kein** Admin, langes Zufallspasswort (`openssl rand -base64 32`). Den Namen frei wählen und nicht öffentlich dokumentieren.
 2. **OAuth-Client registrieren:** `/admin/oauth-clients` → „Register“, Name `<client-name>`, Redirect-URI genau der Wert, den das Skript verwendet (Standard von `ATELIER_SMOKE_REDIRECT_URI` im Skript, eine Loopback-Adresse; wer eine andere einträgt, setzt `ATELIER_SMOKE_REDIRECT_URI` in der Datei unten gleich). Die angezeigte Client-ID notieren. Die Redirect-URI wird nie aufgerufen; das Skript liest nur den Code aus der Weiterleitung.
-3. **Datei anlegen** an dem Ort, den `$ATELIER_SMOKE_ENV` nennt (Standard im Skript: `.smoke.env` im Repository-Wurzelverzeichnis; gitignored über das Muster `*.env` und zusätzlich ausdrücklich):
+3. **Datei anlegen** an dem Ort, den `$ATELIER_SMOKE_ENV` nennt (Standard im Skript: `.smoke.env` im Wurzelverzeichnis des Repositorys, aus dem das Skript läuft; `.gitignore` kennt genau diesen Namen, eine anders benannte Zugangsdatei gehört außerhalb des Repositorys):
 
    ```bash
    install -m 600 /dev/null "$ATELIER_SMOKE_ENV"
@@ -48,8 +48,9 @@ Das Skript legt nichts an. Die Einrichtung macht ein Admin in der Oberfläche:
    ATELIER_SMOKE_USER=<smoke-user>
    ATELIER_SMOKE_PASSWORD=<Passwort aus Schritt 1>
    ATELIER_SMOKE_CLIENT_ID=<Client-ID aus Schritt 2>
+   # Adresse der eigenen Installation (Pflicht, ohne Vorgabe: dorthin gehen Benutzername und Passwort):
+   ATELIER_SMOKE_BASE_URL=https://<atelier-host>
    # optional:
-   # ATELIER_SMOKE_BASE_URL=https://<atelier-host>
    # ATELIER_SMOKE_REDIRECT_URI=<Redirect-URI aus Schritt 2, falls abweichend vom Standard>
    # ATELIER_SMOKE_TIMEOUT=1500
    # ATELIER_SMOKE_WAIT=25

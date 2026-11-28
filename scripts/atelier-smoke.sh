@@ -6,7 +6,7 @@
 #   2. Anmeldung mit dem Smoke-Konto: Login-Formular (Cookie), dann OAuth-Freigabe mit PKCE für den registrierten
 #      Smoke-Client (Consent-Seite lesen, ihr Formular mit dem Antiforgery-Feld absenden) und Tausch gegen ein
 #      Zugriffstoken. Zugangsdaten nur aus der Datei $ATELIER_SMOKE_ENV
-#      (Standard /srv/docker/websites/geef_atelier/.smoke.env, Modus 0600, gitignored). Werte werden nie ausgegeben.
+#      (Standard .smoke.env im Wurzelverzeichnis des Repositorys, Modus 0600, gitignored). Werte werden nie ausgegeben.
 #   3. Auftrag über den MCP-Endpunkt (/mcp, Werkzeug submit_order, Standardweg): ein Ein-Satz-Auftrag. Stellt Atelier
 #      Rückfragen (state needs_input), überspringt das Skript sie mit answer_order(skip=true).
 #   4. Warten mit get_order_status (waitSeconds), bis done gesetzt ist und ein outcome vorliegt (der Text ist erst mit
@@ -21,7 +21,7 @@
 #            Ein Traceback erscheint nie; auch ein unerwarteter interner Fehler endet mit einer Ergebniszeile und Exit 4.
 # Passwortschutz: Unverschlüsseltes http:// ist nur für die Hosts in ALLOWED_HTTP_HOSTS erlaubt (localhost, 127.0.0.1, ::1,
 #            geef-atelier-web); jeder andere http-Host bricht vor dem Login mit Exit 2 ab. Weiterleitungen folgt das Skript nie.
-# Variablen (Umgebung schlägt Datei): ATELIER_SMOKE_ENV, ATELIER_SMOKE_BASE_URL, ATELIER_SMOKE_TIMEOUT,
+# Variablen (Umgebung schlägt Datei): ATELIER_SMOKE_ENV, ATELIER_SMOKE_BASE_URL (Pflicht, ohne Vorgabe), ATELIER_SMOKE_TIMEOUT,
 #            ATELIER_SMOKE_WAIT (waitSeconds je Statusabfrage, Standard 25), ATELIER_SMOKE_POLL (Pause zwischen zwei
 #            Statusabfragen, Standard 2), ATELIER_SMOKE_REDIRECT_URI, ATELIER_SMOKE_SKIP_HEALTH=1 (nur Tests),
 #            ATELIER_SMOKE_VERBOSE=1 (Zwischenschritte auf stderr), WEB_CONTAINER.
@@ -29,7 +29,7 @@
 
 set -uo pipefail
 
-ATELIER_SMOKE_ENV=${ATELIER_SMOKE_ENV:-/srv/docker/websites/geef_atelier/.smoke.env}
+ATELIER_SMOKE_ENV=${ATELIER_SMOKE_ENV:-$(dirname -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")")/.smoke.env}
 WEB_CONTAINER=${WEB_CONTAINER:-geef-atelier-web}
 
 result() { echo "SMOKE $*"; }
@@ -105,11 +105,11 @@ def load_settings(path):
 
 
 cfg = load_settings(ENV_FILE)
-missing = [k for k in REQUIRED if not cfg.get(k)]
+missing = [k for k in (*REQUIRED, "ATELIER_SMOKE_BASE_URL") if not cfg.get(k)]
 if missing:
     result(f"NICHT EINGERICHTET: in {ENV_FILE} fehlen {', '.join(missing)} (siehe docs/ops/atelier-smoke.md).", 2)
 
-BASE = cfg.get("ATELIER_SMOKE_BASE_URL", "https://geef.stefan-bechtel.de").rstrip("/")
+BASE = cfg["ATELIER_SMOKE_BASE_URL"].rstrip("/")
 REDIRECT_URI = cfg.get("ATELIER_SMOKE_REDIRECT_URI", "http://127.0.0.1/atelier-smoke/callback")
 ALLOWED_HTTP_HOSTS = ("localhost", "127.0.0.1", "::1", "geef-atelier-web")
 

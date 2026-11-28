@@ -110,7 +110,7 @@ weist jeden Lauf ab, den keiner annimmt.
 
 1. **`OrderGroundingStep`** lädt den Auftrag und seine Dateien, setzt die Dateien in das Hintergrunddokument, liest die im
    Anliegen genannten Regeln, schreibt die `RunSourceUsages`, bereitet das Material der Faktenprüfung vor und legt den
-   Modus der Faktenprüfung des Laufs fest (`Runs.FactCheckMode`). Für die erste Version eines Auftrags im Modus `Direct` ohne Dateien fragt
+   Modus der Faktenprüfung des Laufs fest (`Runs.FactCheckMode`). Für die erste Version eines Auftrags ohne Dateien fragt
    er den `OrderResearchService` nach Stellen aus dem Web (Tavily; Schalter `Research:Mode`). Dieser Grounding-Schritt
    zusammen mit der Web-Recherche ist das einzige Grounding.
 2. **`DirectWriterExecutor`** schreibt den Text. Mit einem CLI-Provider schreibt er in ein Dokument (`draft.md`) und bittet
@@ -207,7 +207,7 @@ Probleme, die ein Lauf umgangen hat, statt anzuhalten (D-067). Werden mit dem La
 | Id | uuid (PK) | |
 | RunId | uuid (FK→Runs) | indiziert |
 | Iteration | int | nullable; Durchgang, in dem das Problem auftrat |
-| Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `run`, `intake` oder `fact-check` (`RunWarningSources`) |
+| Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `run` oder `intake` (`RunWarningSources`) |
 | Code | varchar(100) | stabiler maschinenlesbarer Code, z.B. `grounding.research_failed`, `grounding.source_warning`, `review.reviewer_failed`, `llm.failover`, `writer.partial_read`, `run.result_not_saved`, `run.restarted_while_finishing` (`RunWarningCodes`, `DirectWarningCodes`). |
 | Message | text | kurze, einfache englische Erklärung für die Person |
 | CreatedAt | timestamptz | |
@@ -435,15 +435,15 @@ Anonymer Browser → /runs → [Authorize] → RedirectToLogin
 ```
 Geef.Atelier.Core/Configuration/AtelierUserOptions.cs   → POCO für Username/PasswordHash
 Geef.Atelier.Application/Auth/IUserAuthenticator.cs     → Interface (Application, nicht Infrastructure)
-Geef.Atelier.Application/Auth/AtelierUserAuthenticator.cs → BCrypt.Verify + CryptographicOperations.FixedTimeEquals
+Geef.Atelier.Application/Auth/AtelierUserAuthenticator.cs → Benutzersuche + BCrypt.Verify
 Geef.Atelier.Application/Auth/ApplicationAuthExtensions.cs → AddAtelierAuth(IServiceCollection, IConfiguration)
 ```
 
 `AtelierUserAuthenticator` ist `internal sealed`. Env-Var-Fallback (`ATELIER_USER`/`ATELIER_PASSWORD_HASH`) wird in `ApplicationAuthExtensions` aufgelöst — docker-compose-User müssen nicht die ASP.NET-Core-Doppelunderstrich-Konvention kennen.
 
-**Timing-Schutz:** `FixedTimeEquals` für Username-Vergleich, `BCrypt.Verify` aufgerufen auch bei falschem Username (konstante Timing-Eigenschaft). Kein Username/Password-Hash wird in Logs geschrieben — nur `"Login attempt rejected"` (ohne PII).
+**Timing-Schutz:** `AtelierUserAuthenticator` sucht den Benutzer und prüft das Passwort mit `BCrypt.Verify`. Ein unbekanntes oder deaktiviertes Konto wird gegen einen Wegwerf-Hash mit demselben Arbeitsfaktor geprüft, sodass die Ablehnung etwa so lange dauert wie bei einem falschen Passwort. Geloggt wird nur der Grund einer Ablehnung (`Login attempt rejected: …`), nie ein Name oder Hash.
 
-**Lazy-Fail bei fehlender Konfiguration:** Service startet auch ohne Env-Vars, Login gibt `false` zurück. Health-Check bleibt anonym (`.AllowAnonymous()` auf `MapHealthChecks`). Init-Warning-Log beim ersten fehlkonfigurierten Login-Versuch.
+**Lazy-Fail bei fehlender Konfiguration:** Der Dienst startet auch ohne `ATELIER_USER`/`ATELIER_PASSWORD_HASH`; er legt dann keinen Administrator an, sodass die Anmeldung nur für bereits vorhandene Konten funktioniert. Der Health-Check bleibt anonym (`.AllowAnonymous()` auf `MapHealthChecks`).
 
 **`ForwardedHeaders` vor `UseAuthentication`:**
 
@@ -537,7 +537,7 @@ Wiederherstellung: `scripts/restore-backup.sh <datei.sql.gz>`. Hochgeladene Orig
 
 ### Reviewer-Kalibrierung
 
-[`06-reviewer-calibration.md`](06-reviewer-calibration_de.md) beschreibt die Schweregrade und Regeln für Reviewer-Rollen.
+[`06-reviewer-calibration.md`](06-reviewer-calibration_de.md) hält die frühere Schweregrad-Einteilung (als historisch gekennzeichnet) und die aktuellen Konvergenzwerte fest.
 
 ### Deployment-Ablauf
 

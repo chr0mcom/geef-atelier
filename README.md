@@ -172,7 +172,7 @@ or in `.mcp.json`:
 
 Enter the URL `https://<your-domain>/mcp` in the client — the client detects the `WWW-Authenticate` header carrying the resource-metadata URL and starts the OAuth flow automatically (dynamic client registration → browser login → consent page → token exchange).
 
-Prerequisite: the OAuth client must be registered in the admin panel at `/admin/oauth-clients`, or the client registers itself via dynamic client registration (`POST /oauth/register`).
+Prerequisite: the OAuth client must be registered under **OAuth clients** in the menu (`/admin/oauth-clients`), or the client registers itself via dynamic client registration (`POST /oauth/register`). Using Atelier from the claude.ai chat window itself and from Claude Desktop has not been tested; see the [guide for AI assistants](docs/13-ai-assistant-guide.md).
 
 ### MCP tools
 
@@ -316,7 +316,7 @@ the app refuses to start on such a database and changes nothing (see the [admin 
 | `https://<your-domain>/start`, `/work` | New request and "My work" |
 | `https://<your-domain>/crew/providers` | Providers (admin only) |
 | `https://<your-domain>/admin/users` | User management (admin only) |
-| `https://<your-domain>/admin/oauth-clients` | OAuth client management (admin only) |
+| `https://<your-domain>/admin/oauth-clients` | OAuth clients (every signed-in person can register one; only administrators can delete) |
 | `https://<your-domain>/.well-known/oauth-authorization-server` | OAuth server metadata |
 
 ---
@@ -327,7 +327,8 @@ The `postgres-backup` container creates daily backups automatically.
 
 - **Schedule:** daily at 03:00 UTC
 - **Retention:** 7 daily, 4 weekly, 6 monthly snapshots
-- **Location:** Docker volume `geef-atelier-backups`
+- **Location:** Docker volume `geef-atelier_geef-atelier-backups` (Compose puts the project name `geef-atelier` in front of every
+  volume name in `docker-compose.yml`; `docker volume ls` shows the full names)
 - **Format:** `.sql.gz` (gzip-compressed pg_dump)
 
 ```bash
@@ -351,8 +352,8 @@ curl https://<your-domain>/health
 
 > **Note:** `scripts/restore-backup.sh` **replaces** all existing data in the database. It works in one transaction: if the dump
 > cannot be applied completely, nothing changes and the web app stays stopped (`docker compose start web` brings it back). Take a
-> fresh backup before restoring. The dump does not hold the uploaded original files (volume `geef-atelier-sources`), the sign-ins
-> of the AI tools (`geef-atelier-cli-auth`) or the keys of the sign-in cookies (`geef-atelier-dpkeys`); back these up separately.
+> fresh backup before restoring. The dump does not hold the uploaded original files (volume `geef-atelier_geef-atelier-sources`), the sign-ins
+> of the AI tools (`geef-atelier_geef-atelier-cli-auth`) or the keys of the sign-in cookies (`geef-atelier_geef-atelier-dpkeys`); back these up separately.
 
 ---
 
