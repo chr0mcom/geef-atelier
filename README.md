@@ -6,6 +6,31 @@
 need, add files if you have them, and get the text together with what was checked, what is still open and what was assumed.
 It runs in the browser and from AI assistants such as Claude Code (over MCP). It is built on the open [Geef SDK](https://github.com/chr0mcom/geef).
 
+## Version 2: a major update
+
+> [!IMPORTANT]
+> **Version 2.0.0 (November 2026) is a major rebuild with breaking changes.** If you know Atelier from before, almost everything
+> about how you use it is different.
+>
+> **→ [What changed in version 2](docs/16-version-2.md)**: before and after, what is new, what is gone, and how to move over.
+>
+> **Looking for version 1, the version with configurable crews, for example from an article?**
+> **→ [Browse version 1](https://github.com/chr0mcom/geef-atelier/tree/v1.0.0)** (tag `v1.0.0`) · [Release v1.0.0](https://github.com/chr0mcom/geef-atelier/releases/tag/v1.0.0) ·
+> [how to try it locally](https://github.com/chr0mcom/geef-atelier/blob/v1.0.0/README.md)
+
+The most important changes:
+
+- **No more crews.** There is one way of writing: your request, at most three questions you can skip, one writer, checks and at
+  most one correction. Templates, profiles, packs, tools, the knowledge base, auto-crew and Template Studio are gone, and there
+  is no choice of a legal, academic or marketing team.
+- **New around your request:** files in full text (up to a size limit), research with quotes, an honest report of what was checked,
+  **Change something** with versions, and **About me**.
+- **New for AI assistants:** MCP tools built around orders. The old tool names are gone or only answer with their successor.
+- **No upgrade in place:** version 2 does not start on a database of version 1.
+  [How to move over](docs/16-version-2.md#moving-from-version-1-to-version-2).
+
+---
+
 ## How it works, in one picture
 
 ```mermaid
@@ -63,6 +88,7 @@ something", D-078).
 
 | Document | Content |
 |---|---|
+| [docs/16-version-2.md](docs/16-version-2.md) | **What changed in version 2**, and where to find version 1 |
 | [docs/README.md](docs/README.md) | Index of all documents |
 | [docs/05-decisions-log.md](docs/05-decisions-log.md) | Every design decision and measurement, most recently D-092 (database cleanup) |
 | [docs/02-architecture.md](docs/02-architecture.md) | Layers, data model, safeguards, switches |
@@ -428,9 +454,22 @@ The list below records how the project grew. It is kept for provenance; the curr
 
 **Model matrix ✅** Model chosen by role (`ModelSlot`) and crew domain from a researched `ModelMatrix`; Claude/OpenAI only via the subscription cli-proxy; assignment at snapshot build with live availability, executor exclusion, cross-family reviewers, reviewer ring and paid cap; composer picks `model_slot`; migration Step46 reclassified all existing custom profiles; cli-proxy codex catalog from `models_cache.json` (D-066, 2026-11-22). Model matrix and model catalog stay; composer and custom profiles were removed in stage 8d (D-091).
 
+> **⬆ Version 1 ends here.** Everything above describes how version 1 came to be, the version with configurable crews. Its last
+> state is kept as **[tag `v1.0.0`](https://github.com/chr0mcom/geef-atelier/tree/v1.0.0)** (original commit
+> [`ad732037`](https://github.com/chr0mcom/geef-atelier/tree/ad732037f49b044ecfc44ad92774d3ada55117c6), 23 November 2026).
+>
+> **⬇ Version 2 begins here.** The entries below are the rebuild; [what changed](docs/16-version-2.md).
+
 **Stage 1: orders and direct path ✅** The order is the unit the person sees (`/start`, `/work`, `/orders/{id}`); files are uploaded one by one with a receipt and kept as sources; the direct path writes with the files in full text (with a map above 150,000 characters, page choice above 600,000), checks the result without a model and corrects once; MCP tools `submit_order`, `get_order_status`, `get_order_result`; migration Step48 links existing runs to orders (D-069, D-070, 2026-11-24).
 
 **Stages 2–6 ✅, rebuild completed (D-077)** Questions before the run (D-071/D-072), honest writing with checks (D-073), research (D-074, switched on after measurement R3′), changing a result (D-075, switched on with D-078) and the full MCP order contract, files over an upload ticket (D-076). Stage 8a: the workshop entries are shown to administrators only (`Ui:WorkshopForAdminsOnly`). Not built, each waiting for a trigger: stage 1b (defused loop and first removal cut), stage 7 (memory), the removal of stage 8 and stage 9 (D-077; the removal followed as stages 8c and 8d, below).
+
+**Completing and switching on (D-078 to D-088, D-090) ✅** Changing a result switched on for everyone, without “Longer” (D-078);
+unwanted web searches stopped (D-079); the page “How it works” and guides per audience (D-080); skipping a question never commits
+the person (D-081); an automatic number correction was built and not shipped (D-082); “Tell Atelier once” (D-083); a new start page
+(D-084); safeguard switches for the old loop, later removed with it (D-085); MCP instructions below the cut-off and SDK 2.4.0
+(D-086); a more thorough way, measured and removed again (D-087); the MCP skill and questions as a form (D-088); the gateway can
+fail over to the same model only (D-090). Research was switched on for everyone after its measurement (addendum to D-074).
 
 **Cleanup, cut 1 (stage 8c, D-089) ✅** Removed code nobody used: Template Studio (its two MCP tools stay as stubs that name `submit_order`), the MCP client with `/mcp-servers` and the tool type `mcp-tool`, the grounding types `rest-api`, `academic-search` and `news-search`, the `ExternalSink` finishing step, the editor for HTTP providers, and the dead fields `MaxQueriesPerRun` and `AdvisorRetryAttempted`. No table, column or row was dropped; older snapshots stay readable and runs skip removed parts with a warning.
 

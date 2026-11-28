@@ -4,6 +4,8 @@
 
 This is the continuously maintained documentation for **Geef.Atelier**: it turns a short request into a finished text and says what was checked, what is still open and what was assumed. It is built on the [Geef SDK](https://github.com/chr0mcom/geef).
 
+> **Version 2 is a major update.** [What changed in version 2](16-version-2.md) · [version 1, with crews](https://github.com/chr0mcom/geef-atelier/tree/v1.0.0)
+
 **New here?** Start with the guide for your role:
 
 | Guide | For |
@@ -22,6 +24,7 @@ The documentation evolves alongside the brainstorming and is updated after every
 | File | Content | Type |
 |---|---|---|
 | [12-user-guide.md](12-user-guide.md) … [15-developer-guide.md](15-developer-guide.md) | Guides per audience (see above) | Living |
+| [16-version-2.md](16-version-2.md) | What changed in version 2 (major update), how to move over, where version 1 is | Living |
 | [01-vision-and-scope.md](01-vision-and-scope.md) | What the project is, what it is not, for whom, in what environment | Living |
 | [02-architecture.md](02-architecture.md) | Layers, components, data flow, DB schema; run safeguards, configuration switches, end-to-end harness (D-067) | Living |
 | [03-walking-skeleton-plan.md](03-walking-skeleton-plan.md) | The original 10-step build plan (historical; skeleton completed) | Historical |

@@ -7,6 +7,33 @@ einen Bericht. Du sagst, was du brauchst, hängst Dateien an, wenn du welche has
 geprüft wurde, was noch offen ist und was angenommen wurde. Es läuft im Browser und aus KI-Assistenten wie Claude Code (über MCP).
 Grundlage ist das offene [Geef SDK](https://github.com/chr0mcom/geef).
 
+## Version 2: ein großes Update
+
+> [!IMPORTANT]
+> **Version 2.0.0 (November 2026) ist ein großer Umbau, der nicht abwärtskompatibel ist (Major Update).** Wer Atelier von früher
+> kennt: Fast alles an der Bedienung ist anders.
+>
+> **→ [Was sich mit Version 2 geändert hat](docs/16-version-2_de.md)**: vorher und nachher, was neu ist, was weggefallen ist und
+> wie man umsteigt.
+>
+> **Du suchst Version 1, die Version mit den einstellbaren Crews, zum Beispiel aus einem Artikel?**
+> **→ [Version 1 ansehen](https://github.com/chr0mcom/geef-atelier/tree/v1.0.0)** (Tag `v1.0.0`) · [Release v1.0.0](https://github.com/chr0mcom/geef-atelier/releases/tag/v1.0.0) ·
+> [lokal ausprobieren](https://github.com/chr0mcom/geef-atelier/blob/v1.0.0/README_de.md)
+
+Die wichtigsten Änderungen:
+
+- **Keine Crews mehr.** Es gibt einen Weg zu schreiben: dein Auftrag, höchstens drei überspringbare Fragen, ein Schreiber,
+  Prüfungen und höchstens eine Korrektur. Vorlagen, Profile, Packs, Tools, Wissensbasis, Auto-Crew und Template Studio sind weg,
+  und eine Wahl zwischen juristischem, akademischem oder Marketing-Team gibt es nicht.
+- **Neu rund um deinen Auftrag:** Dateien im Volltext (bis zu einer Größengrenze), Recherche mit Belegen, ein ehrlicher Bericht,
+  was geprüft wurde, **Change something** mit Versionen und **About me**.
+- **Neu für KI-Assistenten:** MCP-Werkzeuge rund um Aufträge. Die alten Werkzeugnamen gibt es nicht mehr, oder sie nennen nur
+  noch ihren Nachfolger.
+- **Kein Upgrade am Ort:** Version 2 startet nicht auf einer Datenbank von Version 1.
+  [So steigst du um](docs/16-version-2_de.md#umstieg-von-version-1-auf-version-2).
+
+---
+
 ## So funktioniert es, in einem Bild
 
 ```mermaid
@@ -65,6 +92,7 @@ ihrer Seite da (D-074, nach bestandener Messung für alle eingeschaltet). Einen 
 
 | Dokument | Inhalt |
 |---|---|
+| [docs/16-version-2_de.md](docs/16-version-2_de.md) | **Was sich mit Version 2 geändert hat**, und wo Version 1 zu finden ist |
 | [docs/README_de.md](docs/README_de.md) | Übersicht aller Dokumente |
 | [docs/05-decisions-log_de.md](docs/05-decisions-log_de.md) | Jede Entwurfsentscheidung und Messung, zuletzt D-092 (Datenbank aufgeräumt) |
 | [docs/02-architecture_de.md](docs/02-architecture_de.md) | Schichten, Datenmodell, Schutzmechanismen, Schalter |
@@ -435,9 +463,23 @@ Die Liste hält fest, wie das Projekt gewachsen ist. Sie bleibt zur Nachvollzieh
 
 **Modellmatrix ✅** Modellwahl nach Rolle (`ModelSlot`) und Crew-Gebiet aus einer recherchierten `ModelMatrix`; Claude/OpenAI nur über den Abo-cli-proxy; Zuweisung beim Snapshot-Bau mit Live-Verfügbarkeit, Executor-Ausschluss, Reviewern aus anderer Familie, Reviewer-Ring und Bezahlt-Deckel; der Composer wählt `model_slot`; Migration Step46 hat alle bestehenden eigenen Profile neu klassifiziert; Codex-Katalog des cli-proxy aus `models_cache.json` (D-066, 2026-11-22). Modellmatrix und Modellkatalog bleiben; Composer und eigene Profile wurden in Stufe 8d entfernt (D-091).
 
+> **⬆ Hier endet Version 1.** Alles darüber beschreibt, wie Version 1 entstanden ist, die Version mit den einstellbaren Crews. Ihr
+> letzter Stand ist als **[Tag `v1.0.0`](https://github.com/chr0mcom/geef-atelier/tree/v1.0.0)** erhalten (ursprünglicher Commit
+> [`ad732037`](https://github.com/chr0mcom/geef-atelier/tree/ad732037f49b044ecfc44ad92774d3ada55117c6), 23. November 2026).
+>
+> **⬇ Hier beginnt Version 2.** Die folgenden Einträge sind der Umbau; [was sich geändert hat](docs/16-version-2_de.md).
+
 **Etappe 1: Aufträge und Direktweg ✅** Der Auftrag ist die Einheit, die die Person sieht (`/start`, `/work`, `/orders/{id}`); Dateien werden einzeln mit Quittung hochgeladen und als Quellen gehalten; der Direktweg schreibt mit den Dateien im Volltext (ab 150.000 Zeichen mit Karte, ab 600.000 mit Seitenauswahl), prüft das Ergebnis ohne Modell und korrigiert einmal; MCP-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`; Migration Step48 verknüpft bestehende Läufe mit Aufträgen (D-069, D-070, 2026-11-24).
 
 **Etappen 2–6 ✅, Umbau abgeschlossen (D-077)** Rückfragen vor dem Lauf (D-071/D-072), ehrliches Schreiben mit Prüfungen (D-073), Recherche (D-074, nach Messung R3′ eingeschaltet), Ändern eines Ergebnisses (D-075, mit D-078 eingeschaltet) und der vollständige MCP-Auftragsvertrag, Dateien über ein Upload-Ticket (D-076). Etappe 8a: Die Werkstatt-Einstiege sehen nur Admins (`Ui:WorkshopForAdminsOnly`). Nicht gebaut, jeweils mit Auslöser: Etappe 1b (entschärfte Schleife und erster Rückbau), Etappe 7 (Gedächtnis), der Rückbau aus Etappe 8 und Etappe 9 (D-077; der Rückbau folgte als Stufen 8c und 8d, unten).
+
+**Fertigstellen und Einschalten (D-078 bis D-088, D-090) ✅** Ändern eines Ergebnisses für alle eingeschaltet, ohne „Longer“
+(D-078); ungewollte Websuchen gestoppt (D-079); die Seite „How it works“ und Leitfäden je Zielgruppe (D-080); Überspringen einer
+Frage legt nie fest (D-081); eine automatische Zahlenkorrektur gebaut und nicht ausgeliefert (D-082); „Tell Atelier once“ (D-083);
+neue Startseite (D-084); Schutzschalter für die alte Schleife, später mit ihr entfernt (D-085); MCP-Hinweise unter der
+Kürzungsgrenze und SDK 2.4.0 (D-086); ein gründlicherer Weg, gemessen und wieder entfernt (D-087); MCP-Skill und Rückfragen als
+Formular (D-088); das Gateway kann auf dasselbe Modell beschränkt ausweichen (D-090). Die Recherche wurde nach ihrer Messung für
+alle eingeschaltet (Zusatz zu D-074).
 
 **Rückbau, Schnitt 1 (Stufe 8c, D-089) ✅** Entfernt, was niemand nutzte: Template Studio (seine zwei MCP-Werkzeuge bleiben als Stummel, die `submit_order` nennen), der MCP-Client mit `/mcp-servers` und dem Werkzeugtyp `mcp-tool`, die Grounding-Typen `rest-api`, `academic-search` und `news-search`, der Abschluss `ExternalSink`, der Editor für HTTP-Provider sowie die toten Felder `MaxQueriesPerRun` und `AdvisorRetryAttempted`. Keine Tabelle, Spalte oder Zeile wurde gelöscht; ältere Snapshots bleiben lesbar, Läufe überspringen entfernte Teile mit einer Warnung.
 

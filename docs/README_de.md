@@ -4,6 +4,8 @@
 
 Dies ist die laufend gepflegte Doku zum Projekt **Geef.Atelier**: Es macht aus einem kurzen Auftrag einen fertigen Text und sagt, was geprüft wurde, was noch offen ist und was angenommen wurde. Grundlage ist das [Geef SDK](https://github.com/chr0mcom/geef).
 
+> **Version 2 ist ein großes Update.** [Was sich mit Version 2 geändert hat](16-version-2_de.md) · [Version 1 mit Crews](https://github.com/chr0mcom/geef-atelier/tree/v1.0.0)
+
 **Neu hier?** Fang mit dem Leitfaden für deine Rolle an:
 
 | Leitfaden | Für |
@@ -22,6 +24,7 @@ Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsru
 | Datei | Inhalt | Typ |
 |---|---|---|
 | [12-user-guide.md](12-user-guide_de.md) … [15-developer-guide.md](15-developer-guide_de.md) | Leitfäden je Zielgruppe (siehe oben) | Living |
+| [16-version-2.md](16-version-2_de.md) | Was sich mit Version 2 geändert hat (Major Update), Umstieg, wo Version 1 liegt | Living |
 | [01-vision-and-scope.md](01-vision-and-scope_de.md) | Was ist das Projekt, was nicht, für wen, in welchem Umfeld | Living |
 | [02-architecture.md](02-architecture_de.md) | Schichten, Komponenten, Datenfluss, DB-Schema; Schutzmechanismen am Lauf, Konfigurationsschalter, Ende-zu-Ende-Gerüst (D-067) | Living |
 | [03-walking-skeleton-plan.md](03-walking-skeleton-plan_de.md) | Der ursprüngliche 10-Schritte-Bauplan (historisch; Skeleton abgeschlossen) | Historisch |
