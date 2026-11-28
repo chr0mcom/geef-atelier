@@ -38,9 +38,9 @@ The documentation evolves alongside the brainstorming and is updated after every
 > **Internal working directories (not in the public repository):**
 > `docs/prompts/` (step-specific build prompts) and `docs/reports/` (persistent
 > completion reports per build step) are deliberately excluded via `.gitignore` and
-> exist only in the local working copy. References to `reports/…` or `prompts/…`
-> in the historical documents serve provenance and are not resolvable on GitHub —
-> this is intentional.
+> exist only in the local working copy. The historical documents name some of these
+> files (`reports/…`, `prompts/…`) to show where a statement comes from. They are
+> plain text, not links, because they are not part of this repository.
 
 ## Development workflow
 

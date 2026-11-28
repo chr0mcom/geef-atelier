@@ -44,7 +44,7 @@ Variante β (eigenes Application-Projekt ohne Infrastructure-Dep, IRunRepository
 ### D-020: Schritt 7 abgeschlossen — Blazor-UI, SignalR, AC8 grün
 
 **Datum:** 11. Mai 2026
-**Bericht:** [reports/step-07-report.md](reports/step-07-report.md)
+**Bericht:** `reports/step-07-report.md`
 **Branch:** `main` — M1+Schritt-6+Schritt-7 alle in main (Push-Range `28daafb..ad90f65`).
 **Reviewer-Iterationen:** 2 (Iteration 1 mit 1 R2-CRITICAL, Iteration 2 grün).
 **Tests:** 55/55 grün. **12 Conventional-Commits.**
@@ -142,7 +142,7 @@ Seit Commit `28daafb` wird `appsettings.Development.json` nicht mehr getrackt. B
 ### D-021: Schritt 8 abgeschlossen — Cookie-Auth, Login/Logout, 71/71 Tests grün
 
 **Datum:** 11. Mai 2026
-**Bericht:** [reports/step-08-report.md](reports/step-08-report.md)
+**Bericht:** `reports/step-08-report.md`
 **Branch:** `main` direkt
 **Reviewer-Iterationen:** 4 (R1–R5 alle mit 0 Findings abgeschlossen)
 **Tests:** 71/71 grün. **13 Conventional-Commits.**
@@ -734,7 +734,7 @@ Auto-Run nach Materialization, Studio-Iterationen, Cost-Budget-Alerts, Bulk-Expo
 ### D-041: Self-hosted OAuth 2.1 AS für Claude Desktop / Claude.ai Custom Connectors
 
 **Datum:** 16. Mai 2026
-**Bericht:** [reports/feature-mcp-oauth-report.md](reports/feature-mcp-oauth-report.md)
+**Bericht:** `reports/feature-mcp-oauth-report.md`
 **Branch:** `feat/mcp-oauth` → PR gegen `main`
 **Reviewer-Iterationen:** 9 (Iteration 9: alle fünf R1–R5 mit 0 Findings)
 **Tests:** 803 grün (+ 1 bekannter E2E-Flake-Skip), 92 neue OAuth-Tests. **14 Conventional-Commits.**
@@ -770,7 +770,7 @@ Auto-Run nach Materialization, Studio-Iterationen, Cost-Budget-Alerts, Bulk-Expo
 
 ## D-042 — Run-Sichtbarkeits-Isolation (User Run Isolation)
 
-*Datum: 17. Mai 2026 | Bericht: [reports/feature-run-user-isolation-report.md](reports/feature-run-user-isolation-report.md)*
+*Datum: 17. Mai 2026 | Bericht: `reports/feature-run-user-isolation-report.md`*
 
 Run-Sichtbarkeit auf eigenen Account eingeschränkt. Admin-Override via explizite Toggles ("Alle Benutzer anzeigen", "System-weite Statistiken anzeigen"). Grundlage: OAuth (Step19) + Multi-User (Step20).
 
@@ -821,7 +821,7 @@ Das Template Studio (`/crew/studio`) hatte bisher nur minimale Edit-Felder im `S
 
 ## D-044 — Finalizer-Foundation: Fünfter Profil-Typ, vollständige System-Library
 
-*Datum: 19. Mai 2026 | Bericht: [reports/feature-finalizer-foundation-report.md](reports/feature-finalizer-foundation-report.md)*
+*Datum: 19. Mai 2026 | Bericht: `reports/feature-finalizer-foundation-report.md`*
 
 Ergänzt eine vollständige Finalizer-Phase als fünften Profil-Typ (FileExport, MetadataEnrich, ExternalSink, Transform) mit 17 System-Profilen, sortierbarer Pipeline-Kette in Templates, Run-Artifacts-Speicherung + Download-Endpoint, vollständiger CRUD-UI, Studio-Integration und MCP-Tools. Vervollständigt das „F" im GEEF-Akronym.
 
@@ -1230,7 +1230,7 @@ Atelier-Akteure arbeiteten bislang ausschließlich aus dem Modellwissen heraus: 
 
 **Kontext:** Akteure mit aufgabengebackenen System-Prompts lecken beim Wiederverwenden in einer anderen
 Crew ihre alte Aufgabe (stille Reviewer-Korruption). Vollständiges Konzept:
-[`prompts/konzept-spezialisierungs-packs.md`](prompts/konzept-spezialisierungs-packs.md),
+`prompts/konzept-spezialisierungs-packs.md`,
 Umsetzungsleitfaden: [`11-specialization-packs_de.md`](11-specialization-packs_de.md).
 
 **D-061/1 — Generische Rolle + `{specialization}`-Slot.** Akteure tragen nur einen generischen Rollen-Prompt mit `{specialization}`-Slot. `PromptComposer.Compose` (rein) ersetzt den Slot durch die geordneten, mit `\n\n` verbundenen Pack-Texte (Fallback: anhängen unter `## Specialization`); Präzedenz last-in-sequence-wins.

@@ -25,14 +25,14 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 ### M1 — Provider-Migration auf OpenAI-konforme APIs
 
 **Branch:** `feature/openai-compatible-providers`
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** Branch `feature/openai-compatible-providers` gepusht (4 Commits + 1 nachgereichter Bericht-Commit). 31/31 Tests grün (9 ohne Docker, 22 weitere via Postgres/Orchestrator-Testcontainer). Architect-Antworten zu allen sechs Schwerpunkten getroffen — markante Entscheidung: `LlmActor`-Enum existiert nur als Typen-Dokumentation, Lookup über String-Keys. Workflow-Abweichung: keine formalen R1–R5-Reviewer-Pässe (durch Subagent-Self-Reviews + Build/Test ersetzt) — R2-Nachholpass nach Merge empfohlen. Bericht: [reports/migration-01-report.md](reports/migration-01-report.md). Details siehe Decisions-Log D-018.
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** Branch `feature/openai-compatible-providers` gepusht (4 Commits + 1 nachgereichter Bericht-Commit). 31/31 Tests grün (9 ohne Docker, 22 weitere via Postgres/Orchestrator-Testcontainer). Architect-Antworten zu allen sechs Schwerpunkten getroffen — markante Entscheidung: `LlmActor`-Enum existiert nur als Typen-Dokumentation, Lookup über String-Keys. Workflow-Abweichung: keine formalen R1–R5-Reviewer-Pässe (durch Subagent-Self-Reviews + Build/Test ersetzt) — R2-Nachholpass nach Merge empfohlen. Bericht: `reports/migration-01-report.md`. Details siehe Decisions-Log D-018.
 **Merge-Status:** ✅ **Abgeschlossen** (Push-Range `28daafb..ad90f65`). main enthält jetzt Schritte 1–7 + M1 zusammen. Branch `feature/openai-compatible-providers` kann gelöscht werden.
 **Offen vor Schritt 7:** Real-OpenRouter-Integration-Test (`AtelierPipelineRunsAgainstOpenRouter`) einmal mit echtem Bearer-Key ausführen — verifiziert Modell-ID-Stabilität, Tool-Use-Verhalten, Latenz.
 **Auslöser:** D-017 — Anthropic-OAuth-Token wird von Messages-API nicht akzeptiert; Pay-as-you-go-Bearer-Key vermeidbar; Multi-Provider-Vorteil sofort nutzbar.
 **Scope:** Ersetzt anthropic-spezifischen LLM-Layer durch OpenAI-API-konformen Adapter (Default: OpenRouter). Pro-Akteur-Modell-Konfiguration. Tool-Use-Format wechselt auf OpenAI-`function`-Schema.
 **Nicht im Scope:** Pipeline-Struktur, EventSink, Persistierung, Orchestrator, Domain-Modell.
 **Empfohlener Merge-Zeitpunkt:** Vor Schritt 7 (UI), damit die UI direkt gegen die neuen Provider-Verträge gebaut wird.
-**Prompt:** [prompts/migration-01-openai-compatible-providers.md](prompts/migration-01-openai-compatible-providers.md)
+**Prompt:** `prompts/migration-01-openai-compatible-providers.md`
 
 ---
 
@@ -57,7 +57,7 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 - `docker compose up` startet App und DB; Health-Check antwortet 200 OK
 - Tests-Projekt enthält mindestens einen Smoke-Test (DbContext lädt, Migration läuft in Test-DB)
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer durch (1 CRITICAL + 4 MAJOR Findings, alle behoben). 9 Conventional-Commits. Bericht: [reports/step-01-report.md](reports/step-01-report.md). Details siehe Decisions-Log D-010.
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer durch (1 CRITICAL + 4 MAJOR Findings, alle behoben). 9 Conventional-Commits. Bericht: `reports/step-01-report.md`. Details siehe Decisions-Log D-010.
 
 ---
 
@@ -78,7 +78,7 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 - Alle Geef-Events werden in der Konsole geloggt
 - Final-Output enthält den erwarteten Marker
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer mit 0 aktionierbaren Findings durch. 7/7 Tests grün (5 Schritt-1-Tests + 2 neue Pipeline-Tests). 6 SDK-Realfakt-Korrekturen vs. Bau-Prompt (FindingSeverity-Enum, DefaultConvergencePolicy, UseMiddleware-Generic, Evaluation-Event-Namen, IterationHistory-Workaround, Namespace-Alias). Bericht: [reports/step-02-report.md](reports/step-02-report.md). Details siehe Decisions-Log D-012.
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer mit 0 aktionierbaren Findings durch. 7/7 Tests grün (5 Schritt-1-Tests + 2 neue Pipeline-Tests). 6 SDK-Realfakt-Korrekturen vs. Bau-Prompt (FindingSeverity-Enum, DefaultConvergencePolicy, UseMiddleware-Generic, Evaluation-Event-Namen, IterationHistory-Workaround, Namespace-Alias). Bericht: `reports/step-02-report.md`. Details siehe Decisions-Log D-012.
 
 ---
 
@@ -99,7 +99,7 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 - Token-Verbrauch wird erfasst und im Final-Output ausgewiesen
 - Strukturierter Reviewer-Output wird korrekt geparst
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 2 MAJOR-Findings vor Phase 4 behoben (defensive JSON-Deserialisierung). 11/11 Tests grün (4 neue Mock-Tests + 7 Regression). Anthropic-Tool-Use mit `submit_review`, `Microsoft.Extensions.Http.Resilience` via `AddStandardResilienceHandler`, `ConvergenceFailedException` bei `AbortOnCritical=true` verifiziert. 14 Conventional-Commits. Bericht: [reports/step-03-report.md](reports/step-03-report.md). Details siehe Decisions-Log D-013.
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 2 MAJOR-Findings vor Phase 4 behoben (defensive JSON-Deserialisierung). 11/11 Tests grün (4 neue Mock-Tests + 7 Regression). Anthropic-Tool-Use mit `submit_review`, `Microsoft.Extensions.Http.Resilience` via `AddStandardResilienceHandler`, `ConvergenceFailedException` bei `AbortOnCritical=true` verifiziert. 14 Conventional-Commits. Bericht: `reports/step-03-report.md`. Details siehe Decisions-Log D-013.
 
 **Offen:** Integration-Test `AtelierPipelineRealAnthropicTests` wurde nicht mit echtem API-Key ausgeführt — vor Schritt 5 nachholen.
 
@@ -120,7 +120,7 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 **Akzeptanzkriterien:**
 - Nach einem Pipeline-Run sind in der DB: ein Run, mehrere Iterations, Findings (für die Iterationen, in denen welche gefunden wurden), und ein vollständiger Event-Log
 - Kein doppeltes Event, keine verlorene Iteration
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 1 MAJOR-Finding (volatile-Annotation für `_lastExecutionContext`) behoben. 15/15 Tests grün (4 neue Persistence-Tests + 11 Regression). PostgresEventSink mit Variante-A-RunId-Propagation, IRunPersistenceService in Core, typisiertes Token-Tracking via `ContextKey<AnthropicTokenUsage>`, Critical-Abort-Findings aus `PipelineFailedEvent.History` (SDK via Dekompilierung verifiziert). 13 Conventional-Commits. Bericht: [reports/step-04-report.md](reports/step-04-report.md). Details siehe Decisions-Log D-015.
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 1 MAJOR-Finding (volatile-Annotation für `_lastExecutionContext`) behoben. 15/15 Tests grün (4 neue Persistence-Tests + 11 Regression). PostgresEventSink mit Variante-A-RunId-Propagation, IRunPersistenceService in Core, typisiertes Token-Tracking via `ContextKey<AnthropicTokenUsage>`, Critical-Abort-Findings aus `PipelineFailedEvent.History` (SDK via Dekompilierung verifiziert). 13 Conventional-Commits. Bericht: `reports/step-04-report.md`. Details siehe Decisions-Log D-015.
 
 **Offen (verschoben):** `AtelierPipelineRealAnthropicTests` mit echtem API-Bearer-Key — kein Key in Session-Umgebung verfügbar. Real-Lauf in Schritt 5 oder später, wenn Bearer-Key bereitgestellt wird.
 
@@ -128,7 +128,7 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 
 ### Schritt 5 — RunOrchestratorService
 
-✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 6 Findings (alle behoben). Bericht: [docs/reports/step-05-report.md](reports/step-05-report.md). D-016.
+✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 6 Findings (alle behoben). Bericht: `reports/step-05-report.md`. D-016.
 
 **Ziel:** Asynchrone Auftragsverarbeitung über einen `BackgroundService`. Aufträge werden mit Status `Pending` in die DB geschrieben; der Service nimmt sie auf, führt die Pipeline aus, schreibt das Ergebnis zurück.
 
@@ -148,7 +148,7 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 - ✅ StopAsync mid-flight → Status=Aborted
 - ✅ 19/19 Tests grün; AC8 Skip (OAuth-only)
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration; 4 MAJOR R2 (Drain-Race, Test-Precondition-Guards) + 2 MAJOR R4 (Doku-Updates) — alle behoben. 19/19 Tests grün (4 neue Orchestrator-Tests + 15 Regression), Concurrency-Test 5/5 deterministisch via `GatedFakeAnthropicClient`. Atomarer Pending→Running-Claim, `SemaphoreSlim` + `ConcurrentDictionary<Guid, Task>` + `WhenAll`-Drain, Crash-Recovery beim Service-Start, Cancellation via Option γ (nur StoppingToken). 11 Conventional-Commits. Bericht: [reports/step-05-report.md](reports/step-05-report.md). Details siehe Decisions-Log D-016.
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration; 4 MAJOR R2 (Drain-Race, Test-Precondition-Guards) + 2 MAJOR R4 (Doku-Updates) — alle behoben. 19/19 Tests grün (4 neue Orchestrator-Tests + 15 Regression), Concurrency-Test 5/5 deterministisch via `GatedFakeAnthropicClient`. Atomarer Pending→Running-Claim, `SemaphoreSlim` + `ConcurrentDictionary<Guid, Task>` + `WhenAll`-Drain, Crash-Recovery beim Service-Start, Cancellation via Option γ (nur StoppingToken). 11 Conventional-Commits. Bericht: `reports/step-05-report.md`. Details siehe Decisions-Log D-016.
 
 **Offen (verschoben):** AC8 (Real-Anthropic-Test mit Bearer-Key) — 3. Mal Skip wegen OAuth-only Token in Session. `CancelRunAsync` als Stub-Implementierung folgt in Schritt 6 zusammen mit DB-Flag-Migration.
 
@@ -175,14 +175,14 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 - ✅ `dotnet test`: 31/31 grün (5 neue Application-Tests + 26 Regression)
 - ✅ AC9: Skip — kein Live-API-Key in Session (Eskalations-Hinweis vor Schritt 9)
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 2 Reviewer-Iterationen, 2 R2-MAJOR-Findings (ServiceProvider-Disposal, Test-Race) behoben. 31/31 Tests grün (5 neue Application-Tests). Variante β (Application-Layer ohne Infrastructure-Dep, IRunRepository in Core), Cancellation-Watcher Pattern A (pro-Run-Task), DB-Flag `RunEntity.CancellationRequested` mit Migration `Step06Cancellation`. 6 Conventional-Commits. Bericht: [reports/step-06-report.md](reports/step-06-report.md). Details siehe Decisions-Log D-019.
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 2 Reviewer-Iterationen, 2 R2-MAJOR-Findings (ServiceProvider-Disposal, Test-Race) behoben. 31/31 Tests grün (5 neue Application-Tests). Variante β (Application-Layer ohne Infrastructure-Dep, IRunRepository in Core), Cancellation-Watcher Pattern A (pro-Run-Task), DB-Flag `RunEntity.CancellationRequested` mit Migration `Step06Cancellation`. 6 Conventional-Commits. Bericht: `reports/step-06-report.md`. Details siehe Decisions-Log D-019.
 Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 
 ---
 
 ### Schritt 7 — Blazor-UI
 
-**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 2 Reviewer-Iterationen, 1 R2-CRITICAL (fehlendes try/catch in `SignalRRunNotifier`) behoben — doppelter Fail-Safe-Pattern etabliert. 55/55 Tests grün (4 neue bUnit + 4 neue Playwright E2E + bestehende Persistence/Orchestrator/Application). Drei Pages (`/new`, `/runs`, `/runs/{id}`), 9 UI-Komponenten in `Components/UI/` mit scoped CSS, SignalR-Hub `RunHub` mit zwei Groups (`run-{id}` + `all-runs`), `IRunNotifier` in Core und `SignalRRunNotifier` in Web als Singleton. **AC8 endlich grün:** OpenRouter-Real-Pipeline mit 5–12s Latenz und 174–523 Tokens pro Run verifiziert. 12 Conventional-Commits in `main`. Bericht: [reports/step-07-report.md](reports/step-07-report.md). Details siehe Decisions-Log D-020.
+**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 2 Reviewer-Iterationen, 1 R2-CRITICAL (fehlendes try/catch in `SignalRRunNotifier`) behoben — doppelter Fail-Safe-Pattern etabliert. 55/55 Tests grün (4 neue bUnit + 4 neue Playwright E2E + bestehende Persistence/Orchestrator/Application). Drei Pages (`/new`, `/runs`, `/runs/{id}`), 9 UI-Komponenten in `Components/UI/` mit scoped CSS, SignalR-Hub `RunHub` mit zwei Groups (`run-{id}` + `all-runs`), `IRunNotifier` in Core und `SignalRRunNotifier` in Web als Singleton. **AC8 endlich grün:** OpenRouter-Real-Pipeline mit 5–12s Latenz und 174–523 Tokens pro Run verifiziert. 12 Conventional-Commits in `main`. Bericht: `reports/step-07-report.md`. Details siehe Decisions-Log D-020.
 
 **Workflow-Festlegung dieser Stufe:** Plan-Phase-Integration etabliert sich als Architect-Form (seit Schritt 5 verwendet); `geef_architecture.md` als Pflicht-Artefakt wird in der Praxis durch Plan-Dokumente äquivalent ersetzt — R4 prüft Architektur-Compliance gegen den Plan. Atelier-Auslegung der "keine HTML in Pages"-Regel: triviale Page-Steuerelemente (einfache `<button>`/`<div>` ohne State) dürfen in Pages bleiben, nur wiederverwendbare UI-**Logik** muss in `Components/UI/`.
 
@@ -209,7 +209,7 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 - ✅ `tools/HashPassword` CLI für BCrypt-Hash-Generierung
 - ✅ 71/71 Tests grün (55 bestehende + 16 neue)
 
-**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 4 Reviewer-Iterationen (R1–R5 alle 0 Findings). 71/71 Tests grün (55 Regression + 4 Application-Auth + 6 bUnit + 6 Playwright-E2E). Cookie-Auth: BCrypt wf=11, 30d SlidingExpiration, HttpOnly, SameSite=Strict, SecurePolicy Dev/Prod-Switch. Login als Static SSR (`@formname`-Pflicht). Logout via `POST /auth/logout` mit AntiforgeryToken. `TestAuthenticationHandler` in Tests für Bypass. Arch-Trade-off: RunHub ohne `[Authorize]` (Blazor Server server-side HubConnection kann Browser-Cookies nicht forwarden — SSR-Pre-render würde 401 erhalten). `ForwardedHeaders`-Middleware vor `UseAuthentication` (Traefik-TLS-Vorbereitung). 13 Conventional-Commits. Bericht: [reports/step-08-report.md](reports/step-08-report.md). Details siehe Decisions-Log D-021.
+**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 4 Reviewer-Iterationen (R1–R5 alle 0 Findings). 71/71 Tests grün (55 Regression + 4 Application-Auth + 6 bUnit + 6 Playwright-E2E). Cookie-Auth: BCrypt wf=11, 30d SlidingExpiration, HttpOnly, SameSite=Strict, SecurePolicy Dev/Prod-Switch. Login als Static SSR (`@formname`-Pflicht). Logout via `POST /auth/logout` mit AntiforgeryToken. `TestAuthenticationHandler` in Tests für Bypass. Arch-Trade-off: RunHub ohne `[Authorize]` (Blazor Server server-side HubConnection kann Browser-Cookies nicht forwarden — SSR-Pre-render würde 401 erhalten). `ForwardedHeaders`-Middleware vor `UseAuthentication` (Traefik-TLS-Vorbereitung). 13 Conventional-Commits. Bericht: `reports/step-08-report.md`. Details siehe Decisions-Log D-021.
 
 ---
 
@@ -241,7 +241,7 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 - Auftrag via MCP stellen, parallel in der Web-UI live mitverfolgen
 - Ergebnis via MCP abholen entspricht dem in der UI
 
-**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 1 Reviewer-Iteration, 0 Critical/Important Findings (1 R2-Minor zu Dummy-FixedTimeEquals behoben). 85/85 Tests grün (14 neue: 3 StaticTokenValidator + 4 BearerHandler + 5 MCP-Unit + 2 MCP-E2E). MCP-Library: `ModelContextProtocol.AspNetCore 1.3.0` (offiziell Microsoft+Anthropic). `Geef.Atelier.Mcp` als Class Library (kein zweiter Web-Host). Multi-Auth: Cookie default + Bearer via `McpPolicy`, kein Cross-Interferenz. Endpoint `/mcp` im Web-Host, `RunEntity.CreatedByUser` als Audit-Trail-Vorbereitung. 14 Conventional-Commits. Bericht: [reports/step-09-report.md](reports/step-09-report.md). Details siehe Decisions-Log D-022 (vom Executor selbst geschrieben).
+**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 1 Reviewer-Iteration, 0 Critical/Important Findings (1 R2-Minor zu Dummy-FixedTimeEquals behoben). 85/85 Tests grün (14 neue: 3 StaticTokenValidator + 4 BearerHandler + 5 MCP-Unit + 2 MCP-E2E). MCP-Library: `ModelContextProtocol.AspNetCore 1.3.0` (offiziell Microsoft+Anthropic). `Geef.Atelier.Mcp` als Class Library (kein zweiter Web-Host). Multi-Auth: Cookie default + Bearer via `McpPolicy`, kein Cross-Interferenz. Endpoint `/mcp` im Web-Host, `RunEntity.CreatedByUser` als Audit-Trail-Vorbereitung. 14 Conventional-Commits. Bericht: `reports/step-09-report.md`. Details siehe Decisions-Log D-022 (vom Executor selbst geschrieben).
 
 **Lackmustest bestanden:** Zwei parallel laufende Frontends (UI über Cookie, MCP über Bearer) nutzen denselben `IRunService` ohne jegliche Eingriffe in Pipeline-/Domain-/Orchestrator-Code. Die Onion-Architektur trägt.
 

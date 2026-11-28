@@ -44,7 +44,7 @@ Variant β (own Application project without an Infrastructure dep, IRunRepositor
 ### D-020: Step 7 completed — Blazor UI, SignalR, AC8 green
 
 **Date:** 11 May 2026
-**Report:** [reports/step-07-report.md](reports/step-07-report.md)
+**Report:** `reports/step-07-report.md`
 **Branch:** `main` — M1 + step 6 + step 7 all in main (push range `28daafb..ad90f65`).
 **Reviewer iterations:** 2 (iteration 1 with 1 R2-CRITICAL, iteration 2 green).
 **Tests:** 55/55 green. **12 conventional commits.**
@@ -142,7 +142,7 @@ Since commit `28daafb`, `appsettings.Development.json` is no longer tracked. Rat
 ### D-021: Step 8 completed — cookie auth, login/logout, 71/71 tests green
 
 **Date:** 11 May 2026
-**Report:** [reports/step-08-report.md](reports/step-08-report.md)
+**Report:** `reports/step-08-report.md`
 **Branch:** `main` directly
 **Reviewer iterations:** 4 (R1–R5 all completed with 0 findings)
 **Tests:** 71/71 green. **13 conventional commits.**
@@ -734,7 +734,7 @@ Auto-run after materialization, Studio iterations, cost-budget alerts, bulk expo
 ### D-041: self-hosted OAuth 2.1 AS for Claude Desktop / Claude.ai custom connectors
 
 **Date:** 16 May 2026
-**Report:** [reports/feature-mcp-oauth-report.md](reports/feature-mcp-oauth-report.md)
+**Report:** `reports/feature-mcp-oauth-report.md`
 **Branch:** `feat/mcp-oauth` → PR against `main`
 **Reviewer iterations:** 9 (iteration 9: all five R1–R5 with 0 findings)
 **Tests:** 803 green (+ 1 known E2E-flake skip), 92 new OAuth tests. **14 conventional commits.**
@@ -770,7 +770,7 @@ Auto-run after materialization, Studio iterations, cost-budget alerts, bulk expo
 
 ## D-042 — run-visibility isolation (user run isolation)
 
-*Date: 17 May 2026 | Report: [reports/feature-run-user-isolation-report.md](reports/feature-run-user-isolation-report.md)*
+*Date: 17 May 2026 | Report: `reports/feature-run-user-isolation-report.md`*
 
 Run visibility restricted to one's own account. Admin override via explicit toggles ("show all users", "show system-wide statistics"). Foundation: OAuth (Step19) + multi-user (Step20).
 
@@ -792,7 +792,7 @@ Run visibility restricted to one's own account. Admin override via explicit togg
 
 ## D-043 — Template Studio Complete Edit (vollständiger Edit-Flow)
 
-*Date: 18 May 2026 | Report: [reports/feature-studio-complete-edit-report.md](reports/feature-studio-complete-edit-report.md)*
+*Date: 18 May 2026 | Report: `reports/feature-studio-complete-edit-report.md`*
 
 Full field parity in the Studio Edit-Step so the Studio workflow requires no post-editing in the separate `/crew/profiles/…` editors. Provider/Model/MaxTokens, Advisor Mode/Trigger, Grounding settings, Executor-as-new-profile, UseExisting/CreateNew toggle, Field-Helps, and Reasoning display all added. Hybrid meta-LLM (proposes with Reasoning fields, defaults fill gaps).
 
@@ -821,7 +821,7 @@ Full field parity in the Studio Edit-Step so the Studio workflow requires no pos
 
 ## D-044 — Finalizer-Foundation: Fünfter Profil-Typ, vollständige System-Library
 
-*Date: 19 May 2026 | Report: [reports/feature-finalizer-foundation-report.md](reports/feature-finalizer-foundation-report.md)*
+*Date: 19 May 2026 | Report: `reports/feature-finalizer-foundation-report.md`*
 
 Adds a complete Finalizer phase as the fifth profile type (FileExport, MetadataEnrich, ExternalSink, Transform) with 17 system profiles, sortable pipeline chain in templates, Run Artifacts storage + download endpoint, full CRUD UI, Studio integration, and MCP tools. Completes the „F" in the GEEF acronym.
 
@@ -1308,7 +1308,7 @@ Atelier actors previously operated exclusively from model knowledge. A reviewer 
 ## D-061 — Specialization Packs: generic actors + reusable scoped specialization layers
 
 **Context:** Actors with task-baked system prompts leak their old task when reused in another crew
-(silent reviewer corruption). Full concept: [`prompts/konzept-spezialisierungs-packs.md`](prompts/konzept-spezialisierungs-packs.md),
+(silent reviewer corruption). Full concept: `prompts/konzept-spezialisierungs-packs.md`,
 implementation guide: [`11-specialization-packs.md`](11-specialization-packs.md).
 
 **D-061/1 — Generic role + `{specialization}` slot.** Actors carry only a generic role prompt with a `{specialization}` slot. `PromptComposer.Compose` (pure) replaces the slot with the ordered, `\n\n`-joined pack texts (fallback: append under `## Specialization`); precedence is last-in-sequence-wins.

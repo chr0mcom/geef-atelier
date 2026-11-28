@@ -38,9 +38,10 @@ Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsru
 > **Interne Arbeitsverzeichnisse (nicht im öffentlichen Repository):**
 > `docs/prompts/` (schritt-spezifische Bau-Prompts) und `docs/reports/` (persistente
 > Abschlussberichte je Bau-Schritt) sind bewusst über `.gitignore` ausgeschlossen und
-> existieren nur in der lokalen Arbeitskopie. Verweise auf `reports/…` bzw. `prompts/…`
-> in den historischen Dokumenten dienen der Provenienz und sind auf GitHub nicht
-> auflösbar — das ist beabsichtigt.
+> existieren nur in der lokalen Arbeitskopie. Die historischen Dokumente nennen einige
+> dieser Dateien (`reports/…`, `prompts/…`), damit erkennbar ist, woher eine Aussage
+> stammt. Sie stehen als reiner Text da, nicht als Link, weil sie nicht zu diesem
+> Repository gehören.
 
 ## Entwicklungs-Workflow
 
