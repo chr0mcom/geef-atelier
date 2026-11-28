@@ -18,7 +18,7 @@ Version 1 is the **version with configurable crews**, for example the one an art
 | see the release with its notes | [Release v1.0.0](https://github.com/chr0mcom/geef-atelier/releases/tag/v1.0.0) |
 | try it on your own computer | the notes at the top of its [README](https://github.com/chr0mcom/geef-atelier/blob/v1.0.0/README.md) |
 | see the original state, unchanged | [commit `ad732037`](https://github.com/chr0mcom/geef-atelier/tree/ad732037f49b044ecfc44ad92774d3ada55117c6) (23 November 2026) |
-| follow every change since then | [compare `ad732037` with `v2.0.0`](https://github.com/chr0mcom/geef-atelier/compare/ad732037f49b044ecfc44ad92774d3ada55117c6...v2.0.0) |
+| see what changed in the code | [compare `ad732037` with `v2.0.0`](https://github.com/chr0mcom/geef-atelier/compare/ad732037f49b044ecfc44ad92774d3ada55117c6...v2.0.0) (GitHub shortens large comparisons; all commits: [history of `v2.0.0`](https://github.com/chr0mcom/geef-atelier/commits/v2.0.0)) |
 
 **Where it is in the history:** every commit up to and including `ad732037` belongs to version 1. The rebuild starts with the
 commits after it, from 24 November 2026.
@@ -32,14 +32,14 @@ run it where others can reach it.**
 
 | | Version 1 | Version 2 |
 |---|---|---|
-| How you order a text | a form with one briefing field and a choice of crew | your request in your own words, with up to 10 files |
+| How you order a text | a form with one briefing field, up to 5 attachments (Markdown, text, PDF) and a choice of crew | your request in your own words, with up to 10 files |
 | Questions back | none | 0 to 3, can always be skipped |
 | Who writes and checks | a crew: one executor, several reviewers, optional advisors | one writer, fixed checks, one fact checker |
 | Repetition | a loop, by default up to 6 rounds, up to 12 in one template | at most one correction |
 | No agreement | the run ended as “Failed” although there was a text | the text is delivered with its open points |
 | Changing a result | resume a run, without a field for what to change | **Change something**, up to 10 versions |
 | What it knows about you | learnings it collected by itself | **About me**, filled in by you |
-| MCP tools | 19 | 10, plus 5 placeholders for old names (for one version) |
+| MCP tools | 19 (its README still says 15) | 10, plus 5 placeholders for old names (for one version) |
 | Database | 34 tables, 39 migrations | 22 tables, one baseline migration |
 | System templates | 5 in code and 1 in the database | 1, in code only |
 | Pages with their own address (page files) | 59 | 31 |
@@ -112,7 +112,7 @@ Version 2 also closes security gaps of version 1.
 | Finalizers and run artifacts | export as Word, PDF or Markdown |
 | HTML, text and JSON export, metadata, webhook and e-mail | removed |
 | AI transformations such as summary or glossary | **Change something** with your own wish |
-| The old review loop and “Extra careful” | the one way of writing ([D-087](05-decisions-log.md#d-087--new-extra-careful-direct-path-with-an-outline-behind-a-switch-measurement-prepared-2026-11-27)) |
+| The review loop (selectable as “Extra careful” for a while during the rebuild) | the one way of writing ([D-087](05-decisions-log.md#d-087--new-extra-careful-direct-path-with-an-outline-behind-a-switch-measurement-prepared-2026-11-27)) |
 | Workshop dashboard and the form `/new` | **My work** and `/start` |
 | Editor for HTTP providers | providers over the command line can still be set up |
 
@@ -144,13 +144,29 @@ exist as placeholders: every call fails with a message that names the successor.
 ([D-092](05-decisions-log.md#d-092--database-and-file-store-cleanup-one-baseline-migration-2026-11-27)). On a database of
 version 1 it stops at start-up and changes nothing. Plan it as a new installation:
 
-1. Back up the database of version 1, and keep the backup if you may want to go back.
-2. Give version 2 an **empty database**. The Compose file uses the same project and volume names as version 1, so the old
-   database volume would otherwise be picked up again. Remove it only after you have checked your backup: version 2 cannot read
-   it. The same applies to the local development setup if you ran version 1 from a commit other than the tag `v1.0.0`.
+1. While version 1 is still running, back up its database and copy the backup **out of Docker**. The built-in backups lie in
+   the volume `geef-atelier_geef-atelier-backups`, which belongs to the same Compose project:
+   ```bash
+   docker compose exec postgres-backup /backup.sh
+   docker compose exec postgres-backup ls -lh /backups/last/
+   docker cp geef-atelier-postgres-backup:/backups/last/<file>.sql.gz ./
+   gunzip -t <file>.sql.gz     # checks that the copy is complete
+   ```
+   Use a file with a date in its name, not the link that ends in `-latest.sql.gz`. Keep this copy if you may want to go back:
+   version 2 writes its own backups into that volume and removes older ones over time.
+2. Give version 2 an **empty database**. The Compose file uses the same project and volume names as version 1, so without this
+   step the old database volume is picked up again. After you have checked your copy, remove **only** the database volume:
+   ```bash
+   docker compose down     # never "down -v": that also deletes the backups, the sign-ins of the AI tools and the cookie keys
+   docker volume rm geef-atelier_geef_atelier_postgres_data
+   ```
+   Version 2 cannot read the old volume. The same applies to the local development setup (volume
+   `geef-atelier-dev_postgres_dev_data`) if you ran version 1 from a commit other than the tag `v1.0.0`.
 3. Follow the [setup in the README](../README.md#production-deployment). New in `.env` is `ATELIER_INTERNAL_API_TOKEN`. Research is
-   shipped switched on: set `TAVILY_API_KEY` or switch it off (`Research__Mode=Off`).
-4. Users, connected AI assistants and OAuth clients have to be set up again, and custom crews, profiles, knowledge documents and
+   shipped switched on: set `TAVILY_API_KEY` in `.env`, or switch research off with `Research__Mode=Off` under
+   `services.web.environment` in `docker-compose.override.yml` (a line in `.env` alone does not reach the web service).
+4. Users, connected AI assistants and OAuth clients have to be set up again, the operator details for imprint and privacy
+   (`/admin/site-settings`) and your own providers have to be entered again, and custom crews, profiles, knowledge documents and
    earlier runs do not come along.
 
 ## Every decision, in order

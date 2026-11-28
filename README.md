@@ -467,7 +467,7 @@ The list below records how the project grew. It is kept for provenance; the curr
 **Completing and switching on (D-078 to D-088, D-090) ✅** Changing a result switched on for everyone, without “Longer” (D-078);
 unwanted web searches stopped (D-079); the page “How it works” and guides per audience (D-080); skipping a question never commits
 the person (D-081); an automatic number correction was built and not shipped (D-082); “Tell Atelier once” (D-083); a new start page
-(D-084); safeguard switches for the old loop, later removed with it (D-085); MCP instructions below the cut-off and SDK 2.4.0
+(D-084); safeguard switches for the old loop, later removed with it (D-085); MCP instructions below the cut-off and MCP SDK 2.4.0
 (D-086); a more thorough way, measured and removed again (D-087); the MCP skill and questions as a form (D-088); the gateway can
 fail over to the same model only (D-090). Research was switched on for everyone after its measurement (addendum to D-074).
 

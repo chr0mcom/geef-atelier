@@ -54,7 +54,7 @@ Berichte dieses Ablaufs liegen in den oben genannten, nicht veröffentlichten Ar
 ## Status
 
 - **Phase:** produktiv. Atelier schreibt jeden Text auf einem Weg: dem Auftrag mit dem Direktweg (D-068 bis D-077). Die Variante „Extra careful“ wurde nach ihrer Messung entfernt (zweiter Zusatz zu D-087). Das ältere Crew-System und alles, was nur es nutzte (Werkstatt, Tools, Lernen, Wissensbasis, Abschlussschritte, Advisor, Packs), wurden in Stufe 8d entfernt (D-091).
-- **Letzte Aktualisierung:** 2026-11-27
+- **Letzte Aktualisierung:** 2026-11-28
 - **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-092: Die Datenbank wurde zu einer Baseline-Migration aufgeräumt, nachdem Stufe 8d, D-091, den Rest der älteren Arbeitsweise entfernt hatte). Die Dokumente kennzeichnen, was entfernt wurde.
 
 ## Konventionen

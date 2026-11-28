@@ -477,7 +477,7 @@ Die Liste hält fest, wie das Projekt gewachsen ist. Sie bleibt zur Nachvollzieh
 (D-078); ungewollte Websuchen gestoppt (D-079); die Seite „How it works“ und Leitfäden je Zielgruppe (D-080); Überspringen einer
 Frage legt nie fest (D-081); eine automatische Zahlenkorrektur gebaut und nicht ausgeliefert (D-082); „Tell Atelier once“ (D-083);
 neue Startseite (D-084); Schutzschalter für die alte Schleife, später mit ihr entfernt (D-085); MCP-Hinweise unter der
-Kürzungsgrenze und SDK 2.4.0 (D-086); ein gründlicherer Weg, gemessen und wieder entfernt (D-087); MCP-Skill und Rückfragen als
+Kürzungsgrenze und MCP-SDK 2.4.0 (D-086); ein gründlicherer Weg, gemessen und wieder entfernt (D-087); MCP-Skill und Rückfragen als
 Formular (D-088); das Gateway kann auf dasselbe Modell beschränkt ausweichen (D-090). Die Recherche wurde nach ihrer Messung für
 alle eingeschaltet (Zusatz zu D-074).
 
