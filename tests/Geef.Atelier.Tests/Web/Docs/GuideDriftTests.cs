@@ -28,6 +28,19 @@ public sealed class GuideDriftTests
         Assert.Equal(OfferedTools().Order(StringComparer.Ordinal), documented.Order(StringComparer.Ordinal));
     }
 
+    [Theory]
+    [InlineData("04-mcp-integration.md")]
+    [InlineData("04-mcp-integration_de.md")]
+    [InlineData("09-endpoint-reference.md")]
+    [InlineData("09-endpoint-reference_de.md")]
+    public void The_errors_of_the_removed_tools_are_quoted_word_for_word(string file)
+    {
+        var text = File.ReadAllText(Path.Combine(RepoRoot(), "docs", file));
+
+        foreach (var message in new[] { Geef.Atelier.Mcp.Tools.RetiredTools.SubmitMessage, Geef.Atelier.Mcp.Tools.RetiredTools.StatusMessage, Geef.Atelier.Mcp.Tools.RetiredTools.ResultMessage })
+            Assert.Contains(message, text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void The_tool_table_is_found_and_not_empty()
     {

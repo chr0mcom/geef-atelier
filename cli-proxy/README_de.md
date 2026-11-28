@@ -150,7 +150,7 @@ Bei eingeschalteter Suche entscheidet das Modell selbst, ob es aktuelle Informat
 - **claude** — Aufruf mit `--allowedTools "WebSearch,WebFetch"`. Nur die Web-Tools sind allowlisted; Bash/Edit/Write sind **nicht** aktiviert (kein voller Permission-Bypass).
 - **codex** — Aufruf mit dem globalen `--search`-Flag, platziert **vor** dem `exec`-Subcommand (codex lehnt es als `exec`-Argument ab). Es aktiviert das native Responses-`web_search`-Tool ohne Per-Call-Approval.
 
-Eine Anfrage, die auf http(s)-Bilder verweist, behält `WebFetch` (claude muss sie herunterladen), bekommt auf diesem Weg aber nie die Suche.
+Im Lean-Modus behält eine Anfrage, die auf http(s)-Bilder verweist, `WebFetch` (claude muss sie herunterladen), bekommt auf diesem Weg aber nie die Suche.
 
 **Kosten:** Die Websuche läuft über das Abo (Claude / Codex), nicht pro Suche abgerechnet — kein Tavily-artiges Per-Request-Billing auf dem CLI-Pfad.
 

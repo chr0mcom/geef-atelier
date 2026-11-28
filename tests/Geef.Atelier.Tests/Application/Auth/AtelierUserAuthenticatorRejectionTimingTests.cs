@@ -17,15 +17,18 @@ public sealed class AtelierUserAuthenticatorRejectionTimingTests
         var sut = new AtelierUserAuthenticator(repo, NullLogger<AtelierUserAuthenticator>.Instance);
         await sut.ValidateCredentialsAsync(username, "wrong-password");
         var hash = BCrypt.Net.BCrypt.HashPassword("reference");
-        var reference = Stopwatch.StartNew();
-        BCrypt.Net.BCrypt.Verify("wrong-password", hash);
-        reference.Stop();
+        var reference = Enumerable.Range(0, 3).Min(_ =>
+        {
+            var single = Stopwatch.StartNew();
+            BCrypt.Net.BCrypt.Verify("wrong-password", hash);
+            return single.Elapsed;
+        });
 
         var watch = Stopwatch.StartNew();
         var result = await sut.ValidateCredentialsAsync(username, "wrong-password");
         watch.Stop();
 
         Assert.Null(result);
-        Assert.True(watch.Elapsed > reference.Elapsed / 2, $"Rejected after {watch.Elapsed.TotalMilliseconds:F1} ms, a password check takes {reference.Elapsed.TotalMilliseconds:F1} ms.");
+        Assert.True(watch.Elapsed > reference / 2, $"Rejected after {watch.Elapsed.TotalMilliseconds:F1} ms, a password check takes {reference.TotalMilliseconds:F1} ms.");
     }
 }

@@ -272,8 +272,8 @@ Werkzeuglisten zwischenspeichern. Alle ihre Parameter sind optional und unbenutz
 | Stummel | Fehlermeldung |
 |---|---|
 | `submit_request`, `submit_auto_crew_request` | „This tool was removed. To get a text written, call submit_order with the person's request word for word.“ |
-| `get_run_status` | „This tool was removed. Call get_order_status with the orderId; list_orders shows the orders, also the earlier ones.“ |
-| `get_run_result`, `get_run_details` | „This tool was removed. Call get_order_result with the orderId; list_orders shows the orders, also the earlier ones.“ |
+| `get_run_status` | „This tool was removed. Call get_order_status with the orderId; list_orders shows the orders.“ |
+| `get_run_result`, `get_run_details` | „This tool was removed. Call get_order_result with the orderId; list_orders shows the orders.“ |
 
 ---
 
